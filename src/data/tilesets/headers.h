@@ -43,7 +43,7 @@ const struct Tileset gTileset_General =
 
 const struct Tileset gTileset_Petalburg =
 {
-    .isCompressed = TRUE,
+    .isCompressed = FALSE,
     .isSecondary = TRUE,
     .tiles = gTilesetTiles_Petalburg,
     .palettes = gTilesetPalettes_Petalburg,

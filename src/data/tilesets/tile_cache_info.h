@@ -79,7 +79,7 @@ extern const struct Tileset gTileset_Unused1;
 extern const struct Tileset gTileset_Unused2;
 
 static const u32 sTileCacheRawTiles_General[] = INCGFX_U32("data/tilesets/primary/general/tiles.png", ".4bpp");
-static const u32 sTileCacheRawTiles_Petalburg[] = INCGFX_U32("data/tilesets/secondary/petalburg/tiles.png", ".4bpp");
+extern const u32 gTilesetTiles_Petalburg[];
 static const u8 sMetatileTileExt_Petalburg[] = INCBIN_U8("data/tilesets/secondary/petalburg/metatile_tiles_ext.bin");
 
 const struct TilesetCapacityInfo gTilesetCapacityInfo[] =
@@ -462,7 +462,7 @@ const struct TilesetCapacityInfo gTilesetCapacityInfo[] =
     },
     {
         .tileset = &gTileset_Petalburg,
-        .rawTiles = sTileCacheRawTiles_Petalburg,
+        .rawTiles = gTilesetTiles_Petalburg,
         .tileExt = sMetatileTileExt_Petalburg,
         .numTiles = 2048,
         .numMetatiles = 1375,

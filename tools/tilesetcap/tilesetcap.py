@@ -259,6 +259,9 @@ TILE_CACHE_WARN_SLOTS = TILE_CACHE_POOL_SLOTS - 48
 TILES_PER_METATILE = 8
 EXT_TILE_HIGH_SHIFT = 5
 EXT_TILE_HIGH_MASK = 0x3
+# The smol header stores the image size in 14 bits of 4-byte units (include/decompress.h).
+MAX_SMOL_IMAGE_BYTES = ((1 << 14) - 1) * 4
+TILE_SIZE_4BPP = 32
 WINDOW = 18
 MAP_OFFSET = 7
 
@@ -444,6 +447,9 @@ def analyse(report, verbose=False):
                          % (ts.symbol, len(ts.ext), ts.numMetatiles * TILES_PER_METATILE))
         if ts.extended and not ts.isSecondary and ts.info['isCompressed']:
             report.error('%s: an extended primary tileset must be uncompressed (.isCompressed = FALSE, ".4bpp" tiles)' % ts.symbol)
+        if ts.info['isCompressed'] and ts.numTiles * TILE_SIZE_4BPP > MAX_SMOL_IMAGE_BYTES:
+            report.error('%s: %d tiles is too large to compress; make it uncompressed (.isCompressed = FALSE, ".4bpp" tiles)'
+                         % (ts.symbol, ts.numTiles))
 
     layouts = [l for l in load_layouts() if not is_frlg_layout(l)]
     layouts_by_id = {l['id']: l for l in layouts}
