@@ -1,4 +1,5 @@
 #include "global.h"
+#include "opal_map_palette.h"
 #include "berry.h"
 #include "bike.h"
 #include "field_camera.h"
@@ -31,7 +32,7 @@ static void RedrawMapSliceWest(struct FieldCameraOffset *, const struct MapLayou
 static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *, s32, s32);
 static void DrawWholeMapViewInternal(int, int, const struct MapLayout *);
 static void DrawMetatileAt(const struct MapLayout *, u16, int, int);
-static void DrawMetatile(s32, const u16 *, const u8 *, u16, bool32);
+static void DrawMetatile(s32, const u16 *, const u8 *, u16, bool32, const u8 *);
 static void CameraPanningCB_PanAhead(void);
 
 static struct FieldCameraOffset sFieldCameraOffset;
@@ -219,7 +220,7 @@ void DrawDoorMetatileAt(int x, int y, u16 *tiles)
 
     if (offset >= 0)
     {
-        DrawMetatile(METATILE_LAYER_TYPE_COVERED, tiles, NULL, offset, TRUE);
+        DrawMetatile(METATILE_LAYER_TYPE_COVERED, tiles, NULL, offset, TRUE, NULL);
         sFieldCameraOffset.copyBGToVRAM = TRUE;
     }
 }
@@ -242,7 +243,8 @@ static void DrawMetatileAt(const struct MapLayout *mapLayout, u16 offset, int x,
     }
     DrawMetatile(MapGridGetMetatileLayerTypeAt(x, y),
                  tileset->metatiles + metatileId * NUM_TILES_PER_METATILE,
-                 TileCache_GetMetatileExt(tileset, metatileId), offset, FALSE);
+                 TileCache_GetMetatileExt(tileset, metatileId), offset, FALSE,
+                 OpalMapPalettesGetReferences(tileset, metatileId));
 }
 
 static void SetCachedCell(u16 *tilemap, u32 cell, const u16 *tiles, const u8 *ext, s32 tileIndex, bool32 physical)
@@ -255,7 +257,7 @@ static void SetCachedCell(u16 *tilemap, u32 cell, const u16 *tiles, const u8 *ex
         TileCache_WriteCell(&tilemap[cell], tiles[tileIndex], ext != NULL ? ext[tileIndex] : 0);
 }
 
-static void DrawMetatileCached(s32 metatileLayerType, const u16 *tiles, const u8 *ext, u16 offset, bool32 isDoor)
+static void DrawMetatileCached(s32 metatileLayerType, const u16 *tiles, const u8 *ext, u16 offset, bool32 isDoor, const u8 *paletteRefs)
 {
     static const u8 offsets[] = {0, 1, 0x20, 0x21};
 
@@ -285,13 +287,14 @@ static void DrawMetatileCached(s32 metatileLayerType, const u16 *tiles, const u8
     ScheduleBgCopyTilemapToVram(1);
     ScheduleBgCopyTilemapToVram(2);
     ScheduleBgCopyTilemapToVram(3);
+    OpalMapPalettesSetMetatile(offset, metatileLayerType, tiles, paletteRefs);
 }
 
-static void DrawMetatile(s32 metatileLayerType, const u16 *tiles, const u8 *ext, u16 offset, bool32 isDoor)
+static void DrawMetatile(s32 metatileLayerType, const u16 *tiles, const u8 *ext, u16 offset, bool32 isDoor, const u8 *paletteRefs)
 {
     if (TileCache_IsActive())
     {
-        DrawMetatileCached(metatileLayerType, tiles, ext, offset, isDoor);
+        DrawMetatileCached(metatileLayerType, tiles, ext, offset, isDoor, paletteRefs);
         return;
     }
 
@@ -343,6 +346,7 @@ static void DrawMetatile(s32 metatileLayerType, const u16 *tiles, const u8 *ext,
     ScheduleBgCopyTilemapToVram(1);
     ScheduleBgCopyTilemapToVram(2);
     ScheduleBgCopyTilemapToVram(3);
+    OpalMapPalettesSetMetatile(offset, metatileLayerType, tiles, paletteRefs);
 }
 
 static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *cameraOffset, s32 x, s32 y)

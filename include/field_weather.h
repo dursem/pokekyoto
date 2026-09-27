@@ -154,6 +154,7 @@ void FadeScreenHardware(u32 mode, s32 delay);
 bool8 IsWeatherNotFadingIn(void);
 void UpdateSpritePaletteWithWeather(u8 spritePaletteIndex, bool8 allowFog);
 void ApplyWeatherColorMapToPals(u8 startPalIndex, u8 numPalettes);
+void ApplyWeatherToNewMapPalette(u32 bank);
 void LoadCustomWeatherSpritePalette(const u16 *palette);
 void ResetDroughtWeatherPaletteLoading(void);
 bool8 LoadDroughtWeatherPalettes(void);

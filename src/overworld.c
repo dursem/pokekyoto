@@ -1,4 +1,5 @@
 #include "global.h"
+#include "opal_map_palette.h"
 #include "overworld.h"
 #include "battle_pyramid.h"
 #include "battle_setup.h"
@@ -1632,6 +1633,7 @@ static void InitOverworldBgs_NoResetHeap(void)
 
 void CleanupOverworldWindowsAndTilemaps(void)
 {
+    OpalMapPalettesReset();
     ClearMirageTowerPulseBlendEffect();
     FreeAllOverworldWindowBuffers();
     TRY_FREE_AND_SET_NULL(gOverworldTilemapBuffer_Bg3);
@@ -1794,6 +1796,12 @@ bool32 CurrentMapHasShadows(void)
 // Update & mix day / night bg palettes (into unfaded)
 void UpdateAltBgPalettes(u16 palettes)
 {
+    if (OpalMapPalettesActive())
+    {
+        OpalMapPalettesUpdateAlternates(palettes);
+        return;
+    }
+
     const struct Tileset *primary = gMapHeader.mapLayout->primaryTileset;
     const struct Tileset *secondary = gMapHeader.mapLayout->secondaryTileset;
     u32 i = 1;
@@ -1832,7 +1840,7 @@ void UpdatePalettesWithTime(u32 palettes)
                 palettes &= ~(mask);
         }
 
-    palettes &= PALETTES_MAP | PALETTES_OBJECTS; // Don't blend UI pals
+    palettes &= OpalMapPalettesMask() | PALETTES_OBJECTS; // Don't blend UI pals
     if (!palettes)
         return;
     TimeMixPalettes(palettes, gPlttBufferUnfaded, gPlttBufferFaded, &gTimeBlend.startBlend, &gTimeBlend.endBlend, gTimeBlend.weight);

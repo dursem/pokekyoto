@@ -1,4 +1,5 @@
 #include "global.h"
+#include "opal_map_palette.h"
 #include "bg.h"
 #include "data.h"
 #include "decompress.h"
@@ -762,6 +763,7 @@ static void BuyMenuDecompressBgGraphics(void)
 {
     DecompressAndCopyTileDataToVram(1, gShopMenu_Gfx, 0x3A0, 0x3E3, 0);
     DecompressDataWithHeaderWram(gShopMenu_Tilemap, sShopData->tilemapBuffers[0]);
+    OpalMapPalettesReserve(1u << SHOP_MENU_PALETTE_ID);
     LoadPalette(gShopMenu_Pal, BG_PLTT_ID(SHOP_MENU_PALETTE_ID), PLTT_SIZE_4BPP);
 }
 
@@ -769,6 +771,8 @@ static void BuyMenuInitWindows(void)
 {
     InitWindows(sShopBuyMenuWindowTemplates);
     DeactivateAllTextPrinters();
+    // Bank 13 is UI-only and outside Kyoto M3, so this reservation masks to a no-op.
+    OpalMapPalettesReserve(1u << 13);
     LoadUserWindowBorderGfx(WIN_MONEY, 1, BG_PLTT_ID(13));
     LoadMessageBoxGfx(WIN_MONEY, 0xA, BG_PLTT_ID(14));
     PutWindowTilemap(WIN_MONEY);
@@ -814,6 +818,7 @@ static void BuyMenuDrawMapBg(void)
     const struct Tileset *tileset;
     const u16 *tiles;
     const u8 *ext;
+    const u8 *references;
     u16 resolvedTiles[NUM_TILES_PER_METATILE];
     u16 metatile;
     u16 numMetatilesInPrimary;
@@ -845,17 +850,15 @@ static void BuyMenuDrawMapBg(void)
                 metatile -= numMetatilesInPrimary;
             }
             tiles = tileset->metatiles + metatile * NUM_TILES_PER_METATILE;
-            if (TileCache_IsActive())
+            ext = TileCache_GetMetatileExt(tileset, metatile);
+            references = OpalMapPalettesGetReferences(tileset, metatile);
+            for (u32 k = 0; k < NUM_TILES_PER_METATILE; k++)
             {
-                ext = TileCache_GetMetatileExt(tileset, metatile);
-                for (u32 k = 0; k < NUM_TILES_PER_METATILE; k++)
-                    resolvedTiles[k] = TileCache_Resolve(tiles[k], ext != NULL ? ext[k] : 0);
-                BuyMenuDrawMapMetatile(i, j, resolvedTiles, metatileLayerType);
+                u16 tile = TileCache_Resolve(tiles[k], ext != NULL ? ext[k] : 0);
+                u32 logical = references != NULL ? references[k] : (tiles[k] >> 12);
+                resolvedTiles[k] = OpalMapPalettesResolve(tile, logical);
             }
-            else
-            {
-                BuyMenuDrawMapMetatile(i, j, tiles, metatileLayerType);
-            }
+            BuyMenuDrawMapMetatile(i, j, resolvedTiles, metatileLayerType);
         }
     }
 }

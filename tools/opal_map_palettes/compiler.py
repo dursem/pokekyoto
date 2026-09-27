@@ -52,7 +52,12 @@ def palette(path):
     return result
 
 
-def mask(values, limit=14):
+PHYSICAL_BANKS = 13
+LOGICAL_PALETTES = 18
+BASE_LOGICAL_PALETTES = 14
+
+
+def mask(values, limit=PHYSICAL_BANKS):
     require(isinstance(values, list) and all(type(v) is int and 0 <= v < limit for v in values),
             f"Expected palette IDs in [0, {limit - 1}], got {values}")
     return sum(1 << v for v in set(values))
@@ -61,11 +66,11 @@ def mask(values, limit=14):
 def validate_mask(required, reserved, pinned, location):
     require(not reserved & pinned, f"{location}: pinned palette conflicts with reserved bank")
     demand = (required | pinned).bit_count()
-    capacity = 14 - reserved.bit_count()
+    capacity = PHYSICAL_BANKS - reserved.bit_count()
     require(demand <= capacity,
             f"{location}: {demand} palettes exceed {capacity} available banks; "
-            f"logical={[i for i in range(18) if (required | pinned) & (1 << i)]}, "
-            f"reserved={[i for i in range(14) if reserved & (1 << i)]}")
+            f"logical={[i for i in range(LOGICAL_PALETTES) if (required | pinned) & (1 << i)]}, "
+            f"reserved={[i for i in range(PHYSICAL_BANKS) if reserved & (1 << i)]}")
     return demand
 
 
@@ -104,7 +109,7 @@ def metatile_masks(path, references=None):
     result = []
     for i, row in enumerate(references):
         require(isinstance(row, list) and len(row) == 8, f"{path}: row {i} needs eight palette IDs")
-        result.append(mask(row, 18))
+        result.append(mask(row, LOGICAL_PALETTES))
     return result, references
 
 
@@ -123,8 +128,10 @@ def make_grid(layout, layouts, maps_by_id, map_data, masks, root):
             continue
         neighbor = maps_by_id[connection["map"]]
         other = layouts[neighbor["layout"]]
-        require(all(layout[k] == other[k] for k in ("primary_tileset", "secondary_tileset")),
-                f"{map_data['id']}: extended seamless connection to {neighbor['id']} requires the same tileset pair")
+        if any(layout[k] != other[k] for k in ("primary_tileset", "secondary_tileset")):
+            # Kyoto M2 redraws the field when a connection changes the tileset pair, so cells from
+            # that neighbor are not part of this palette transaction/certification envelope.
+            continue
         source = words(root / other["blockdata_filepath"])
         ow, oh = other["width"], other["height"]
         offset = connection["offset"]
@@ -184,8 +191,8 @@ def certify(layout, map_data, layouts, maps_by_id, masks, root, reserved, pinned
 
 
 def effect_requirements(root, spec, layouts, maps):
-    reserved = mask(spec.get("reserved_banks", []))
-    pinned = mask(spec.get("pinned_palettes", [])) | 1
+    reserved = mask(spec.get("reserved_banks", []), PHYSICAL_BANKS)
+    pinned = mask(spec.get("pinned_palettes", []), PHYSICAL_BANKS) | 1
     effects = set(spec.get("effects", []))
     layout_ids = {v["id"] for v in layouts}
     preview_path = root / "src/map_preview_screen.c"
@@ -217,9 +224,11 @@ def effect_requirements(root, spec, layouts, maps):
         require(effect in ("shop", "elevator", "spotlight", "decoration", "preview", "league_lighting", "mirage_tower"),
                 f"Unknown palette effect {effect}")
         if effect == "shop":
-            reserved |= (1 << 13) | (1 << 12) | (1 << 11 if any(v.get("layout_version") == "frlg" for v in layouts) else 0)
+            # Kyoto Emerald has 13 physical map banks (0..12). BG banks 13..15 are UI-only.
+            reserved |= 1 << 12
         elif effect in ("elevator", "decoration", "preview"):
-            reserved |= 1 << 13
+            # These effects use BG bank 13, which is outside Kyoto M3's map allocator.
+            pass
         elif effect == "spotlight":
             reserved |= 1 << 12
         elif effect == "league_lighting":
@@ -255,23 +264,13 @@ def compile_project(root, manifest, game="emerald"):
                     and v.get("layout_version", "emerald") == ("frlg" if game == "firered" else "emerald")]
         if not selected:
             continue
-        selected_ids = {v["id"] for v in selected}
-        for origin in maps:
-            source_layout = layouts[origin["layout"]]
-            if source_layout.get("layout_version", "emerald") != ("frlg" if game == "firered" else "emerald"):
-                continue
-            for connection in origin.get("connections") or []:
-                if connection["direction"] not in ("up", "down", "left", "right"):
-                    continue
-                target = layouts[maps_by_id[connection["map"]]["layout"]]
-                if target["id"] in selected_ids:
-                    require(all(source_layout[k] == target[k] for k in ("primary_tileset", "secondary_tileset", "layout_version")),
-                            f"{origin['id']}: incoming extended connection requires the same tileset pair and format")
         reserved, pinned, effects = effect_requirements(root, spec, selected, maps)
         if "BattleDome" in body:
             pinned |= 1 << 8
         require(not reserved & pinned, f"{name}: reserved/pinned conflict")
-        resident = mask(spec.get("resident_palettes", []), 18)
+        resident = mask(spec.get("resident_palettes", []), LOGICAL_PALETTES)
+        # Emerald's NORMAL layer writes 0x3014 to BG3, whose palette nibble is 3.
+        resident |= 1 << 3
         # Door animation tables still name legacy logical palettes. Keep their union resident.
         door_path = root / "src/field_door.c"
         door_text = door_path.read_text() if door_path.exists() else ""
@@ -295,7 +294,7 @@ def compile_project(root, manifest, game="emerald"):
         for layout in selected:
             primary_count = fmt["primary_frlg"] if layout.get("layout_version") == "frlg" else fmt["primary"]
             primary, _ = metatile_masks(defs[layout["primary_tileset"]][0])
-            require(all(not value >> 14 for value in primary),
+            require(all(not value >> PHYSICAL_BANKS for value in primary),
                     f"{layout['id']}: primary metatiles may not reference UI/extra palettes")
             require(len(primary) <= primary_count and len(secondary) <= fmt["id_mask"] - primary_count,
                     f"{layout['id']}: too many metatiles")
@@ -328,7 +327,7 @@ def compile_project(root, manifest, game="emerald"):
                                         reserved, pinned, mutations, resident))
             code.append(f"extern const struct MapLayout {layout['name']};")
             profiles.append(f"    {{&{layout['name']}, {reserved}, {pinned}, {resident}, {len(primary)}}},")
-            report.append({"layout": layout["id"], "peak": peak, "capacity": 14 - reserved.bit_count()})
+            report.append({"layout": layout["id"], "peak": peak, "capacity": PHYSICAL_BANKS - reserved.bit_count()})
         rows = []
         nights = []
         weather = []
@@ -366,7 +365,17 @@ def enable(root, name):
     source, body = defs[name]
     require(re.search(r'\.isSecondary\s*=\s*TRUE', body), "Only secondary tilesets can be extended")
     _, references = metatile_masks(source)
-    require(all(p < 14 for row in references for p in row), "Resolve legacy UI palette references before enabling this tileset")
+    # Vanilla Emerald contains a few transparent-padding subtiles carrying palette nibble 14.
+    # Palette 14 is not a stock map palette in Kyoto (physical map banks are 0..12), so before the
+    # sidecar exists these cannot represent authored extra palettes. Normalize them to logical 0.
+    normalized = 0
+    for row in references:
+        for i, value in enumerate(row):
+            if value >= BASE_LOGICAL_PALETTES:
+                row[i] = 0
+                normalized += 1
+    if normalized:
+        print(f"{name}: normalized {normalized} legacy palette-nibble >=14 padding references to logical 0")
     sidecar = source.with_name("palette_refs.json")
     require(not sidecar.exists(), f"Refusing to overwrite {sidecar}")
     extras = [source.parent / "palettes" / f"extra_{i}.pal" for i in range(4)]

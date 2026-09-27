@@ -267,6 +267,19 @@ TILE_CACHE_INFO_DEPS := $(shell find data/tilesets -name 'metatiles.bin' -o -nam
 $(TILE_CACHE_INFO): $(TILESETCAP_TOOL) $(TILE_CACHE_INFO_DEPS)
 	python3 $(TILESETCAP_TOOL) gen --out $@
 
+# Kyoto/Opal M3: certify logical palette libraries and generate runtime profiles.
+OPAL_PALETTE_TOOL := tools/opal_map_palettes/compiler.py
+OPAL_PALETTE_MANIFEST := data/tilesets/opal_palettes.json
+OPAL_PALETTE_OUTPUT := $(DATA_SRC_SUBDIR)/tilesets/opal_palettes.generated.h
+AUTO_GEN_TARGETS += $(OPAL_PALETTE_OUTPUT)
+OPAL_PALETTE_DEPS := $(OPAL_PALETTE_MANIFEST) \
+                     $(shell find data/tilesets -type f \( -name 'palette_refs.json' -o -name 'extra_*.pal' -o -name 'metatiles.bin' \)) \
+                     data/layouts/layouts.json $(wildcard data/maps/*/map.json) $(wildcard data/maps/*/scripts.pory) \
+                     include/fieldmap.h include/global.fieldmap.h src/field_door.c
+
+$(OPAL_PALETTE_OUTPUT): $(OPAL_PALETTE_TOOL) $(OPAL_PALETTE_DEPS)
+	python3 $(OPAL_PALETTE_TOOL) --root . --game emerald --output $@
+
 PERL := perl
 SHA1 := $(shell { command -v sha1sum || command -v shasum; } 2>/dev/null) -c
 

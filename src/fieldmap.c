@@ -1,4 +1,5 @@
 #include "global.h"
+#include "opal_map_palette.h"
 #include "battle_pyramid.h"
 #include "bg.h"
 #include "fieldmap.h"
@@ -1059,6 +1060,10 @@ static void LoadPrimaryTilesetPalette(struct MapLayout const *mapLayout)
 
 void LoadSecondaryTilesetPalette(struct MapLayout const *mapLayout, bool8 skipFaded)
 {
+    OpalMapPalettesLoad(mapLayout);
+    if (OpalMapPalettesActive())
+        return;
+
     LoadTilesetPalette(mapLayout->secondaryTileset, GetNumPalsInPrimary(mapLayout) * 16, (NUM_PALS_TOTAL - GetNumPalsInPrimary(mapLayout)) * PLTT_SIZE_4BPP, skipFaded, GetNumPalsInPrimary(mapLayout));
 }
 
@@ -1079,6 +1084,8 @@ void CopyMapTilesetsToVram(struct MapLayout const *mapLayout)
 
 void LoadMapTilesetPalettes(struct MapLayout const *mapLayout)
 {
+    OpalMapPalettesReset();
+
     if (mapLayout)
     {
         LoadPrimaryTilesetPalette(mapLayout);

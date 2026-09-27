@@ -1,4 +1,5 @@
 #include "global.h"
+#include "opal_map_palette.h"
 #include "palette.h"
 #include "util.h"
 #include "decompress.h"
@@ -33,6 +34,67 @@ ALIGNED(4) EWRAM_DATA u16 gPlttBufferUnfaded[PLTT_BUFFER_SIZE] = {0};
 ALIGNED(4) EWRAM_DATA u16 gPlttBufferFaded[PLTT_BUFFER_SIZE] = {0};
 EWRAM_DATA struct PaletteFadeControl gPaletteFade = {0};
 static EWRAM_DATA u32 sPlttBufferTransferPending = 0;
+
+// M3 remembers the current software map fade so a logical palette that moves
+// into a new physical bank can be reconstructed without popping for a frame.
+static EWRAM_DATA u32 sMapFadeMask;
+static EWRAM_DATA u16 sMapFadeColor;
+static EWRAM_DATA u8 sMapFadeY;
+static EWRAM_DATA u8 sMapFadeMode;
+static EWRAM_DATA u8 sMapFastSteps;
+static EWRAM_DATA u8 sMapFastSubmode;
+
+static void RecordMapFade(u32 mask)
+{
+    sMapFadeMask = mask & PALETTES_MAP;
+    sMapFadeY = gPaletteFade.y;
+    sMapFadeColor = gPaletteFade.blendColor;
+    sMapFadeMode = gPaletteFade.mode;
+}
+
+void ReapplyMapPaletteFade(u32 bank)
+{
+    u16 *unfaded = &gPlttBufferUnfaded[BG_PLTT_ID(bank)];
+    u16 *faded = &gPlttBufferFaded[BG_PLTT_ID(bank)];
+
+    if (!(sMapFadeMask & (1u << bank)) || (sMapFadeMode != FAST_FADE && !sMapFadeY))
+        return;
+
+    if (sMapFadeMode == FAST_FADE)
+    {
+        bool32 isFadeOut = sMapFastSubmode == FAST_FADE_OUT_TO_WHITE
+                        || sMapFastSubmode == FAST_FADE_OUT_TO_BLACK;
+        for (u32 i = 0; i < 16; i++)
+        {
+            u32 color = 0;
+            for (u32 shift = 0; shift < 15; shift += 5)
+            {
+                s32 component = ((isFadeOut ? faded[i] : unfaded[i]) >> shift) & 31;
+                switch (sMapFastSubmode)
+                {
+                case FAST_FADE_IN_FROM_WHITE: component = max(component, 31 - sMapFastSteps); break;
+                case FAST_FADE_IN_FROM_BLACK: component = min(component, sMapFastSteps); break;
+                case FAST_FADE_OUT_TO_WHITE: component = min(31, component + sMapFastSteps); break;
+                case FAST_FADE_OUT_TO_BLACK: component = max(0, component - sMapFastSteps); break;
+                }
+                color |= component << shift;
+            }
+            faded[i] = color;
+        }
+        return;
+    }
+
+    if (sMapFadeMode == TIME_OF_DAY_FADE)
+    {
+        TimeMixPalettes(1, unfaded, faded, gPaletteFade.bld0, gPaletteFade.bld1, gPaletteFade.weight);
+        BlendPalettesFine(1, faded, faded, sMapFadeY, sMapFadeColor);
+    }
+    else if (sMapFadeMode == NORMAL_FADE)
+    {
+        BlendPalette(BG_PLTT_ID(bank), 16, sMapFadeY, sMapFadeColor);
+    }
+}
+
 
 static const u8 sRoundedDownGrayscaleMap[] = {
      0,  0,  0,  0,  0,
@@ -139,7 +201,8 @@ bool32 BeginNormalPaletteFade(u32 selectedPalettes, s8 delay, u8 startY, u8 targ
 
         temp = gPaletteFade.bufferTransferDisabled;
         gPaletteFade.bufferTransferDisabled = FALSE;
-        CpuCopy32(gPlttBufferFaded, (void *)PLTT, PLTT_SIZE);
+        if (!OpalMapPalettesActive())
+            CpuCopy32(gPlttBufferFaded, (void *)PLTT, PLTT_SIZE);
         sPlttBufferTransferPending = FALSE;
         if (gPaletteFade.mode == HARDWARE_FADE && gPaletteFade.active)
             UpdateBlendRegisters();
@@ -186,7 +249,8 @@ bool32 BeginTimeOfDayPaletteFade(u32 selectedPalettes, s8 delay, u8 startY, u8 t
 
     temp = gPaletteFade.bufferTransferDisabled;
     gPaletteFade.bufferTransferDisabled = 0;
-    CpuCopy32(gPlttBufferFaded, (void *)PLTT, PLTT_SIZE);
+    if (!OpalMapPalettesActive())
+        CpuCopy32(gPlttBufferFaded, (void *)PLTT, PLTT_SIZE);
     sPlttBufferTransferPending = 0;
     if (gPaletteFade.mode == HARDWARE_FADE && gPaletteFade.active)
         UpdateBlendRegisters();
@@ -196,6 +260,7 @@ bool32 BeginTimeOfDayPaletteFade(u32 selectedPalettes, s8 delay, u8 startY, u8 t
 
 void ResetPaletteFadeControl(void)
 {
+    sMapFadeMask = 0;
     gPaletteFade.multipurpose1 = 0;
     gPaletteFade.multipurpose2 = 0;
     gPaletteFade.delayCounter = 0;
@@ -241,8 +306,10 @@ static u8 UpdateTimeOfDayPaletteFade(void)
     }
     gPaletteFade.delayCounter = 0;
 
-    // First pply TOD blend to relevant subset of palettes
-    timePalettes = gPaletteFadeSelectedPalettes & PALETTES_MAP; // tile palettes, don't blend [13, 15]
+    RecordMapFade(gPaletteFadeSelectedPalettes);
+
+    // First apply TOD blend to the physical map-bank subset currently controlled by M3.
+    timePalettes = gPaletteFadeSelectedPalettes & OpalMapPalettesMask();
     // Sprite palettes, don't blend those with tags
     u32 i;
     u32 j = 1 << 16;
@@ -324,6 +391,7 @@ static u32 UpdateNormalPaletteFade_Alternate(void)
     if (!gPaletteFade.objPaletteToggle)
     {
         selectedPalettes = gPaletteFadeSelectedPalettes;
+        RecordMapFade(selectedPalettes);
     }
     else
     {
@@ -399,6 +467,7 @@ static u32 UpdateNormalPaletteFade_Simultaneous(void)
     paletteOffset = 0;
 
     selectedPalettes = gPaletteFadeSelectedPalettes;
+    RecordMapFade(selectedPalettes);
     while (selectedPalettes)
     {
         if (selectedPalettes & 1)
@@ -524,6 +593,8 @@ void BeginFastPaletteFade(u32 submode)
 
 static void BeginFastPaletteFadeInternal(u32 submode)
 {
+    sMapFastSteps = 0;
+    sMapFastSubmode = submode;
     gPaletteFade.y = 31;
     gPaletteFadeSubmode = submode & 0x3F;
     gPaletteFade.active = TRUE;
@@ -566,6 +637,8 @@ static u32 UpdateFastPaletteFade(void)
     {
         paletteOffsetStart = 0;
         paletteOffsetEnd = OBJ_PLTT_OFFSET;
+        sMapFastSteps = min(32, sMapFastSteps + 2);
+        RecordMapFade(PALETTES_MAP);
     }
 
     switch (gPaletteFadeSubmode)
@@ -698,6 +771,7 @@ static u32 UpdateFastPaletteFade(void)
 
 void BeginHardwarePaletteFade(u32 blendCnt, u32 delay, u32 y, u32 targetY, u32 shouldResetBlendRegisters)
 {
+    sMapFadeMask = 0;
     gPaletteFadeBlendCnt = blendCnt;
     gPaletteFade.delayCounter = delay;
     gPaletteFadeDelay = delay;
