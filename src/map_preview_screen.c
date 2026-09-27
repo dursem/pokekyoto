@@ -1,4 +1,5 @@
 #include "global.h"
+#include "opal_map_palette.h"
 #include "event_data.h"
 #include "field_screen_effect.h"
 #include "field_weather.h"
@@ -392,6 +393,13 @@ void MapPreview_LoadGfx(mapsec_u8_t mapsec)
     idx = GetMapPreviewScreenIdx(mapsec);
     if (idx != MPS_COUNT)
     {
+        if (sMapPreviewScreenData[idx].usesAllPalettes)
+        {
+            bool32 invalid = OpalMapPalettesActive() && sMapPreviewScreenData[idx].type == MPS_TYPE_FADE_IN;
+            OpalMapPalettesReset();
+            fatal_assertf(!invalid, "An all-palette preview cannot crossfade over an extended map");
+        }
+
         ResetTempTileDataBuffers();
         if (sMapPreviewScreenData[idx].usesAllPalettes)
             LoadPalette(sMapPreviewScreenData[idx].palptr, BG_PLTT_ID(0), 16 * PLTT_SIZE_4BPP);

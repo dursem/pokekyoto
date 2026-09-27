@@ -1,4 +1,5 @@
 #include "global.h"
+#include "opal_map_palette.h"
 #include "debug.h"
 #include "malloc.h"
 #include "battle.h"
@@ -5487,12 +5488,14 @@ void DoPokemonLeagueLightingEffect(void)
         {
             data[0] = sChampionRoomLightingTimers[0];
             data[2] = 8;
+            OpalMapPalettesPin(7);
             LoadPalette(sChampionRoomLightingPalettes[0], BG_PLTT_ID(7), PLTT_SIZE_4BPP);
         }
         else
         {
             data[0] = sEliteFourLightingTimers[0];
             data[2] = 11;
+            OpalMapPalettesPin(7);
             LoadPalette(sEliteFourLightingPalettes[0], BG_PLTT_ID(7), PLTT_SIZE_4BPP);
         }
         data[1] = 0;
@@ -5515,11 +5518,13 @@ static void Task_RunPokemonLeagueLightingEffect(u8 taskId)
         if (gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(MAP_POKEMON_LEAGUE_CHAMPIONS_ROOM) && gSaveBlock1Ptr->location.mapNum == MAP_NUM(MAP_POKEMON_LEAGUE_CHAMPIONS_ROOM))
         {
             data[0] = sChampionRoomLightingTimers[data[1]];
+            OpalMapPalettesPin(7);
             LoadPalette(sChampionRoomLightingPalettes[data[1]], BG_PLTT_ID(7), PLTT_SIZE_4BPP);
         }
         else
         {
             data[0] = sEliteFourLightingTimers[data[1]];
+            OpalMapPalettesPin(7);
             LoadPalette(sEliteFourLightingPalettes[data[1]], BG_PLTT_ID(7), PLTT_SIZE_4BPP);
         }
         // ApplyGlobalTintToPaletteSlot(7, 1);
@@ -5530,15 +5535,18 @@ static void Task_CancelPokemonLeagueLightingEffect(u8 taskId)
 {
     if (FlagGet(FLAG_TEMP_4) != FALSE)
     {
+        // M3 must keep physical bank 7 pinned while the League lighting task owns it.
+        OpalMapPalettesPin(7);
+
         if (gSaveBlock1Ptr->location.mapGroup == MAP_GROUP(MAP_POKEMON_LEAGUE_CHAMPIONS_ROOM) && gSaveBlock1Ptr->location.mapNum == MAP_NUM(MAP_POKEMON_LEAGUE_CHAMPIONS_ROOM))
             LoadPalette(sChampionRoomLightingPalettes[8], BG_PLTT_ID(7), PLTT_SIZE_4BPP);
         else
             LoadPalette(sEliteFourLightingPalettes[11], BG_PLTT_ID(7), PLTT_SIZE_4BPP);
+
         // ApplyGlobalTintToPaletteSlot(7, 1);
         if (gPaletteFade.active)
-        {
             BlendPalettes(0x00000080, 16, RGB_BLACK);
-        }
+
         DestroyTask(taskId);
     }
 }

@@ -1,4 +1,5 @@
 #include "global.h"
+#include "opal_map_palette.h"
 #include "event_data.h"
 #include "field_door.h"
 #include "field_camera.h"
@@ -1036,10 +1037,26 @@ static const struct DoorGraphics sDoorAnimGraphicsTable[] =
 
 static void CopyDoorTilesToVram(const struct DoorGraphics *gfx, const struct DoorAnimFrame *frame)
 {
+    u32 numTiles;
+    u32 firstTile;
+
     if (gfx->size == DOOR_SIZE_2x2_LEFT || gfx->size == DOOR_SIZE_2x2_RIGHT)
-        CpuFastCopy(gfx->tiles + frame->offset, (void *)(VRAM + TILE_OFFSET_4BPP(DOOR_TILE_START_SIZE2)), 16 * TILE_SIZE_4BPP);
+    {
+        numTiles = 16;
+        firstTile = DOOR_TILE_START_SIZE2;
+    }
     else
-        CpuFastCopy(gfx->tiles + frame->offset, (void *)(VRAM + TILE_OFFSET_4BPP(DOOR_TILE_START_SIZE1)), 8 * TILE_SIZE_4BPP);
+    {
+        numTiles = 8;
+        firstTile = DOOR_TILE_START_SIZE1;
+    }
+
+    for (u32 i = 0; i < numTiles; i++)
+    {
+        const void *source = gfx->tiles + frame->offset + i * TILE_SIZE_4BPP;
+        if (!OpalMapPalettesQueueTile(source, firstTile + i))
+            CpuFastCopy(source, (void *)(VRAM + TILE_OFFSET_4BPP(firstTile + i)), TILE_SIZE_4BPP);
+    }
 }
 
 static void BuildDoorTiles(u16 *tiles, u16 tileNum, const u8 *paletteNums)

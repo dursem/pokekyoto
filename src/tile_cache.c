@@ -1,4 +1,5 @@
 #include "global.h"
+#include "opal_map_palette.h"
 #include "tile_cache.h"
 #include "bg.h"
 #include "dma3.h"
@@ -24,6 +25,7 @@ struct PendingReleases
 {
     u32 slots[SLOT_BITMAP_WORDS];
     u32 dmaTicket;
+    u32 tilemapTicket;
 };
 
 struct TileCache
@@ -238,6 +240,7 @@ static void SealReleasesThisFrame(void)
     for (u32 i = 0; i < SLOT_BITMAP_WORDS; i++)
         target->slots[i] |= sTileCache.releasedThisFrame[i];
     target->dmaTicket = GetDma3RequestsQueued();
+    target->tilemapTicket = OpalMapPalettesTilemapsPrepared();
     CpuFill32(0, sTileCache.releasedThisFrame, sizeof(sTileCache.releasedThisFrame));
     sTileCache.hasReleasesThisFrame = FALSE;
 }
@@ -245,10 +248,12 @@ static void SealReleasesThisFrame(void)
 static void CommitReleases(void)
 {
     u32 dmaDone = GetDma3RequestsDone();
+    u32 tilemapsDone = OpalMapPalettesTilemapsCommitted();
     u32 committed = 0;
 
     while (committed < sTileCache.numPending
-        && (s32)(dmaDone - sTileCache.pending[committed].dmaTicket) >= 0)
+        && (s32)(dmaDone - sTileCache.pending[committed].dmaTicket) >= 0
+        && (s32)(tilemapsDone - sTileCache.pending[committed].tilemapTicket) >= 0)
         committed++;
 
     if (committed == 0)

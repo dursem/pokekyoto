@@ -1,5 +1,6 @@
 #include <limits.h>
 #include "global.h"
+#include "opal_map_palette.h"
 #include "bg.h"
 #include "dma3.h"
 #include "gpu_regs.h"
@@ -862,6 +863,9 @@ void DecompressAndCopyToBgTilemapBuffer(u32 bg, const u32 *src, u32 mode, u32 de
 
 void CopyBgTilemapBufferToVram(u32 bg)
 {
+    if (OpalMapPalettesQueueBg(bg))
+        return;
+
     u16 sizeToLoad;
 
     if (!IsInvalidBg(bg) && !IsTileMapOutsideWram(bg))

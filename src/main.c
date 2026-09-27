@@ -1,4 +1,5 @@
 #include "global.h"
+#include "opal_map_palette.h"
 #include "crt0.h"
 #include "malloc.h"
 #include "link.h"
@@ -192,11 +193,15 @@ static void InitMainCallbacks(void)
 
 static void CallCallbacks(void)
 {
+    OpalMapPalettesBeginFrame();
+
     if (gMain.callback1)
         gMain.callback1();
 
     if (gMain.callback2)
         gMain.callback2();
+
+    OpalMapPalettesEndFrame();
 }
 
 void SetMainCallback2(MainCallback callback)
@@ -361,13 +366,21 @@ static void VBlankIntr(void)
     if (gTrainerHillVBlankCounter && *gTrainerHillVBlankCounter < 0xFFFFFFFF)
         (*gTrainerHillVBlankCounter)++;
 
-    if (gMain.vblankCallback)
-        gMain.vblankCallback();
+    bool32 blockVideo = OpalMapPalettesBlockTransfer();
+    if (!blockVideo)
+    {
+        OpalMapPalettesCommit();
+        if (gMain.vblankCallback)
+            gMain.vblankCallback();
+    }
 
     gMain.vblankCounter2++;
 
-    CopyBufferedValuesToGpuRegs();
-    ProcessDma3Requests();
+    if (!blockVideo)
+    {
+        CopyBufferedValuesToGpuRegs();
+        ProcessDma3Requests();
+    }
 
     gPcmDmaCounter = gSoundInfo.pcmDmaCounter;
 

@@ -1,4 +1,25 @@
 {
   "version": 1,
-  "tilesets": []
+  "tilesets": [
+    {
+      "tileset": "gTileset_Petalburg",
+      "palette_refs": "data/tilesets/secondary/petalburg/palette_refs.json",
+      "palettes": [
+        {
+          "day": "data/tilesets/secondary/petalburg/palettes/extra_0.pal"
+        },
+        {
+          "day": "data/tilesets/secondary/petalburg/palettes/extra_1.pal"
+        },
+        {
+          "day": "data/tilesets/secondary/petalburg/palettes/extra_2.pal"
+        },
+        {
+          "day": "data/tilesets/secondary/petalburg/palettes/extra_3.pal"
+        }
+      ],
+      "effects": [],
+      "dynamic_metatiles": []
+    }
+  ]
 }
