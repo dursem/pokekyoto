@@ -256,6 +256,17 @@ $(DATA_SRC_SUBDIR)/wild_encounters.h: $(DATA_SRC_SUBDIR)/wild_encounters.json $(
 $(INCLUDE_DIRS)/constants/script_commands.h: $(MISC_TOOL_DIR)/make_scr_cmd_constants.py $(DATA_ASM_SUBDIR)/script_cmd_table.inc
 	python3  $(MISC_TOOL_DIR)/make_scr_cmd_constants.py
 
+# Kyoto/Opal M2: generate extended tileset capacity metadata and validate streamed map envelopes.
+TILESETCAP_TOOL := $(TOOLS_DIR)/tilesetcap/tilesetcap.py
+TILE_CACHE_INFO := $(DATA_SRC_SUBDIR)/tilesets/tile_cache_info.h
+AUTO_GEN_TARGETS += $(TILE_CACHE_INFO)
+TILE_CACHE_INFO_DEPS := $(shell find data/tilesets -name 'metatiles.bin' -o -name 'metatile_tiles_ext.bin' -o -name 'tiles.png') \
+                        $(shell find data/layouts -name '*.bin') $(wildcard data/maps/*/map.json) data/layouts/layouts.json \
+                        $(DATA_SRC_SUBDIR)/tilesets/headers.h $(DATA_SRC_SUBDIR)/tilesets/metatiles.h $(DATA_SRC_SUBDIR)/tilesets/graphics.h
+
+$(TILE_CACHE_INFO): $(TILESETCAP_TOOL) $(TILE_CACHE_INFO_DEPS)
+	python3 $(TILESETCAP_TOOL) gen --out $@
+
 PERL := perl
 SHA1 := $(shell { command -v sha1sum || command -v shasum; } 2>/dev/null) -c
 

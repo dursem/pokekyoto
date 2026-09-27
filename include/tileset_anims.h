@@ -5,6 +5,7 @@ void InitTilesetAnimations(void);
 void InitSecondaryTilesetAnimation(void);
 void UpdateTilesetAnimations(void);
 void TransferTilesetAnimsBuffer(void);
+void TilesetAnims_DiscoverVramSlots(const struct MapLayout *layout, u32 *primarySlots, u32 *secondarySlots);
 
 void InitTilesetAnim_General(void);
 void InitTilesetAnim_Petalburg(void);

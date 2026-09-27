@@ -11,6 +11,7 @@
 #include "rotating_gate.h"
 #include "sprite.h"
 #include "text.h"
+#include "tile_cache.h"
 
 //EWRAM_DATA bool8 gUnusedBikeCameraAheadPanback = FALSE;   //  Old EWRAM variable that was never set to anything other than false
 
@@ -30,7 +31,7 @@ static void RedrawMapSliceWest(struct FieldCameraOffset *, const struct MapLayou
 static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *, s32, s32);
 static void DrawWholeMapViewInternal(int, int, const struct MapLayout *);
 static void DrawMetatileAt(const struct MapLayout *, u16, int, int);
-static void DrawMetatile(s32, const u16 *, u16);
+static void DrawMetatile(s32, const u16 *, const u8 *, u16, bool32);
 static void CameraPanningCB_PanAhead(void);
 
 static struct FieldCameraOffset sFieldCameraOffset;
@@ -218,7 +219,7 @@ void DrawDoorMetatileAt(int x, int y, u16 *tiles)
 
     if (offset >= 0)
     {
-        DrawMetatile(METATILE_LAYER_TYPE_COVERED, tiles, offset);
+        DrawMetatile(METATILE_LAYER_TYPE_COVERED, tiles, NULL, offset, TRUE);
         sFieldCameraOffset.copyBGToVRAM = TRUE;
     }
 }
@@ -226,78 +227,113 @@ void DrawDoorMetatileAt(int x, int y, u16 *tiles)
 static void DrawMetatileAt(const struct MapLayout *mapLayout, u16 offset, int x, int y)
 {
     u16 metatileId = MapGridGetMetatileIdAt(x, y);
-    const u16 *metatiles;
+    const struct Tileset *tileset;
 
-    if (metatileId > NUM_METATILES_TOTAL)
+    if (metatileId == MAPGRID_UNDEFINED || metatileId >= NUM_METATILES_TOTAL)
         metatileId = 0;
     if (metatileId < GetNumMetatilesInPrimary(mapLayout))
     {
-        metatiles = mapLayout->primaryTileset->metatiles;
+        tileset = mapLayout->primaryTileset;
     }
     else
     {
-        metatiles = mapLayout->secondaryTileset->metatiles;
+        tileset = mapLayout->secondaryTileset;
         metatileId -= GetNumMetatilesInPrimary(mapLayout);
     }
-    DrawMetatile(MapGridGetMetatileLayerTypeAt(x, y), metatiles + metatileId * NUM_TILES_PER_METATILE, offset);
+    DrawMetatile(MapGridGetMetatileLayerTypeAt(x, y),
+                 tileset->metatiles + metatileId * NUM_TILES_PER_METATILE,
+                 TileCache_GetMetatileExt(tileset, metatileId), offset, FALSE);
 }
 
-static void DrawMetatile(s32 metatileLayerType, const u16 *tiles, u16 offset)
+static void SetCachedCell(u16 *tilemap, u32 cell, const u16 *tiles, const u8 *ext, s32 tileIndex, bool32 physical)
 {
+    if (tileIndex < 0)
+        TileCache_WriteCellPhysical(&tilemap[cell], 0);
+    else if (physical)
+        TileCache_WriteCellPhysical(&tilemap[cell], tiles[tileIndex]);
+    else
+        TileCache_WriteCell(&tilemap[cell], tiles[tileIndex], ext != NULL ? ext[tileIndex] : 0);
+}
+
+static void DrawMetatileCached(s32 metatileLayerType, const u16 *tiles, const u8 *ext, u16 offset, bool32 isDoor)
+{
+    static const u8 offsets[] = {0, 1, 0x20, 0x21};
+
+    for (u32 i = 0; i < ARRAY_COUNT(offsets); i++)
+    {
+        u32 cell = offset + offsets[i];
+        switch (metatileLayerType)
+        {
+        case METATILE_LAYER_TYPE_SPLIT:
+            SetCachedCell(gOverworldTilemapBuffer_Bg3, cell, tiles, ext, i, isDoor);
+            TileCache_WriteCellPhysical(&gOverworldTilemapBuffer_Bg2[cell], 0);
+            SetCachedCell(gOverworldTilemapBuffer_Bg1, cell, tiles, ext, 4 + i, isDoor);
+            break;
+        case METATILE_LAYER_TYPE_COVERED:
+            SetCachedCell(gOverworldTilemapBuffer_Bg3, cell, tiles, ext, i, isDoor);
+            SetCachedCell(gOverworldTilemapBuffer_Bg2, cell, tiles, ext, 4 + i, isDoor);
+            TileCache_WriteCellPhysical(&gOverworldTilemapBuffer_Bg1[cell], 0);
+            break;
+        case METATILE_LAYER_TYPE_NORMAL:
+            // Preserve Emerald's stock garbage/fill entry on BG3; it references resident primary tile 0x14.
+            TileCache_WriteCellPhysical(&gOverworldTilemapBuffer_Bg3[cell], 0x3014);
+            SetCachedCell(gOverworldTilemapBuffer_Bg2, cell, tiles, ext, i, isDoor);
+            SetCachedCell(gOverworldTilemapBuffer_Bg1, cell, tiles, ext, 4 + i, isDoor);
+            break;
+        }
+    }
+    ScheduleBgCopyTilemapToVram(1);
+    ScheduleBgCopyTilemapToVram(2);
+    ScheduleBgCopyTilemapToVram(3);
+}
+
+static void DrawMetatile(s32 metatileLayerType, const u16 *tiles, const u8 *ext, u16 offset, bool32 isDoor)
+{
+    if (TileCache_IsActive())
+    {
+        DrawMetatileCached(metatileLayerType, tiles, ext, offset, isDoor);
+        return;
+    }
+
     switch (metatileLayerType)
     {
     case METATILE_LAYER_TYPE_SPLIT:
-        // Draw metatile's bottom layer to the bottom background layer.
         gOverworldTilemapBuffer_Bg3[offset] = tiles[0];
         gOverworldTilemapBuffer_Bg3[offset + 1] = tiles[1];
         gOverworldTilemapBuffer_Bg3[offset + 0x20] = tiles[2];
         gOverworldTilemapBuffer_Bg3[offset + 0x21] = tiles[3];
-
-        // Draw transparent tiles to the middle background layer.
         gOverworldTilemapBuffer_Bg2[offset] = 0;
         gOverworldTilemapBuffer_Bg2[offset + 1] = 0;
         gOverworldTilemapBuffer_Bg2[offset + 0x20] = 0;
         gOverworldTilemapBuffer_Bg2[offset + 0x21] = 0;
-
-        // Draw metatile's top layer to the top background layer.
         gOverworldTilemapBuffer_Bg1[offset] = tiles[4];
         gOverworldTilemapBuffer_Bg1[offset + 1] = tiles[5];
         gOverworldTilemapBuffer_Bg1[offset + 0x20] = tiles[6];
         gOverworldTilemapBuffer_Bg1[offset + 0x21] = tiles[7];
         break;
     case METATILE_LAYER_TYPE_COVERED:
-        // Draw metatile's bottom layer to the bottom background layer.
         gOverworldTilemapBuffer_Bg3[offset] = tiles[0];
         gOverworldTilemapBuffer_Bg3[offset + 1] = tiles[1];
         gOverworldTilemapBuffer_Bg3[offset + 0x20] = tiles[2];
         gOverworldTilemapBuffer_Bg3[offset + 0x21] = tiles[3];
-
-        // Draw metatile's top layer to the middle background layer.
         gOverworldTilemapBuffer_Bg2[offset] = tiles[4];
         gOverworldTilemapBuffer_Bg2[offset + 1] = tiles[5];
         gOverworldTilemapBuffer_Bg2[offset + 0x20] = tiles[6];
         gOverworldTilemapBuffer_Bg2[offset + 0x21] = tiles[7];
-
-        // Draw transparent tiles to the top background layer.
         gOverworldTilemapBuffer_Bg1[offset] = 0;
         gOverworldTilemapBuffer_Bg1[offset + 1] = 0;
         gOverworldTilemapBuffer_Bg1[offset + 0x20] = 0;
         gOverworldTilemapBuffer_Bg1[offset + 0x21] = 0;
         break;
     case METATILE_LAYER_TYPE_NORMAL:
-        // Draw garbage to the bottom background layer.
         gOverworldTilemapBuffer_Bg3[offset] = 0x3014;
         gOverworldTilemapBuffer_Bg3[offset + 1] = 0x3014;
         gOverworldTilemapBuffer_Bg3[offset + 0x20] = 0x3014;
         gOverworldTilemapBuffer_Bg3[offset + 0x21] = 0x3014;
-
-        // Draw metatile's bottom layer to the middle background layer.
         gOverworldTilemapBuffer_Bg2[offset] = tiles[0];
         gOverworldTilemapBuffer_Bg2[offset + 1] = tiles[1];
         gOverworldTilemapBuffer_Bg2[offset + 0x20] = tiles[2];
         gOverworldTilemapBuffer_Bg2[offset + 0x21] = tiles[3];
-
-        // Draw metatile's top layer to the top background layer, which covers object event sprites.
         gOverworldTilemapBuffer_Bg1[offset] = tiles[4];
         gOverworldTilemapBuffer_Bg1[offset + 1] = tiles[5];
         gOverworldTilemapBuffer_Bg1[offset + 0x20] = tiles[6];
@@ -415,6 +451,8 @@ void CameraUpdateNoObjectRefresh(void)
         CameraMove(deltaX, deltaY);
         AddCameraTileOffset(&sFieldCameraOffset, deltaX * 2, deltaY * 2);
         RedrawMapSlicesForCameraUpdate(&sFieldCameraOffset, deltaX * 2, deltaY * 2);
+        if (TileCache_TakeRedrawRequest())
+            DrawWholeMapView();
     }
 
     AddCameraPixelOffset(&sFieldCameraOffset, movementSpeedX, movementSpeedY);
@@ -481,6 +519,8 @@ void CameraUpdate(void)
         SetBerryTreesSeen();
         AddCameraTileOffset(&sFieldCameraOffset, deltaX * 2, deltaY * 2);
         RedrawMapSlicesForCameraUpdate(&sFieldCameraOffset, deltaX * 2, deltaY * 2);
+        if (TileCache_TakeRedrawRequest())
+            DrawWholeMapView();
         TryDespawnOWEsCrossingMapConnection();
     }
 

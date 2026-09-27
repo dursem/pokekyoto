@@ -20,6 +20,9 @@ struct Dma3Request
 static struct Dma3Request sDma3Requests[MAX_DMA_REQUESTS];
 
 static vbool8 sDma3ManagerLocked;
+// Monotonic tickets let the tile cache delay slot reuse until queued tilemap DMA has completed.
+static u32 sDma3RequestsQueued;
+static vu32 sDma3RequestsDone;
 static u8 sDma3RequestCursor;
 
 void ClearDma3Requests(void)
@@ -35,6 +38,7 @@ void ClearDma3Requests(void)
         sDma3Requests[i].src = NULL;
         sDma3Requests[i].dest = NULL;
     }
+    sDma3RequestsDone = sDma3RequestsQueued;
 
     sDma3ManagerLocked = FALSE;
 }
@@ -88,6 +92,7 @@ void ProcessDma3Requests(void)
         sDma3Requests[sDma3RequestCursor].size = 0;
         sDma3Requests[sDma3RequestCursor].mode = 0;
         sDma3Requests[sDma3RequestCursor].value = 0;
+        sDma3RequestsDone++;
 
         sDma3RequestCursor = INCREMENT_OR_WRAP(sDma3RequestCursor, MAX_DMA_REQUESTS); // loop back to the first DMA request
     }
@@ -114,6 +119,7 @@ s16 RequestDma3Copy(const void *src, void *dest, u16 size, u32 mode)
             else
                 sDma3Requests[cursor].mode = DMA_REQUEST_COPY16;
 
+            sDma3RequestsQueued++;
             sDma3ManagerLocked = FALSE;
             return cursor;
         }
@@ -147,6 +153,7 @@ s16 RequestDma3Fill(s32 value, void *dest, u16 size, u32 mode)
             else
                 sDma3Requests[cursor].mode = DMA_REQUEST_FILL16;
 
+            sDma3RequestsQueued++;
             sDma3ManagerLocked = FALSE;
             return cursor;
         }
@@ -178,4 +185,15 @@ s16 CheckForSpaceForDma3Request(s16 index)
             return -1;
         return 0;
     }
+}
+
+
+u32 GetDma3RequestsQueued(void)
+{
+    return sDma3RequestsQueued;
+}
+
+u32 GetDma3RequestsDone(void)
+{
+    return sDma3RequestsDone;
 }

@@ -12,6 +12,7 @@
 #include "pokenav.h"
 #include "script.h"
 #include "secret_base.h"
+#include "tile_cache.h"
 #include "trainer_hill.h"
 #include "tv.h"
 #include "constants/rgb.h"
@@ -19,6 +20,11 @@
 #include "constants/metatile_behaviors.h"
 #include "constants/metatile_behaviors_frlg.h"
 #include "wild_encounter.h"
+
+// Saves made before the 11-bit Kyoto/Opal map-grid migration store mapView blocks in the old format.
+#define MAP_VIEW_FORMAT_INDEX (ARRAY_COUNT(gSaveBlock1Ptr->mapView) - 1)
+#define MAP_VIEW_FORMAT_TAG   0x0B11
+STATIC_ASSERT(MAP_OFFSET_W * MAP_OFFSET_H < ARRAY_COUNT(((struct SaveBlock1 *)0)->mapView), MapViewHasSpareEntry)
 
 struct ConnectionFlags
 {
@@ -503,6 +509,9 @@ u32 GetAttributeByMetatileIdAndMapLayout(u16 metatile, u8 attributeType, bool32 
 {
     u32 attribute;
 
+    if (metatile == MAPGRID_UNDEFINED)
+        return MB_INVALID;
+
     if (isFrlg)
         return GetAttributeByMetatileIdAndMapLayoutFrlg(metatile, attributeType);
 
@@ -540,6 +549,7 @@ void SaveMapView(void)
         for (j = x; j < x + MAP_OFFSET_W; j++)
             *mapView++ = sBackupMapData[width * i + j];
     }
+    gSaveBlock1Ptr->mapView[MAP_VIEW_FORMAT_INDEX] = MAP_VIEW_FORMAT_TAG;
 }
 
 static bool32 SavedMapViewIsEmpty(void)
@@ -577,6 +587,12 @@ static void LoadSavedMapView(void)
     mapView = gSaveBlock1Ptr->mapView;
     if (SavedMapViewIsEmpty())
         return;
+
+    if (mapView[MAP_VIEW_FORMAT_INDEX] != MAP_VIEW_FORMAT_TAG)
+    {
+        ClearSavedMapView();
+        return;
+    }
 
     width = gBackupMapLayout.width;
     x = gSaveBlock1Ptr->pos.x;
@@ -1014,11 +1030,25 @@ void CopyPrimaryTilesetToVram(struct MapLayout const *mapLayout)
 
 void CopySecondaryTilesetToVram(struct MapLayout const *mapLayout)
 {
+    if (TileCache_LayoutIsStreamed(mapLayout))
+    {
+        TileCache_LoadLayout(mapLayout);
+        return;
+    }
+    TileCache_Disable();
     CopyTilesetToVram(mapLayout->secondaryTileset, NUM_TILES_TOTAL - GetNumTilesInPrimary(mapLayout), GetNumTilesInPrimary(mapLayout));
 }
 
+// Used when walking into a connected map while cells from the previous map are still on screen.
 void CopySecondaryTilesetToVramUsingHeap(struct MapLayout const *mapLayout)
 {
+    if (TileCache_LayoutIsStreamed(mapLayout))
+    {
+        TileCache_SwitchLayout(mapLayout);
+        return;
+    }
+    if (TileCache_Disable())
+        TileCache_RequestRedraw();
     CopyTilesetToVramUsingHeap(mapLayout->secondaryTileset, NUM_TILES_TOTAL - GetNumTilesInPrimary(mapLayout), GetNumTilesInPrimary(mapLayout));
 }
 
@@ -1037,6 +1067,12 @@ void CopyMapTilesetsToVram(struct MapLayout const *mapLayout)
     if (mapLayout)
     {
         CopyTilesetToVramUsingHeap(mapLayout->primaryTileset, GetNumTilesInPrimary(mapLayout), 0);
+        if (TileCache_LayoutIsStreamed(mapLayout))
+        {
+            TileCache_LoadLayout(mapLayout);
+            return;
+        }
+        TileCache_Disable();
         CopyTilesetToVramUsingHeap(mapLayout->secondaryTileset, NUM_TILES_TOTAL - GetNumTilesInPrimary(mapLayout), GetNumTilesInPrimary(mapLayout));
     }
 }

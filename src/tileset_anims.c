@@ -6,6 +6,7 @@
 #include "task.h"
 #include "battle_transition.h"
 #include "fieldmap.h"
+#include "tile_cache.h"
 
 static EWRAM_DATA struct {
     const u16 *src;
@@ -20,6 +21,7 @@ static u16 sSecondaryTilesetAnimCounter;
 static u16 sSecondaryTilesetAnimCounterMax;
 static void (*sPrimaryTilesetAnimCallback)(u16);
 static void (*sSecondaryTilesetAnimCallback)(u16);
+static u32 *sAnimDiscoverySlots;
 
 static void _InitPrimaryTilesetAnimation(void);
 static void _InitSecondaryTilesetAnimation(void);
@@ -552,6 +554,19 @@ static void ResetTilesetAnimBuffer(void)
 
 static void AppendTilesetAnimToBuffer(const u16 *src, u16 *dest, u16 size)
 {
+    u32 firstSlot = ((uintptr_t)dest - BG_VRAM) / TILE_SIZE_4BPP;
+    u32 numSlots = (size + TILE_SIZE_4BPP - 1) / TILE_SIZE_4BPP;
+
+    if (sAnimDiscoverySlots != NULL)
+    {
+        for (u32 slot = firstSlot; slot < firstSlot + numSlots && slot < NUM_TILES_TOTAL; slot++)
+            sAnimDiscoverySlots[slot / 32] |= 1u << (slot % 32);
+        return;
+    }
+
+    if (!TileCache_AllowsAnimDest(firstSlot, numSlots))
+        return;
+
     if (sTilesetDMA3TransferBufferSize < 20)
     {
         sTilesetDMA3TransferBuffer[sTilesetDMA3TransferBufferSize].src = src;
@@ -581,6 +596,45 @@ void InitTilesetAnimations(void)
 void InitSecondaryTilesetAnimation(void)
 {
     _InitSecondaryTilesetAnimation();
+}
+
+static void RecordAnimVramSlots(void (*callback)(u16), u32 counterMax, u32 *slots)
+{
+    if (callback == NULL || slots == NULL)
+        return;
+
+    sAnimDiscoverySlots = slots;
+    for (u32 timer = 0; timer < counterMax; timer++)
+        callback(timer);
+    sAnimDiscoverySlots = NULL;
+}
+
+void TilesetAnims_DiscoverVramSlots(const struct MapLayout *layout, u32 *primarySlots, u32 *secondarySlots)
+{
+    u16 primaryCounter = sPrimaryTilesetAnimCounter;
+    u16 primaryCounterMax = sPrimaryTilesetAnimCounterMax;
+    u16 secondaryCounter = sSecondaryTilesetAnimCounter;
+    u16 secondaryCounterMax = sSecondaryTilesetAnimCounterMax;
+    void (*primaryCallback)(u16) = sPrimaryTilesetAnimCallback;
+    void (*secondaryCallback)(u16) = sSecondaryTilesetAnimCallback;
+
+    sPrimaryTilesetAnimCounterMax = 0;
+    sPrimaryTilesetAnimCallback = NULL;
+    sSecondaryTilesetAnimCounterMax = 0;
+    sSecondaryTilesetAnimCallback = NULL;
+    if (layout->primaryTileset != NULL && layout->primaryTileset->callback != NULL)
+        layout->primaryTileset->callback();
+    if (layout->secondaryTileset != NULL && layout->secondaryTileset->callback != NULL)
+        layout->secondaryTileset->callback();
+    RecordAnimVramSlots(sPrimaryTilesetAnimCallback, sPrimaryTilesetAnimCounterMax, primarySlots);
+    RecordAnimVramSlots(sSecondaryTilesetAnimCallback, sSecondaryTilesetAnimCounterMax, secondarySlots);
+
+    sPrimaryTilesetAnimCounter = primaryCounter;
+    sPrimaryTilesetAnimCounterMax = primaryCounterMax;
+    sSecondaryTilesetAnimCounter = secondaryCounter;
+    sSecondaryTilesetAnimCounterMax = secondaryCounterMax;
+    sPrimaryTilesetAnimCallback = primaryCallback;
+    sSecondaryTilesetAnimCallback = secondaryCallback;
 }
 
 void UpdateTilesetAnimations(void)
@@ -1167,6 +1221,8 @@ static void QueueAnimTiles_BattlePyramid_StatueShadow(u16 timer)
 
 static void BlendAnimPalette_BattleDome_FloorLights(u16 timer)
 {
+    if (sAnimDiscoverySlots != NULL)
+        return;
     CpuCopy16(sTilesetAnims_BattleDomeFloorLightPals[timer % ARRAY_COUNT(sTilesetAnims_BattleDomeFloorLightPals)], &gPlttBufferUnfaded[BG_PLTT_ID(8)], PLTT_SIZE_4BPP);
     BlendPalette(BG_PLTT_ID(8), 16, gPaletteFade.y, gPaletteFade.blendColor & 0x7FFF);
     if ((u8)FindTaskIdByFunc(Task_BattleTransition_Intro) != TASK_NONE)
@@ -1178,6 +1234,8 @@ static void BlendAnimPalette_BattleDome_FloorLights(u16 timer)
 
 static void BlendAnimPalette_BattleDome_FloorLightsNoBlend(u16 timer)
 {
+    if (sAnimDiscoverySlots != NULL)
+        return;
     CpuCopy16(sTilesetAnims_BattleDomeFloorLightPals[timer % ARRAY_COUNT(sTilesetAnims_BattleDomeFloorLightPals)], &gPlttBufferUnfaded[BG_PLTT_ID(8)], PLTT_SIZE_4BPP);
     if ((u8)FindTaskIdByFunc(Task_BattleTransition_Intro) == TASK_NONE)
     {

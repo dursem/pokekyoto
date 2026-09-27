@@ -2,13 +2,14 @@
 #define GUARD_GLOBAL_FIELDMAP_H
 
 // Masks/shifts for blocks in the map grid
-// Map grid blocks consist of a 10 bit metatile id, a 2 bit collision value, and a 4 bit elevation value
-// This is the data stored in each data/layouts/*/map.bin file
-#define MAPGRID_METATILE_ID_MASK 0x03FF // Bits 0-9
-#define MAPGRID_COLLISION_MASK   0x0C00 // Bits 10-11
+// Map grid blocks consist of an 11 bit metatile id, a 1 bit collision value, and a 4 bit elevation value
+// This is the data stored in each data/layouts/*/map.bin file.
+// Bit 10 was borrowed from the old 2-bit collision field; Kyoto/Opal wide maps only use collision 0/1.
+#define MAPGRID_METATILE_ID_MASK 0x07FF // Bits 0-10
+#define MAPGRID_COLLISION_MASK   0x0800 // Bit 11
 #define MAPGRID_ELEVATION_MASK   0xF000 // Bits 12-15
 #define MAPGRID_METATILE_ID_SHIFT 0
-#define MAPGRID_COLLISION_SHIFT  10
+#define MAPGRID_COLLISION_SHIFT  11
 #define MAPGRID_ELEVATION_SHIFT  12
 
 enum
@@ -27,10 +28,9 @@ enum
 #define UNPACK_COLLISION(data) UNPACK(data, MAPGRID_COLLISION_SHIFT, MAPGRID_COLLISION_MASK)
 #define UNPACK_ELEVATION(data) UNPACK(data, MAPGRID_ELEVATION_SHIFT, MAPGRID_ELEVATION_MASK)
 
-// An undefined map grid block has all metatile id bits set and nothing else
+// 0x7FF is reserved as undefined, leaving secondary IDs through 0x7FE.
 #define MAPGRID_UNDEFINED   MAPGRID_METATILE_ID_MASK
 
-// When setting impassability manually GF sets all the collision bits
 #define MAPGRID_IMPASSABLE  MAPGRID_COLLISION_MASK
 
 // Masks/shifts for metatile attributes

@@ -33,6 +33,7 @@
 #include "string_util.h"
 #include "strings.h"
 #include "text_window.h"
+#include "tile_cache.h"
 #include "tv.h"
 #include "shop_criteria.h"
 #include "constants/decorations.h"
@@ -810,6 +811,10 @@ static void BuyMenuDrawMapBg(void)
     s16 i, j;
     s16 x, y;
     const struct MapLayout *mapLayout;
+    const struct Tileset *tileset;
+    const u16 *tiles;
+    const u8 *ext;
+    u16 resolvedTiles[NUM_TILES_PER_METATILE];
     u16 metatile;
     u16 numMetatilesInPrimary;
     u8 metatileLayerType;
@@ -831,9 +836,26 @@ static void BuyMenuDrawMapBg(void)
                 metatileLayerType = METATILE_LAYER_TYPE_COVERED;
 
             if (metatile < numMetatilesInPrimary)
-                BuyMenuDrawMapMetatile(i, j, mapLayout->primaryTileset->metatiles + metatile * NUM_TILES_PER_METATILE, metatileLayerType);
+            {
+                tileset = mapLayout->primaryTileset;
+            }
             else
-                BuyMenuDrawMapMetatile(i, j, mapLayout->secondaryTileset->metatiles + ((metatile - numMetatilesInPrimary) * NUM_TILES_PER_METATILE), metatileLayerType);
+            {
+                tileset = mapLayout->secondaryTileset;
+                metatile -= numMetatilesInPrimary;
+            }
+            tiles = tileset->metatiles + metatile * NUM_TILES_PER_METATILE;
+            if (TileCache_IsActive())
+            {
+                ext = TileCache_GetMetatileExt(tileset, metatile);
+                for (u32 k = 0; k < NUM_TILES_PER_METATILE; k++)
+                    resolvedTiles[k] = TileCache_Resolve(tiles[k], ext != NULL ? ext[k] : 0);
+                BuyMenuDrawMapMetatile(i, j, resolvedTiles, metatileLayerType);
+            }
+            else
+            {
+                BuyMenuDrawMapMetatile(i, j, tiles, metatileLayerType);
+            }
         }
     }
 }
