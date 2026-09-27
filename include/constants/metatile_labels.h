@@ -10,20 +10,20 @@
 #define METATILE_BattleDome_Door_PreBattleRoom  0x2AA
 
 // gTileset_BattleFrontier
-#define METATILE_BattleFrontier_CorridorOpenDoor_Bottom  0x2AF
-#define METATILE_BattleFrontier_CorridorOpenDoor_Top     0x2A7
-#define METATILE_BattleFrontier_Door_Elevator            0x2AE
-#define METATILE_BattleFrontier_Door_MultiCorridor_Left  0x34D
-#define METATILE_BattleFrontier_Door_MultiCorridor_Right 0x34E
-#define METATILE_BattleFrontier_Elevator_Bottom0         0x3D9
-#define METATILE_BattleFrontier_Elevator_Bottom1         0x3DA
-#define METATILE_BattleFrontier_Elevator_Bottom2         0x3DB
-#define METATILE_BattleFrontier_Elevator_Mid0            0x3D1
-#define METATILE_BattleFrontier_Elevator_Mid1            0x3D2
-#define METATILE_BattleFrontier_Elevator_Mid2            0x3D3
-#define METATILE_BattleFrontier_Elevator_Top0            0x3C9
-#define METATILE_BattleFrontier_Elevator_Top1            0x3CA
-#define METATILE_BattleFrontier_Elevator_Top2            0x3CB
+#define METATILE_BattleFrontier_CorridorOpenDoor_Bottom   0x2AF
+#define METATILE_BattleFrontier_CorridorOpenDoor_Top      0x2A7
+#define METATILE_BattleFrontier_Door_Elevator             0x2AE
+#define METATILE_BattleFrontier_Door_MultiCorridor_Left   0x34D
+#define METATILE_BattleFrontier_Door_MultiCorridor_Right  0x34E
+#define METATILE_BattleFrontier_Elevator_Bottom0          0x3D9
+#define METATILE_BattleFrontier_Elevator_Bottom1          0x3DA
+#define METATILE_BattleFrontier_Elevator_Bottom2          0x3DB
+#define METATILE_BattleFrontier_Elevator_Mid0             0x3D1
+#define METATILE_BattleFrontier_Elevator_Mid1             0x3D2
+#define METATILE_BattleFrontier_Elevator_Mid2             0x3D3
+#define METATILE_BattleFrontier_Elevator_Top0             0x3C9
+#define METATILE_BattleFrontier_Elevator_Top1             0x3CA
+#define METATILE_BattleFrontier_Elevator_Top2             0x3CB
 
 // gTileset_BattleFrontierOutsideEast
 #define METATILE_BattleFrontierOutsideEast_Door              0x49C

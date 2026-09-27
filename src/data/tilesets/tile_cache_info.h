@@ -289,7 +289,7 @@ const struct TilesetCapacityInfo gTilesetCapacityInfo[] =
         .rawTiles = sTileCacheRawTiles_General,
         .tileExt = NULL,
         .numTiles = 512,
-        .numMetatiles = 512,
+        .numMetatiles = 672,
         .streamed = FALSE,
     },
     {
@@ -464,8 +464,8 @@ const struct TilesetCapacityInfo gTilesetCapacityInfo[] =
         .tileset = &gTileset_Petalburg,
         .rawTiles = sTileCacheRawTiles_Petalburg,
         .tileExt = sMetatileTileExt_Petalburg,
-        .numTiles = 160,
-        .numMetatiles = 144,
+        .numTiles = 2048,
+        .numMetatiles = 1375,
         .streamed = TRUE,
     },
     {
