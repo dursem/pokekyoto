@@ -197,7 +197,7 @@ const u8 *OpalMapPalettesGetReferences(const struct Tileset *tileset, u32 metati
 
     REQUIRE_PALETTE(metatile < sState->extension->metatileCount,
                     "Invalid extended metatile %u", metatile);
-    return sState->extension->references + metatile * NUM_TILES_PER_METATILE;
+    return sState->extension->references + metatile * OPAL_MAP_REFS_PER_METATILE;
 }
 
 static void SetReference(u32 layer, u32 cell, u32 logical)
@@ -258,7 +258,15 @@ void OpalMapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, con
         case METATILE_LAYER_TYPE_TRIPLE:
             SetReference(2, cell, LogicalForTile(tiles, references, i));
             SetReference(1, cell, LogicalForTile(tiles, references, 4 + i));
-            SetReference(0, cell, thirdTiles ? (thirdTiles[i] >> 12) : 0);
+            SetReference(
+                0,
+                cell,
+                thirdTiles
+                    ? LogicalForTile(
+                          thirdTiles,
+                          references ? references + NUM_TILES_PER_METATILE : NULL,
+                          i)
+                    : 0);
             break;
         case METATILE_LAYER_TYPE_COVERED:
             SetReference(2, cell, LogicalForTile(tiles, references, i));
