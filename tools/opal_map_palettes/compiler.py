@@ -106,35 +106,11 @@ def metatile_masks(path, references=None):
     if references is None:
         references = [[word >> 12 for word in entries[i:i + 8]] for i in range(0, len(entries), 8)]
     require(len(references) == count, f"{path}: palette sidecar must have {count} rows")
-    third_path = path.parent / "metatile_third_layer.bin"
-    third = None
-    if third_path.exists():
-        third = words(third_path)
-        require(len(third) == count * 4,
-                f"{third_path}: expected four third-layer entries per metatile")
-
     result = []
-    normalized = []
-
     for i, row in enumerate(references):
-        require(
-            isinstance(row, list) and len(row) in (8, 12),
-            f"{path}: row {i} needs eight or twelve palette IDs"
-        )
-
-        row = list(row)
-
-        if len(row) == 8:
-            if third is not None:
-                extra = third[i * 4:(i + 1) * 4]
-                row.extend(word >> 12 for word in extra)
-            else:
-                row.extend([0, 0, 0, 0])
-
+        require(isinstance(row, list) and len(row) == 8, f"{path}: row {i} needs eight palette IDs")
         result.append(mask(row, LOGICAL_PALETTES))
-        normalized.append(row)
-
-    return result, normalized
+    return result, references
 
 
 def make_grid(layout, layouts, maps_by_id, map_data, masks, root):

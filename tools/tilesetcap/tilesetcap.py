@@ -257,7 +257,6 @@ MAX_METATILES_IN_SECONDARY = (1 << FORMATS['wide']['id_bits']) - MAX_METATILES_I
 TILE_CACHE_POOL_SLOTS = 995 - LEGACY_TILES_IN_PRIMARY
 TILE_CACHE_WARN_SLOTS = TILE_CACHE_POOL_SLOTS - 48
 TILES_PER_METATILE = 8
-TILES_PER_TRIPLE_LAYER = 4
 EXT_TILE_HIGH_SHIFT = 5
 EXT_TILE_HIGH_MASK = 0x3
 # The smol header stores the image size in 14 bits of 4-byte units (include/decompress.h).
@@ -294,42 +293,16 @@ class TilesetData:
         self.extPath = os.path.join(self.dir, 'metatile_tiles_ext.bin') if os.path.exists(ext_file) else None
         self.ext = open(ext_file, 'rb').read() if self.extPath else None
 
-        third_file = path(self.dir, 'metatile_third_layer.bin')
-        self.thirdPath = os.path.join(self.dir, 'metatile_third_layer.bin') if os.path.exists(third_file) else None
-        self.third = read_u16(third_file) if self.thirdPath else None
-
-        third_ext_file = path(self.dir, 'metatile_third_layer_ext.bin')
-        self.thirdExtPath = os.path.join(self.dir, 'metatile_third_layer_ext.bin') if os.path.exists(third_ext_file) else None
-        self.thirdExt = open(third_ext_file, 'rb').read() if self.thirdExtPath else None
-
-        self.attributes = read_u16(path(info['attributes'])) if info.get('attributes') else []
-        self.tripleMetatiles = [
-            i for i, value in enumerate(self.attributes)
-            if ((value >> 12) & 0xF) == 3
-        ]
-
     @property
     def extended(self):
-        return self.ext is not None or self.thirdExt is not None
+        # Only the extension sidecar can hold tile id bits 10-11, so without it every reference is a legacy one.
+        return self.ext is not None
 
     def virtual_tiles(self, local):
         """The virtual tile ids referenced by one metatile."""
         words = self.metatiles[local * TILES_PER_METATILE:(local + 1) * TILES_PER_METATILE]
         high = self.ext[local * TILES_PER_METATILE:(local + 1) * TILES_PER_METATILE] if self.ext else bytes(TILES_PER_METATILE)
-        result = [(w & 0x3FF) | (((h >> EXT_TILE_HIGH_SHIFT) & EXT_TILE_HIGH_MASK) << 10) for w, h in zip(words, high)]
-
-        if self.third is not None:
-            third = self.third[local * TILES_PER_TRIPLE_LAYER:(local + 1) * TILES_PER_TRIPLE_LAYER]
-            third_high = (
-                self.thirdExt[local * TILES_PER_TRIPLE_LAYER:(local + 1) * TILES_PER_TRIPLE_LAYER]
-                if self.thirdExt else bytes(TILES_PER_TRIPLE_LAYER)
-            )
-            result.extend(
-                (w & 0x3FF) | (((h >> EXT_TILE_HIGH_SHIFT) & EXT_TILE_HIGH_MASK) << 10)
-                for w, h in zip(third, third_high)
-            )
-
-        return result
+        return [(w & 0x3FF) | (((h >> EXT_TILE_HIGH_SHIFT) & EXT_TILE_HIGH_MASK) << 10) for w, h in zip(words, high)]
 
 
 def virtual_tile_to_local(tile):
@@ -472,23 +445,6 @@ def analyse(report, verbose=False):
         if ts.ext is not None and len(ts.ext) != ts.numMetatiles * TILES_PER_METATILE:
             report.error('%s: metatile_tiles_ext.bin has %d entries but metatiles.bin has %d'
                          % (ts.symbol, len(ts.ext), ts.numMetatiles * TILES_PER_METATILE))
-
-        if ts.third is not None and len(ts.third) != ts.numMetatiles * TILES_PER_TRIPLE_LAYER:
-            report.error('%s: metatile_third_layer.bin has %d words but expected %d'
-                         % (ts.symbol, len(ts.third), ts.numMetatiles * TILES_PER_TRIPLE_LAYER))
-
-        if ts.thirdExt is not None and ts.third is None:
-            report.error('%s: metatile_third_layer_ext.bin requires metatile_third_layer.bin'
-                         % ts.symbol)
-
-        if ts.thirdExt is not None and len(ts.thirdExt) != ts.numMetatiles * TILES_PER_TRIPLE_LAYER:
-            report.error('%s: metatile_third_layer_ext.bin has %d entries but expected %d'
-                         % (ts.symbol, len(ts.thirdExt), ts.numMetatiles * TILES_PER_TRIPLE_LAYER))
-
-        if ts.tripleMetatiles and ts.third is None:
-            report.error('%s: uses TRIPLE layer metatiles but has no metatile_third_layer.bin'
-                         % ts.symbol)
-
         if ts.extended and not ts.isSecondary and ts.info['isCompressed']:
             report.error('%s: an extended primary tileset must be uncompressed (.isCompressed = FALSE, ".4bpp" tiles)' % ts.symbol)
         if ts.info['isCompressed'] and ts.numTiles * TILE_SIZE_4BPP > MAX_SMOL_IMAGE_BYTES:
@@ -596,13 +552,8 @@ def cmd_gen(args):
             out.append('static const u32 %s[] = INCGFX_U32("%s/tiles.png", ".4bpp");' % (raw_names[symbol], ts.dir))
     for symbol in sorted(tilesets):
         ts = tilesets[symbol]
-        name = c_identifier(symbol)
         if ts.extPath:
-            out.append('static const u8 sMetatileTileExt_%s[] = INCBIN_U8("%s");' % (name, ts.extPath))
-        if ts.thirdPath:
-            out.append('static const u16 sMetatileThirdLayer_%s[] = INCBIN_U16("%s");' % (name, ts.thirdPath))
-        if ts.thirdExtPath:
-            out.append('static const u8 sMetatileThirdLayerExt_%s[] = INCBIN_U8("%s");' % (name, ts.thirdExtPath))
+            out.append('static const u8 sMetatileTileExt_%s[] = INCBIN_U8("%s");' % (c_identifier(symbol), ts.extPath))
     out += ['', 'const struct TilesetCapacityInfo gTilesetCapacityInfo[] =', '{']
     for symbol in sorted(tilesets):
         ts = tilesets[symbol]
@@ -611,8 +562,6 @@ def cmd_gen(args):
                 '        .tileset = &%s,' % symbol,
                 '        .rawTiles = %s,' % raw_names.get(symbol, 'NULL'),
                 '        .tileExt = %s,' % ('sMetatileTileExt_' + name if ts.extPath else 'NULL'),
-                '        .thirdLayer = %s,' % ('sMetatileThirdLayer_' + name if ts.thirdPath else 'NULL'),
-                '        .thirdLayerExt = %s,' % ('sMetatileThirdLayerExt_' + name if ts.thirdExtPath else 'NULL'),
                 '        .numTiles = %d,' % ts.numTiles,
                 '        .numMetatiles = %d,' % ts.numMetatiles,
                 '        .streamed = %s,' % ('TRUE' if ts.extended else 'FALSE'),
