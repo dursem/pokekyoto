@@ -61,7 +61,7 @@ bool32 OpalMapPalettesQueueBg(u32 bg);
 u32 OpalMapPalettesTilemapsPrepared(void);
 u32 OpalMapPalettesTilemapsCommitted(void);
 bool32 OpalMapPalettesQueueTile(const void *source, u32 tile);
-void OpalMapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, const u8 *references);
+void OpalMapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, const u8 *references, const u16 *thirdTiles);
 const u8 *OpalMapPalettesGetReferences(const struct Tileset *tileset, u32 metatile);
 u32 OpalMapPalettesWeatherType(u32 bank, u32 fallback);
 u32 OpalMapPalettesMask(void);

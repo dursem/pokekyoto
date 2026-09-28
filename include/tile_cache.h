@@ -45,6 +45,8 @@ struct TilesetCapacityInfo
     const struct Tileset *tileset;
     const u32 *rawTiles;
     const u8 *tileExt;
+    const u16 *thirdLayer;
+    const u8 *thirdLayerExt;
     u16 numTiles;
     u16 numMetatiles;
     bool8 streamed;
@@ -63,6 +65,8 @@ bool32 TileCache_Disable(void);
 void TileCache_RequestRedraw(void);
 bool32 TileCache_TakeRedrawRequest(void);
 const u8 *TileCache_GetMetatileExt(const struct Tileset *tileset, u32 metatile);
+const u16 *TileCache_GetMetatileThirdLayer(const struct Tileset *tileset, u32 metatile);
+const u8 *TileCache_GetMetatileThirdLayerExt(const struct Tileset *tileset, u32 metatile);
 void TileCache_WriteCell(u16 *cell, u16 tile, u32 ext);
 void TileCache_WriteCellPhysical(u16 *cell, u16 tile);
 u16 TileCache_Resolve(u16 tile, u32 ext);

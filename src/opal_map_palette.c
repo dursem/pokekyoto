@@ -238,7 +238,7 @@ static inline u32 LogicalForTile(const u16 *tiles, const u8 *references, u32 ind
  *   COVERED : BG3=bottom[0..3], BG2=top,    BG1=blank
  *   NORMAL  : BG3=stock 0x3014 filler, BG2=bottom, BG1=top
  */
-void OpalMapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, const u8 *references)
+void OpalMapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, const u8 *references, const u16 *thirdTiles)
 {
     static const u8 offsets[] = {0, 1, 32, 33};
 
@@ -254,6 +254,11 @@ void OpalMapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, con
             SetReference(2, cell, LogicalForTile(tiles, references, i));
             SetReference(1, cell, 0);
             SetReference(0, cell, LogicalForTile(tiles, references, 4 + i));
+            break;
+        case METATILE_LAYER_TYPE_TRIPLE:
+            SetReference(2, cell, LogicalForTile(tiles, references, i));
+            SetReference(1, cell, LogicalForTile(tiles, references, 4 + i));
+            SetReference(0, cell, thirdTiles ? (thirdTiles[i] >> 12) : 0);
             break;
         case METATILE_LAYER_TYPE_COVERED:
             SetReference(2, cell, LogicalForTile(tiles, references, i));

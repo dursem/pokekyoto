@@ -420,6 +420,26 @@ const u8 *TileCache_GetMetatileExt(const struct Tileset *tileset, u32 metatile)
     return info->tileExt + metatile * NUM_TILES_PER_METATILE;
 }
 
+const u16 *TileCache_GetMetatileThirdLayer(const struct Tileset *tileset, u32 metatile)
+{
+    const struct TilesetCapacityInfo *info = GetTilesetCapacityInfo(tileset);
+
+    if (info == NULL || info->thirdLayer == NULL || metatile >= info->numMetatiles)
+        return NULL;
+
+    return info->thirdLayer + metatile * NUM_TILES_PER_METATILE_LAYER;
+}
+
+const u8 *TileCache_GetMetatileThirdLayerExt(const struct Tileset *tileset, u32 metatile)
+{
+    const struct TilesetCapacityInfo *info = GetTilesetCapacityInfo(tileset);
+
+    if (info == NULL || info->thirdLayerExt == NULL || metatile >= info->numMetatiles)
+        return NULL;
+
+    return info->thirdLayerExt + metatile * NUM_TILES_PER_METATILE_LAYER;
+}
+
 bool32 TileCache_AllowsAnimDest(u32 firstSlot, u32 numSlots)
 {
     if (!sTileCache.active)

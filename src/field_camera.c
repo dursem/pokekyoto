@@ -32,7 +32,7 @@ static void RedrawMapSliceWest(struct FieldCameraOffset *, const struct MapLayou
 static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *, s32, s32);
 static void DrawWholeMapViewInternal(int, int, const struct MapLayout *);
 static void DrawMetatileAt(const struct MapLayout *, u16, int, int);
-static void DrawMetatile(s32, const u16 *, const u8 *, u16, bool32, const u8 *);
+static void DrawMetatile(s32, const u16 *, const u8 *, const u16 *, const u8 *, u16, bool32, const u8 *);
 static void CameraPanningCB_PanAhead(void);
 
 static struct FieldCameraOffset sFieldCameraOffset;
@@ -220,7 +220,7 @@ void DrawDoorMetatileAt(int x, int y, u16 *tiles)
 
     if (offset >= 0)
     {
-        DrawMetatile(METATILE_LAYER_TYPE_COVERED, tiles, NULL, offset, TRUE, NULL);
+        DrawMetatile(METATILE_LAYER_TYPE_COVERED, tiles, NULL, NULL, NULL, offset, TRUE, NULL);
         sFieldCameraOffset.copyBGToVRAM = TRUE;
     }
 }
@@ -243,7 +243,10 @@ static void DrawMetatileAt(const struct MapLayout *mapLayout, u16 offset, int x,
     }
     DrawMetatile(MapGridGetMetatileLayerTypeAt(x, y),
                  tileset->metatiles + metatileId * NUM_TILES_PER_METATILE,
-                 TileCache_GetMetatileExt(tileset, metatileId), offset, FALSE,
+                 TileCache_GetMetatileExt(tileset, metatileId),
+                 TileCache_GetMetatileThirdLayer(tileset, metatileId),
+                 TileCache_GetMetatileThirdLayerExt(tileset, metatileId),
+                 offset, FALSE,
                  OpalMapPalettesGetReferences(tileset, metatileId));
 }
 
@@ -257,7 +260,7 @@ static void SetCachedCell(u16 *tilemap, u32 cell, const u16 *tiles, const u8 *ex
         TileCache_WriteCell(&tilemap[cell], tiles[tileIndex], ext != NULL ? ext[tileIndex] : 0);
 }
 
-static void DrawMetatileCached(s32 metatileLayerType, const u16 *tiles, const u8 *ext, u16 offset, bool32 isDoor, const u8 *paletteRefs)
+static void DrawMetatileCached(s32 metatileLayerType, const u16 *tiles, const u8 *ext, const u16 *thirdTiles, const u8 *thirdExt, u16 offset, bool32 isDoor, const u8 *paletteRefs)
 {
     static const u8 offsets[] = {0, 1, 0x20, 0x21};
 
@@ -270,6 +273,14 @@ static void DrawMetatileCached(s32 metatileLayerType, const u16 *tiles, const u8
             SetCachedCell(gOverworldTilemapBuffer_Bg3, cell, tiles, ext, i, isDoor);
             TileCache_WriteCellPhysical(&gOverworldTilemapBuffer_Bg2[cell], 0);
             SetCachedCell(gOverworldTilemapBuffer_Bg1, cell, tiles, ext, 4 + i, isDoor);
+            break;
+        case METATILE_LAYER_TYPE_TRIPLE:
+            SetCachedCell(gOverworldTilemapBuffer_Bg3, cell, tiles, ext, i, isDoor);
+            SetCachedCell(gOverworldTilemapBuffer_Bg2, cell, tiles, ext, 4 + i, isDoor);
+            if (thirdTiles != NULL)
+                SetCachedCell(gOverworldTilemapBuffer_Bg1, cell, thirdTiles, thirdExt, i, isDoor);
+            else
+                TileCache_WriteCellPhysical(&gOverworldTilemapBuffer_Bg1[cell], 0);
             break;
         case METATILE_LAYER_TYPE_COVERED:
             SetCachedCell(gOverworldTilemapBuffer_Bg3, cell, tiles, ext, i, isDoor);
@@ -287,14 +298,14 @@ static void DrawMetatileCached(s32 metatileLayerType, const u16 *tiles, const u8
     ScheduleBgCopyTilemapToVram(1);
     ScheduleBgCopyTilemapToVram(2);
     ScheduleBgCopyTilemapToVram(3);
-    OpalMapPalettesSetMetatile(offset, metatileLayerType, tiles, paletteRefs);
+    OpalMapPalettesSetMetatile(offset, metatileLayerType, tiles, paletteRefs, thirdTiles);
 }
 
-static void DrawMetatile(s32 metatileLayerType, const u16 *tiles, const u8 *ext, u16 offset, bool32 isDoor, const u8 *paletteRefs)
+static void DrawMetatile(s32 metatileLayerType, const u16 *tiles, const u8 *ext, const u16 *thirdTiles, const u8 *thirdExt, u16 offset, bool32 isDoor, const u8 *paletteRefs)
 {
     if (TileCache_IsActive())
     {
-        DrawMetatileCached(metatileLayerType, tiles, ext, offset, isDoor, paletteRefs);
+        DrawMetatileCached(metatileLayerType, tiles, ext, thirdTiles, thirdExt, offset, isDoor, paletteRefs);
         return;
     }
 
@@ -313,6 +324,22 @@ static void DrawMetatile(s32 metatileLayerType, const u16 *tiles, const u8 *ext,
         gOverworldTilemapBuffer_Bg1[offset + 1] = tiles[5];
         gOverworldTilemapBuffer_Bg1[offset + 0x20] = tiles[6];
         gOverworldTilemapBuffer_Bg1[offset + 0x21] = tiles[7];
+        break;
+    case METATILE_LAYER_TYPE_TRIPLE:
+        gOverworldTilemapBuffer_Bg3[offset] = tiles[0];
+        gOverworldTilemapBuffer_Bg3[offset + 1] = tiles[1];
+        gOverworldTilemapBuffer_Bg3[offset + 0x20] = tiles[2];
+        gOverworldTilemapBuffer_Bg3[offset + 0x21] = tiles[3];
+
+        gOverworldTilemapBuffer_Bg2[offset] = tiles[4];
+        gOverworldTilemapBuffer_Bg2[offset + 1] = tiles[5];
+        gOverworldTilemapBuffer_Bg2[offset + 0x20] = tiles[6];
+        gOverworldTilemapBuffer_Bg2[offset + 0x21] = tiles[7];
+
+        gOverworldTilemapBuffer_Bg1[offset] = thirdTiles ? thirdTiles[0] : 0;
+        gOverworldTilemapBuffer_Bg1[offset + 1] = thirdTiles ? thirdTiles[1] : 0;
+        gOverworldTilemapBuffer_Bg1[offset + 0x20] = thirdTiles ? thirdTiles[2] : 0;
+        gOverworldTilemapBuffer_Bg1[offset + 0x21] = thirdTiles ? thirdTiles[3] : 0;
         break;
     case METATILE_LAYER_TYPE_COVERED:
         gOverworldTilemapBuffer_Bg3[offset] = tiles[0];
@@ -346,7 +373,7 @@ static void DrawMetatile(s32 metatileLayerType, const u16 *tiles, const u8 *ext,
     ScheduleBgCopyTilemapToVram(1);
     ScheduleBgCopyTilemapToVram(2);
     ScheduleBgCopyTilemapToVram(3);
-    OpalMapPalettesSetMetatile(offset, metatileLayerType, tiles, paletteRefs);
+    OpalMapPalettesSetMetatile(offset, metatileLayerType, tiles, paletteRefs, thirdTiles);
 }
 
 static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *cameraOffset, s32 x, s32 y)

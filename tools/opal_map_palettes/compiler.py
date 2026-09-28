@@ -106,10 +106,24 @@ def metatile_masks(path, references=None):
     if references is None:
         references = [[word >> 12 for word in entries[i:i + 8]] for i in range(0, len(entries), 8)]
     require(len(references) == count, f"{path}: palette sidecar must have {count} rows")
+    third_path = path.parent / "metatile_third_layer.bin"
+    third = None
+    if third_path.exists():
+        third = words(third_path)
+        require(len(third) == count * 4,
+                f"{third_path}: expected four third-layer entries per metatile")
+
     result = []
     for i, row in enumerate(references):
         require(isinstance(row, list) and len(row) == 8, f"{path}: row {i} needs eight palette IDs")
-        result.append(mask(row, LOGICAL_PALETTES))
+        value = mask(row, LOGICAL_PALETTES)
+
+        if third is not None:
+            extra = third[i * 4:(i + 1) * 4]
+            value |= mask([word >> 12 for word in extra], LOGICAL_PALETTES)
+
+        result.append(value)
+
     return result, references
 
 
