@@ -1,0 +1,358 @@
+diff --git a/include/core/tile.h b/include/core/tile.h
+index 11fd6a9..3bcafec 100644
+--- a/include/core/tile.h
++++ b/include/core/tile.h
+@@ -16,7 +16,7 @@ public:
+     uint16_t tileId:10;
+     uint16_t xflip:1;
+     uint16_t yflip:1;
+-    uint16_t palette:4;
++    uint16_t palette; // Logical Opal palette IDs also include 16 and 17.
+     uint16_t rawValue() const;
+ 
+     Qt::Orientations orientation() const;
+diff --git a/include/core/tileset.h b/include/core/tileset.h
+index dcf55ec..ad34b01 100644
+--- a/include/core/tileset.h
++++ b/include/core/tileset.h
+@@ -31,6 +31,7 @@ public:
+     QString metatile_attrs_path;
+     QString tilesImagePath;
+     QStringList palettePaths;
++    QString opalPaletteRefsPath;
+ 
+     QHash<int, QString> metatileLabels;
+     QList<QList<QRgb>> palettes;
+diff --git a/include/opalpalettes.h b/include/opalpalettes.h
+new file mode 100644
+index 0000000..d876a8c
+--- /dev/null
++++ b/include/opalpalettes.h
+@@ -0,0 +1,95 @@
++#pragma once
++#include <QFile>
++#include <QJsonDocument>
++#include <QJsonArray>
++#include <QJsonObject>
++#include <QCryptographicHash>
++#include <QSaveFile>
++#include <QStringList>
++#include <QVector>
++
++namespace OpalPalettes {
++// Kyoto Emerald uses 8 sub-tiles per metatile. These helpers intentionally accept the project-provided column count instead of hard-coding Opal's original 12.
++inline bool readJson(const QString &path, QJsonDocument &doc, QString &error) {
++    QFile file(path);
++    if (!file.open(QIODevice::ReadOnly)) { error = path + ": " + file.errorString(); return false; }
++    QJsonParseError parse;
++    doc = QJsonDocument::fromJson(file.readAll(), &parse);
++    if (parse.error != QJsonParseError::NoError) { error = path + ": " + parse.errorString(); return false; }
++    return true;
++}
++inline bool readReferences(const QString &path, const QByteArray &metatiles, int rows, int columns, QVector<QVector<int>> &refs, QString &error) {
++    QJsonDocument doc;
++    if (!readJson(path, doc, error)) return false;
++    error = QString("%1: expected one row of %2 IDs (0–17) per metatile, with a matching binary checksum")
++            .arg(path).arg(columns);
++    const auto root = doc.object();
++    const auto digest = QString::fromLatin1(QCryptographicHash::hash(metatiles, QCryptographicHash::Sha256).toHex());
++    if (columns <= 0 || !doc.isObject() || root.value("version").toInt() != 1
++        || root.value("metatiles_sha256").toString() != digest
++        || !root.value("palettes").isArray() || root.value("palettes").toArray().size() != rows) return false;
++    QVector<QVector<int>> result;
++    for (const auto &value : root.value("palettes").toArray()) {
++        if (!value.isArray() || value.toArray().size() != columns) return false;
++        QVector<int> row;
++        for (const auto &id : value.toArray()) {
++            if (!id.isDouble() || id.toDouble() != id.toInt(-1) || id.toInt(-1) < 0 || id.toInt() >= 18) return false;
++            row.append(id.toInt());
++        }
++        result.append(row);
++    }
++    refs = result;
++    error.clear();
++    return true;
++}
++inline bool writeReferences(const QString &path, const QVector<QVector<int>> &refs, const QByteArray &metatiles, QString &error) {
++    QJsonArray rows;
++    const int columns = refs.isEmpty() ? 0 : refs.first().size();
++    if (columns <= 0) { error = "Kyoto/Opal palette sidecar has no metatile columns"; return false; }
++    for (const auto &row : refs) {
++        if (row.size() != columns) { error = "Kyoto/Opal palette rows have inconsistent sub-tile counts"; return false; }
++        QJsonArray values;
++        for (int id : row) {
++            if (id < 0 || id >= 18) { error = "Invalid Opal palette ID"; return false; }
++            values.append(id);
++        }
++        rows.append(values);
++    }
++    QJsonObject root;
++    root.insert("version", 1);
++    root.insert("metatiles_sha256", QString::fromLatin1(QCryptographicHash::hash(metatiles, QCryptographicHash::Sha256).toHex()));
++    root.insert("palettes", rows);
++    QSaveFile file(path);
++    const auto bytes = QJsonDocument(root).toJson();
++    if (!file.open(QIODevice::WriteOnly) || file.write(bytes) != bytes.size() || !file.commit()) {
++        error = path + ": " + file.errorString(); return false;
++    }
++    return true;
++}
++inline bool tilesetPaths(const QString &root, const QString &name, QString &refs, QStringList &palettes, QString &error) {
++    const QString path = root + "/data/tilesets/opal_palettes.json";
++    if (!QFile::exists(path)) return true;
++    QJsonDocument doc;
++    if (!readJson(path, doc, error)) return false;
++    const auto obj = doc.object();
++    error = path + ": invalid or duplicate Opal tileset entry";
++    if (obj.value("version").toInt() != 1 || !obj.value("tilesets").isArray()) return false;
++    bool found = false;
++    for (const auto &value : obj.value("tilesets").toArray()) {
++        const auto entry = value.toObject();
++        if (entry.value("tileset").toString() != name) continue;
++        if (found || entry.value("palette_refs").toString().isEmpty() || entry.value("palettes").toArray().size() != 4) return false;
++        found = true;
++        refs = root + "/" + entry.value("palette_refs").toString();
++        while (palettes.size() < 18) palettes.append(QString());
++        const auto extra = entry.value("palettes").toArray();
++        for (int i = 0; i < 4; i++) {
++            const auto day = extra[i].toObject().value("day").toString();
++            if (day.isEmpty()) return false;
++            palettes[14 + i] = root + "/" + day;
++        }
++    }
++    error.clear();
++    return true;
++}
++}
+diff --git a/src/core/tileset.cpp b/src/core/tileset.cpp
+index 0aa1f7d..eedb18b 100644
+--- a/src/core/tileset.cpp
++++ b/src/core/tileset.cpp
+@@ -6,6 +6,7 @@
+ #include "imageproviders.h"
+ #include "validator.h"
+ 
++#include "opalpalettes.h"
+ #include <QPainter>
+ #include <QImage>
+ #include <algorithm>
+@@ -22,6 +23,7 @@ Tileset::Tileset(const Tileset &other)
+       metatile_attrs_path(other.metatile_attrs_path),
+       tilesImagePath(other.tilesImagePath),
+       palettePaths(other.palettePaths),
++      opalPaletteRefsPath(other.opalPaletteRefsPath),
+       metatileLabels(other.metatileLabels),
+       palettes(other.palettes),
+       palettePreviews(other.palettePreviews),
+@@ -49,6 +51,7 @@ Tileset &Tileset::operator=(const Tileset &other) {
+     tilesImagePath = other.tilesImagePath;
+     m_tilesImage = other.m_tilesImage.copy();
+     palettePaths = other.palettePaths;
++    opalPaletteRefsPath = other.opalPaletteRefsPath;
+     metatileLabels = other.metatileLabels;
+     palettes = other.palettes;
+     palettePreviews = other.palettePreviews;
+@@ -364,7 +367,7 @@ bool Tileset::appendToGraphics(const QString &filepath, const QString &friendlyN
+         // Append to asm file
+         dataString.append("\t.align 2\n");
+         dataString.append(QString("gTilesetPalettes_%1::\n").arg(friendlyName));
+-        for (int i = 0; i < Project::getNumPalettesTotal(); i++)
++        for (int i = 0; i < qMin(Project::getNumPalettesTotal(), Tileset::maxPalettes()); i++)
+             dataString.append(QString("\t.incbin \"%1%2%3\"\n").arg(palettesPath).arg(i, 2, 10, QLatin1Char('0')).arg(palettesExt));
+         dataString.append("\n\t.align 2\n");
+         dataString.append(QString("gTilesetTiles_%1::\n").arg(friendlyName));
+@@ -372,7 +375,7 @@ bool Tileset::appendToGraphics(const QString &filepath, const QString &friendlyN
+     } else {
+         // Append to C file
+         dataString.append(QString("const u16 gTilesetPalettes_%1[][%2] =\n{\n").arg(friendlyName).arg(Tileset::numColorsPerPalette()));
+-        for (int i = 0; i < Project::getNumPalettesTotal(); i++)
++        for (int i = 0; i < qMin(Project::getNumPalettesTotal(), Tileset::maxPalettes()); i++)
+             dataString.append(QString("    INCBIN_U16(\"%1%2%3\"),\n").arg(palettesPath).arg(i, 2, 10, QLatin1Char('0')).arg(palettesExt));
+         dataString.append("};\n");
+         dataString.append(QString("\nconst u32 gTilesetTiles_%1[] = INCBIN_U32(\"%2\");\n").arg(friendlyName, tilesPath));
+@@ -472,6 +475,13 @@ bool Tileset::loadMetatiles() {
+         numMetatiles = maxMetatiles();
+     }
+ 
++    QVector<QVector<int>> opalRefs;
++    QString error;
++    if (!opalPaletteRefsPath.isEmpty()
++        && !OpalPalettes::readReferences(opalPaletteRefsPath, data, numMetatiles, tilesPerMetatile, opalRefs, error)) {
++        logError(error);
++        return false;
++    }
+     for (int i = 0; i < numMetatiles; i++) {
+         auto metatile = new Metatile;
+         int index = i * bytesPerMetatile;
+@@ -479,6 +489,7 @@ bool Tileset::loadMetatiles() {
+             uint16_t tileRaw = static_cast<unsigned char>(data[index++]);
+             tileRaw |= static_cast<unsigned char>(data[index++]) << 8;
+             metatile->tiles.append(Tile(tileRaw));
++            if (!opalRefs.isEmpty()) metatile->tiles.last().palette = opalRefs[i][j];
+         }
+         m_metatiles.append(metatile);
+     }
+@@ -486,22 +497,38 @@ bool Tileset::loadMetatiles() {
+ }
+ 
+ bool Tileset::saveMetatiles() {
+-    QFile file(this->metatiles_path);
+-    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+-        logError(QString("Could not open '%1' for writing: %2").arg(this->metatiles_path).arg(file.errorString()));
+-        return false;
+-    }
+-
+     QByteArray data;
+-    int numTiles = projectConfig.getNumTilesInMetatile();
++    QVector<QVector<int>> refs;
++    const bool extended = !opalPaletteRefsPath.isEmpty();
++    const int numTiles = projectConfig.getNumTilesInMetatile();
+     for (const auto &metatile : m_metatiles) {
++        QVector<int> row;
+         for (int i = 0; i < numTiles; i++) {
+-            uint16_t tile = metatile->tiles.value(i).rawValue();
+-            data.append(static_cast<char>(tile));
+-            data.append(static_cast<char>(tile >> 8));
++            Tile tile = metatile->tiles.value(i);
++            if (tile.palette >= (extended ? 18 : 16)
++                || (Project::getNumPalettesTotal() == 18 && !is_secondary && tile.palette >= 14)) {
++                logError("Enable Opal extra palettes on the secondary tileset before using logical palette IDs 14–17.");
++                return false;
++            }
++            row.append(tile.palette);
++            if (extended && tile.palette >= 14) tile.palette = 0;
++            const uint16_t raw = tile.rawValue();
++            data.append(static_cast<char>(raw));
++            data.append(static_cast<char>(raw >> 8));
+         }
++        refs.append(row);
++    }
++    QString error;
++    // Each file is replaced atomically. The ROM compiler rejects mismatched row counts.
++    if (extended && !OpalPalettes::writeReferences(opalPaletteRefsPath, refs, data, error)) {
++        logError(error);
++        return false;
++    }
++    QSaveFile file(metatiles_path);
++    if (!file.open(QIODevice::WriteOnly) || file.write(data) != data.size() || !file.commit()) {
++        logError(QString("Could not save %1: %2").arg(metatiles_path, file.errorString()));
++        return false;
+     }
+-    file.write(data);
+     return true;
+ }
+ 
+@@ -668,6 +695,7 @@ bool Tileset::savePalettes() {
+     bool success = true;
+     int numPalettes = qMin(this->palettePaths.length(), this->palettes.length());
+     for (int i = 0; i < numPalettes; i++) {
++        if (this->palettePaths.at(i).isEmpty()) continue;
+         if (!PaletteUtil::writeJASC(this->palettePaths.at(i), this->palettes.at(i).toVector(), 0, Tileset::numColorsPerPalette()))
+             success = false;
+     }
+diff --git a/src/project.cpp b/src/project.cpp
+index d43b094..3a6f4a8 100644
+--- a/src/project.cpp
++++ b/src/project.cpp
+@@ -1,4 +1,5 @@
+ #include "project.h"
++#include "opalpalettes.h"
+ #include "config.h"
+ #include "history.h"
+ #include "log.h"
+@@ -1502,6 +1503,8 @@ bool Project::loadTilesetAssets(Tileset* tileset) {
+ void Project::readTilesetPaths(Tileset* tileset) {
+     // Parse the tileset data files to try and get explicit file paths for this tileset's assets
+     const QString rootDir = this->root + "/";
++    tileset->palettePaths.clear();
++    tileset->opalPaletteRefsPath.clear();
+     if (this->usingAsmTilesets) {
+         // Read asm tileset data files. Backwards compatibility
+         const QList<QStringList> graphics = parser.parseAsm(projectConfig.getFilePath(ProjectFilePath::tilesets_graphics_asm));
+@@ -1555,6 +1558,12 @@ void Project::readTilesetPaths(Tileset* tileset) {
+             tileset->palettePaths.append(palettes_dir_path + QString("%1").arg(i, 2, 10, QLatin1Char('0')) + ".pal");
+         }
+     }
++    QString error;
++    if (!OpalPalettes::tilesetPaths(root, tileset->name, tileset->opalPaletteRefsPath, tileset->palettePaths, error)) {
++        logError(error);
++        // Force loading to fail, rather than silently discard authored references.
++        tileset->opalPaletteRefsPath = rootDir + "__invalid_opal_palette_manifest__";
++    }
+ }
+ 
+ Tileset *Project::createNewTileset(QString name, bool secondary, bool checkerboardFill) {
+@@ -2366,6 +2375,7 @@ bool Project::readFieldmapProperties() {
+         }
+     };
+     loadDefine(numPalsTotalName,        &Project::num_pals_total, 2, Tileset::maxPalettes());
++    if (QFile::exists(root + "/data/tilesets/opal_palettes.json")) Project::num_pals_total = 18;
+     loadDefine(numTilesTotalName,       &Project::num_tiles_total, 2, 1024); // 1024 is fixed because we store tile IDs in a 10-bit field.
+     loadDefine(numPalsPrimaryName,      &Project::num_pals_primary, 1, Project::num_pals_total - 1);
+     loadDefine(numTilesPrimaryName,     &Project::num_tiles_primary, 1, Project::num_tiles_total - 1);
+diff --git a/src/ui/tileseteditor.cpp b/src/ui/tileseteditor.cpp
+index 723a2af..572138b 100644
+--- a/src/ui/tileseteditor.cpp
++++ b/src/ui/tileseteditor.cpp
+@@ -15,6 +15,9 @@
+ #include <QDialogButtonBox>
+ #include <QCloseEvent>
+ #include <QImageReader>
++#include <QProcess>
++#include <QStandardPaths>
++#include <QMessageBox>
+ 
+ TilesetEditor::TilesetEditor(Project *project, Layout *layout, QWidget *parent) :
+     QMainWindow(parent),
+@@ -67,6 +70,51 @@ TilesetEditor::TilesetEditor(Project *project, Layout *layout, QWidget *parent)
+ 
+     connect(ui->lineEdit_MetatileLabel, &QLineEdit::editingFinished, this, &TilesetEditor::commitMetatileLabel);
+ 
++    if (QFile::exists(this->project->root + "/data/tilesets/opal_palettes.json")) {
++        QMenu *menu = menuBar()->addMenu(tr("Opal palettes"));
++        auto enable = menu->addAction(tr("Enable four extra secondary palettes"));
++        auto validate = menu->addAction(tr("Validate saved maps and palettes"));
++        auto run = [this, menu](bool enabling) {
++            if (!save()) return;
++            QString python = QStandardPaths::findExecutable("python3");
++            if (python.isEmpty()) python = QStandardPaths::findExecutable("python");
++            if (python.isEmpty()) {
++                QMessageBox::warning(this, tr("Opal palettes"), tr("Python 3.10 or newer is required."));
++                return;
++            }
++            QStringList args{this->project->root + "/tools/opal_map_palettes/compiler.py", "--root", this->project->root};
++            args << "--game" << (projectConfig.baseGameVersion == BaseGameVersion::pokefirered ? "firered" : "emerald");
++            if (enabling) args << "--enable" << secondaryTileset->name;
++            auto process = new QProcess(this);
++            menu->setEnabled(false);
++            connect(process, &QProcess::errorOccurred, this, [this, menu, process](QProcess::ProcessError) {
++                menu->setEnabled(true);
++                QMessageBox::warning(this, tr("Opal palettes"), process->errorString());
++                process->deleteLater();
++            });
++            connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
++                    [this, menu, process, enabling](int code, QProcess::ExitStatus) {
++                menu->setEnabled(true);
++                const QString output = QString::fromUtf8(process->readAllStandardOutput())
++                                     + QString::fromUtf8(process->readAllStandardError());
++                if (enabling) {
++                    auto original = this->project->getTileset(secondaryTileset->name);
++                    if (this->project->loadTilesetAssets(original)) {
++                        reset();
++                        emit tilesetsSaved(primaryTileset->name, secondaryTileset->name);
++                    }
++                }
++                QMessageBox::information(this, tr("Opal palette validation"),
++                    (code ? tr("Validation failed.\n") : tr("Validation passed.\n")) + output
++                    + tr("\nValidation uses saved map files. Save maps in the main window before validating."));
++                process->deleteLater();
++            });
++            process->start(python, args);
++        };
++        connect(enable, &QAction::triggered, this, [run] { run(true); });
++        connect(validate, &QAction::triggered, this, [run] { run(false); });
++    }
++
+     initAttributesUi();
+     initMetatileSelector();
+     initMetatileLayersItem();
