@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_cloud_layers.h"
 #include "opal_map_palette.h"
 #include "palette.h"
 #include "util.h"
@@ -130,6 +131,7 @@ void FillPalette(u32 value, u32 offset, u32 size)
 
 void TransferPlttBuffer(void)
 {
+    KyotoCloud_BeforePaletteTransfer();
     if (!gPaletteFade.bufferTransferDisabled)
     {
         DmaCopy16Defvars(3, gPlttBufferFaded, (void *)PLTT, PLTT_SIZE);

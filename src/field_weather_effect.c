@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_cloud_layers.h"
 #include "battle_anim.h"
 #include "event_object_movement.h"
 #include "fieldmap.h"
@@ -35,63 +36,6 @@ const u8 gWeatherSandstormTiles[] = INCGFX_U8("graphics/weather/sandstorm.png", 
 // WEATHER_SUNNY_CLOUDS
 //------------------------------------------------------------------------------
 
-static void CreateCloudSprites(void);
-static void DestroyCloudSprites(void);
-static void UpdateCloudSprite(struct Sprite *);
-
-// The clouds are positioned on the map's grid.
-// These coordinates are for the lower half of Route 120.
-static const struct Coords16 sCloudSpriteMapCoords[] =
-{
-    { 0, 66},
-    { 5, 73},
-    {10, 78},
-};
-
-static const struct SpriteSheet sCloudSpriteSheet =
-{
-    .data = gWeatherCloudTiles,
-    .size = sizeof(gWeatherCloudTiles),
-    .tag = GFXTAG_CLOUD
-};
-
-static const struct OamData sCloudSpriteOamData =
-{
-    .y = 0,
-    .affineMode = ST_OAM_AFFINE_OFF,
-    .objMode = ST_OAM_OBJ_BLEND,
-    .mosaic = FALSE,
-    .bpp = ST_OAM_4BPP,
-    .shape = SPRITE_SHAPE(64x64),
-    .x = 0,
-    .matrixNum = 0,
-    .size = SPRITE_SIZE(64x64),
-    .tileNum = 0,
-    .priority = 3,
-    .paletteNum = 0,
-    .affineParam = 0,
-};
-
-static const union AnimCmd sCloudSpriteAnimCmd[] =
-{
-    ANIMCMD_FRAME(0, 16),
-    ANIMCMD_END,
-};
-
-static const union AnimCmd *const sCloudSpriteAnimCmds[] =
-{
-    sCloudSpriteAnimCmd,
-};
-
-static const struct SpriteTemplate sCloudSpriteTemplate =
-{
-    .tileTag = GFXTAG_CLOUD,
-    .paletteTag = PALTAG_WEATHER_2,
-    .oam = &sCloudSpriteOamData,
-    .anims = sCloudSpriteAnimCmds,
-    .callback = UpdateCloudSprite,
-};
-
 void Clouds_InitVars(void)
 {
     gWeatherPtr->noShadows = FALSE;
@@ -115,11 +59,11 @@ void Clouds_Main(void)
     switch (gWeatherPtr->initStep)
     {
     case 0:
-        CreateCloudSprites();
+        KyotoCloud_Create();
         gWeatherPtr->initStep++;
         break;
     case 1:
-        Weather_SetTargetBlendCoeffs(12, 8, 1);
+        Weather_SetTargetBlendCoeffs(14, 2, 1);
         gWeatherPtr->initStep++;
         break;
     case 2:
@@ -143,7 +87,7 @@ bool8 Clouds_Finish(void)
     case 1:
         if (Weather_UpdateBlend())
         {
-            DestroyCloudSprites();
+            KyotoCloud_Destroy();
             gWeatherPtr->finishStep++;
         }
         return TRUE;
@@ -173,61 +117,6 @@ void Sunny_Main(void)
 bool8 Sunny_Finish(void)
 {
     return FALSE;
-}
-
-static void CreateCloudSprites(void)
-{
-    u16 i;
-    u8 spriteId;
-    struct Sprite *sprite;
-
-    if (gWeatherPtr->cloudSpritesCreated == TRUE)
-        return;
-
-    LoadSpriteSheet(&sCloudSpriteSheet);
-    LoadCustomWeatherSpritePalette(gCloudsWeatherPalette);
-    for (i = 0; i < NUM_CLOUD_SPRITES; i++)
-    {
-        spriteId = CreateSpriteUnchecked(&sCloudSpriteTemplate, 0, 0, 0xFF);
-        if (spriteId != MAX_SPRITES)
-        {
-            gWeatherPtr->sprites.s1.cloudSprites[i] = &gSprites[spriteId];
-            sprite = gWeatherPtr->sprites.s1.cloudSprites[i];
-            SetSpritePosToMapCoords(sCloudSpriteMapCoords[i].x + MAP_OFFSET, sCloudSpriteMapCoords[i].y + MAP_OFFSET, &sprite->x, &sprite->y);
-            sprite->coordOffsetEnabled = TRUE;
-        }
-        else
-        {
-            gWeatherPtr->sprites.s1.cloudSprites[i] = NULL;
-        }
-    }
-
-    gWeatherPtr->cloudSpritesCreated = TRUE;
-}
-
-static void DestroyCloudSprites(void)
-{
-    u16 i;
-
-    if (!gWeatherPtr->cloudSpritesCreated)
-        return;
-
-    for (i = 0; i < NUM_CLOUD_SPRITES; i++)
-    {
-        if (gWeatherPtr->sprites.s1.cloudSprites[i] != NULL)
-            DestroySprite(gWeatherPtr->sprites.s1.cloudSprites[i]);
-    }
-
-    FreeSpriteTilesByTag(GFXTAG_CLOUD);
-    gWeatherPtr->cloudSpritesCreated = FALSE;
-}
-
-static void UpdateCloudSprite(struct Sprite *sprite)
-{
-    // Move 1 pixel left every 2 frames.
-    sprite->data[0] = (sprite->data[0] + 1) & 1;
-    if (sprite->data[0])
-        sprite->x--;
 }
 
 //------------------------------------------------------------------------------

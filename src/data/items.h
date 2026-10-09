@@ -19,6 +19,9 @@
 
 const u8 gQuestionMarksItemName[] = _("????????");
 
+static const u32 sParagliderItemIcon[] = INCGFX_U32("graphics/glide/item.png", ".4bpp.lz");
+static const u16 sParagliderItemPalette[] = INCGFX_U16("graphics/glide/item.png", ".gbapal");
+
 const struct ItemInfo gItemsInfo[] =
 {
     [ITEM_NONE] =
@@ -14021,6 +14024,22 @@ const struct ItemInfo gItemsInfo[] =
         .secondaryId = MACH_BIKE,
         .iconPic = gItemIcon_MachBike,
         .iconPalette = gItemIconPalette_MachBike,
+    },
+
+    [ITEM_PARAGLIDER] =
+    {
+        .name = ITEM_NAME("Paraglider"),
+        .price = 0,
+        .description = COMPOUND_STRING(
+            "A glider for crossing\n"
+            "cloud paths. Use at\n"
+            "a marked landing."),
+        .importance = 1,
+        .pocket = POCKET_KEY_ITEMS,
+        .type = ITEM_USE_FIELD,
+        .fieldUseFunc = ItemUseOutOfBattle_Paraglider,
+        .iconPic = sParagliderItemIcon,
+        .iconPalette = sParagliderItemPalette,
     },
 
     [ITEM_ACRO_BIKE] =

@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_cloud_layers.h"
 #include "item_menu.h"
 #include "battle.h"
 #include "battle_controllers.h"
@@ -657,6 +658,7 @@ void QuizLadyOpenBagMenu(void)
 
 void GoToBagMenu(u8 location, u8 pocket, MainCallback exitCallback)
 {
+    KyotoCloud_OnCallbackChange(NULL);
     gBagMenu = AllocZeroed(sizeof(*gBagMenu));
     if (gBagMenu == NULL)
     {

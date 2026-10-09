@@ -1,4 +1,5 @@
 #include "global.h"
+#include "glide.h"
 #include "item_use.h"
 #include "battle.h"
 #include "battle_anim.h"
@@ -272,6 +273,25 @@ void ItemUseOutOfBattle_ExpShare(u8 taskId)
 #endif
 }
 
+static void ItemUseOnFieldCB_Paraglider(u8 taskId)
+{
+    Glide_Toggle();
+    ScriptUnfreezeObjectEvents();
+    UnlockPlayerFieldControls();
+    DestroyTask(taskId);
+}
+
+void ItemUseOutOfBattle_Paraglider(u8 taskId)
+{
+    if (Glide_CanUse())
+    {
+        sItemUseOnFieldCB = ItemUseOnFieldCB_Paraglider;
+        SetUpItemUseOnFieldCallback(taskId);
+    }
+    else
+        DisplayDadsAdviceCannotUseItemMessage(taskId, gTasks[taskId].tUsingRegisteredKeyItem);
+}
+
 void ItemUseOutOfBattle_Bike(u8 taskId)
 {
     s16 *data = gTasks[taskId].data;
@@ -280,6 +300,11 @@ void ItemUseOutOfBattle_Bike(u8 taskId)
     u8 behavior;
     PlayerGetDestCoords(&coordsX, &coordsY);
     behavior = MapGridGetMetatileBehaviorAt(coordsX, coordsY);
+    if (Glide_IsActive())
+    {
+        DisplayDadsAdviceCannotUseItemMessage(taskId, tUsingRegisteredKeyItem);
+        return;
+    }
     if (FlagGet(FLAG_SYS_CYCLING_ROAD) == TRUE || MetatileBehavior_IsVerticalRail(behavior) == TRUE || MetatileBehavior_IsHorizontalRail(behavior) == TRUE || MetatileBehavior_IsIsolatedVerticalRail(behavior) == TRUE || MetatileBehavior_IsIsolatedHorizontalRail(behavior) == TRUE)
     {
         DisplayCannotDismountBikeMessage(taskId, tUsingRegisteredKeyItem);

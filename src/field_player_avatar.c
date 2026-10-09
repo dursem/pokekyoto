@@ -1,4 +1,5 @@
 #include "global.h"
+#include "glide.h"
 #include "main.h"
 #include "bike.h"
 #include "event_data.h"
@@ -361,6 +362,9 @@ void PlayerStep(enum Direction direction, u16 newKeys, u16 heldKeys)
 {
     struct ObjectEvent *playerObjEvent = &gObjectEvents[gPlayerAvatar.objectEventId];
 
+    Glide_Update();
+    if (Glide_IsActive())
+        heldKeys &= ~B_BUTTON;
     HideShowWarpArrow(playerObjEvent);
     if (gPlayerAvatar.preventStep == FALSE && !TryUpdatePlayerSpinDirection())
     {
@@ -965,6 +969,8 @@ enum Collision CheckForObjectEventCollision(struct ObjectEvent *objectEvent, s16
 {
     enum Collision collision = GetCollisionAtCoords(objectEvent, x, y, direction);
 
+    if (Glide_IsActive())
+        return collision;
     if (collision == COLLISION_ELEVATION_MISMATCH && CanStopSurfing(x, y, direction))
         return COLLISION_STOP_SURFING;
 

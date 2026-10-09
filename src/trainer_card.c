@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_cloud_layers.h"
 #include "scanline_effect.h"
 #include "palette.h"
 #include "task.h"
@@ -1811,6 +1812,7 @@ static bool8 Task_EndCardFlip(struct Task *task)
 
 void ShowPlayerTrainerCard(void (*callback)(void))
 {
+    KyotoCloud_OnCallbackChange(NULL);
     sData = AllocZeroed(sizeof(*sData));
     sData->callback2 = callback;
     if (callback == CB2_ReshowFrontierPass)

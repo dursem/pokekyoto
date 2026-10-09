@@ -817,6 +817,22 @@ void RequestSpriteCopy(const u8 *src, u8 *dest, u16 size)
     }
 }
 
+// Use the animation frame queued for this OAM snapshot when shading clouds.
+const u8 *GetSpriteGraphicsForPendingFrame(const u8 *vram, u32 size)
+{
+    s32 i;
+    if (!sShouldProcessSpriteCopyRequests)
+        return vram;
+    for (i = sSpriteCopyRequestCount - 1; i >= 0; i--)
+    {
+        u32 start = (u32)sSpriteCopyRequests[i].dest;
+        u32 address = (u32)vram;
+        if (address >= start && address - start + size <= sSpriteCopyRequests[i].size)
+            return sSpriteCopyRequests[i].src + (address - start);
+    }
+    return vram;
+}
+
 void CopyFromSprites(u8 *dest)
 {
     u32 i;
