@@ -1,6 +1,7 @@
 #ifndef GUARD_KYOTO_ICONS_H
 #define GUARD_KYOTO_ICONS_H
 #include "pokemon_icon.h"
+#define KYOTO_USE_POKESPRITE_ICONS FALSE // Native icons retain their two distinct animation frames.
 #define KYOTO_ICON_FRAME_BYTES 640
 void KyotoIconSetSubsprites(struct Sprite *sprite);
 const u16 *KyotoIconPalette(enum Species species, bool32 shiny, u32 personality, bool32 isEgg);

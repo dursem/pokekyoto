@@ -29,6 +29,7 @@ static const u8 ALIGNED(4) sPokespriteData[] = INCBIN_U8("graphics/pokemon/kyoto
 static const u8 *ImportedIcon(enum Species species, enum SpeciesIconType type, bool32 shiny)
 {
     u32 id;
+    if (!KYOTO_USE_POKESPRITE_ICONS) return NULL;
     if (type == EGG_ICON) return NULL;
     id = sPokespriteIds[SanitizeSpeciesId(species)][type == FEMALE_ICON];
     return id ? sPokespriteData + id * 1344 + (shiny ? 672 : 0) : NULL;

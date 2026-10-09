@@ -42,6 +42,10 @@ static u8 sFireflyFadeStartShadeLevel;
 static bool8 sFireflyFadingIn;
 static bool8 sFireflyFadingOut;
 static bool8 sFireflyLightingConfigured;
+// Release OBJ resources for battles/menus, but remember the map's completed entrance.
+static bool8 sFireflyResumeActive;
+static u8 sFireflyResumeMapGroup;
+static u8 sFireflyResumeMapNum;
 static u16 sFireflySavedWindowBits;
 static u16 sFireflySavedWinOut;
 static u16 sFireflySavedBlendControl;
@@ -197,20 +201,26 @@ static const u8 sFireflyFlickerFrame[8] =
 
 void FireflyShade_InitVars(void)
 {
+    bool8 resume = sFireflyResumeActive
+                && sFireflyResumeMapGroup == gSaveBlock1Ptr->location.mapGroup
+                && sFireflyResumeMapNum == gSaveBlock1Ptr->location.mapNum;
+    sFireflyResumeActive = FALSE;
+    sFireflyResumeMapGroup = gSaveBlock1Ptr->location.mapGroup;
+    sFireflyResumeMapNum = gSaveBlock1Ptr->location.mapNum;
     // Firefly Shade uses hardware brightness outside circular OBJ windows.
     // Keeping the weather color map at 0 leaves the true map palette available
     // inside every moving light circle.
     gWeatherPtr->initStep = 0;
     gWeatherPtr->targetColorMapIndex = 0;
     gWeatherPtr->colorMapStepDelay = 20;
-    sFireflyFadeTimer = 0;
-    sFireflyBlendEVA = 0;
-    sFireflyShadeLevel = 0;
-    sFireflyFadingIn = TRUE;
+    sFireflyFadeTimer = resume ? FIREFLY_FADE_FRAMES : 0;
+    sFireflyBlendEVA = resume ? 16 : 0;
+    sFireflyShadeLevel = resume ? FIREFLY_SHADE_LEVEL : 0;
+    sFireflyFadingIn = !resume;
     sFireflyFadingOut = FALSE;
-    Weather_SetBlendCoeffs(0, 16);
-    gWeatherPtr->noShadows = TRUE;
-    gWeatherPtr->weatherGfxLoaded = FALSE;
+    Weather_SetBlendCoeffs(resume ? 8 : 0, resume ? BASE_SHADOW_INTENSITY : 16);
+    gWeatherPtr->noShadows = !resume;
+    gWeatherPtr->weatherGfxLoaded = resume;
 }
 
 void FireflyShade_InitAll(void)
@@ -234,6 +244,7 @@ bool8 FireflyShade_Finish(void)
     switch (gWeatherPtr->finishStep)
     {
     case 0:
+        sFireflyResumeActive = FALSE;
         sFireflyFadingIn = FALSE;
         sFireflyFadingOut = TRUE;
         sFireflyFadeTimer = 0;
@@ -689,6 +700,11 @@ static void RestoreFireflyLighting(void)
 // and OBJ slots are reused. The weather initializer recreates it on return.
 void FireflyShade_Reset(void)
 {
+    if (sFireflyLightingConfigured && !sFireflyFadingIn && !sFireflyFadingOut
+     && sFireflyBlendEVA == 16 && gWeatherPtr->currWeather == WEATHER_SHADE)
+    {
+        sFireflyResumeActive = TRUE;
+    }
     DestroyFireflySprites();
     sFireflyFadingIn = FALSE;
     sFireflyFadingOut = FALSE;

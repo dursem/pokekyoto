@@ -1,4 +1,6 @@
 #include "global.h"
+#include "main.h"
+#include "config/battle.h"
 #include "battle.h"
 #include "palette.h"
 #include "pokemon.h"
@@ -510,7 +512,8 @@ static void Task_HandleMonAnimation(u8 taskId)
         for (i = 2; i < ARRAY_COUNT(sprite->data); i++)
             sprite->data[i] = 0;
 
-        if (gTestRunnerHeadless && !gBattleTestRunnerState->forceMoveAnim)
+        if ((!B_KYOTO_MON_SPRITE_ANIMATIONS && gMain.inBattle)
+         || (gTestRunnerHeadless && !gBattleTestRunnerState->forceMoveAnim))
             sprite->callback = WaitAnimEnd;
         else
             sprite->callback = sMonAnimFunctions[gTasks[taskId].tAnimId];
