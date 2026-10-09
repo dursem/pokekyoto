@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_icons.h"
 #include "malloc.h"
 #include "battle_anim.h"
 #include "battle_interface.h"
@@ -572,6 +573,7 @@ static void CB2_CreateTradeMenu(void)
                                                          (sTradeMonSpriteCoords[i][1] * 8) - 12,
                                                          1,
                                                          GetMonData(mon, MON_DATA_PERSONALITY));
+            KyotoIconApplyMon(&gSprites[sTradeMenu->partySpriteIds[TRADE_PLAYER][i]], mon);
         }
 
         for (i = 0; i < sTradeMenu->partyCounts[TRADE_PARTNER]; i++)
@@ -583,6 +585,7 @@ static void CB2_CreateTradeMenu(void)
                                                          (sTradeMonSpriteCoords[i + PARTY_SIZE][1] * 8) - 12,
                                                          1,
                                                          GetMonData(mon, MON_DATA_PERSONALITY));
+            KyotoIconApplyMon(&gSprites[sTradeMenu->partySpriteIds[TRADE_PARTNER][i]], mon);
         }
         gMain.state++;
         break;
@@ -761,6 +764,7 @@ static void CB2_ReturnToTradeMenu(void)
                                                          (sTradeMonSpriteCoords[i][1] * 8) - 12,
                                                          1,
                                                          GetMonData(mon, MON_DATA_PERSONALITY));
+            KyotoIconApplyMon(&gSprites[sTradeMenu->partySpriteIds[TRADE_PLAYER][i]], mon);
         }
 
         for (i = 0; i < sTradeMenu->partyCounts[TRADE_PARTNER]; i++)
@@ -772,6 +776,7 @@ static void CB2_ReturnToTradeMenu(void)
                                                          (sTradeMonSpriteCoords[i + PARTY_SIZE][1] * 8) - 12,
                                                          1,
                                                          GetMonData(mon, MON_DATA_PERSONALITY));
+            KyotoIconApplyMon(&gSprites[sTradeMenu->partySpriteIds[TRADE_PARTNER][i]], mon);
         }
         gMain.state++;
         break;

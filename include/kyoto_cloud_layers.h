@@ -8,4 +8,5 @@ void KyotoCloud_VBlank(void);
 void KyotoCloud_OnCallbackChange(void (*callback)(void));
 void KyotoCloud_SetFieldLoading(void);
 void KyotoCloud_BeforePaletteTransfer(void);
+bool32 KyotoCloud_UsesShadowWindow(void);
 #endif

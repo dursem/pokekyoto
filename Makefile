@@ -273,7 +273,7 @@ OPAL_PALETTE_MANIFEST := data/tilesets/opal_palettes.json
 OPAL_PALETTE_OUTPUT := $(DATA_SRC_SUBDIR)/tilesets/opal_palettes.generated.h
 AUTO_GEN_TARGETS += $(OPAL_PALETTE_OUTPUT)
 OPAL_PALETTE_DEPS := $(OPAL_PALETTE_MANIFEST) \
-                     $(shell find data/tilesets -type f \( -name 'palette_refs.json' -o -name 'extra_*.pal' -o -name 'metatiles.bin' \)) \
+                     $(shell find data/tilesets -type f \( -name 'palette_refs.json' -o -name '*.pal' -o -name '*.pla' -o -name 'metatiles.bin' \)) \
                      data/layouts/layouts.json $(wildcard data/maps/*/map.json) $(wildcard data/maps/*/scripts.pory) \
                      include/fieldmap.h include/global.fieldmap.h src/field_door.c
 
@@ -452,6 +452,11 @@ generated: $(AUTO_GEN_TARGETS)
 %.1bpp:     %.png  ; $(GFX) $< $@
 %.4bpp:     %.png  ; $(GFX) $< $@
 %.8bpp:     %.png  ; $(GFX) $< $@
+# Optional emissive-color metadata must trigger palette regeneration.
+LIGHT_PALETTE_SOURCES := $(shell find graphics data/tilesets -name '*.pla' 2>/dev/null)
+$(foreach p,$(LIGHT_PALETTE_SOURCES),$(eval $(p:.pla=.gbapal): $(p)))
+$(foreach p,$(LIGHT_PALETTE_SOURCES),$(eval $(ASSETS_DIR_NAME)/$(p:.pla=.gbapal): $(p)))
+
 %.gbapal:   %.pal  ; $(GFX) $< $@
 %.gbapal:   %.png  ; $(GFX) $< $@
 %.lz:       %      ; $(GFX) $< $@

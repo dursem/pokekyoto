@@ -1,4 +1,6 @@
 #include "global.h"
+#include "kyoto_lighting.h"
+#include "kyoto_icons.h"
 #include "sprite.h"
 #include "main.h"
 #include "overworld.h"
@@ -275,6 +277,8 @@ EWRAM_DATA bool8 gAffineAnimsDisabled = FALSE;
 
 void ResetSpriteData(void)
 {
+    KyotoLight_Reset();
+    KyotoIconReset(TRUE);
     ResetOamRange(0, 128);
     sOamDummyIndex = 0;
     ResetAllSprites();
@@ -572,10 +576,11 @@ void DestroySprite(struct Sprite *sprite)
         if (!sprite->usingSheet)
         {
             u16 i;
-            u16 tileEnd = (sprite->images->size / TILE_SIZE_4BPP) + sprite->oam.tileNum;
+            u16 tileEnd = ((KyotoIconManaged(sprite) ? KYOTO_ICON_FRAME_BYTES : sprite->images->size) / TILE_SIZE_4BPP) + sprite->oam.tileNum;
             for (i = sprite->oam.tileNum; i < tileEnd; i++)
                 FREE_SPRITE_TILE(i);
         }
+        KyotoIconRelease(sprite);
         ResetSprite(sprite);
     }
 }

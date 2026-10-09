@@ -10,6 +10,7 @@
 #include "constants/weather.h"
 #include "kyoto_cloud_layers.h"
 #include "kyoto_cloud_config.h"
+#include "gpu_regs.h"
 
 #define CLOUD_COUNT 11
 #define CLOUD_CELL_BYTES 2048
@@ -32,6 +33,42 @@ struct CloudState
     u32 tickBase, pauseFrame, pauseTickBase;
 };
 EWRAM_DATA static struct CloudState sCloud = {0};
+static bool8 sShadowWindowActive;
+
+bool32 KyotoCloud_UsesShadowWindow(void)
+{
+    // Hardware fades and iris/flash windows retain their normal ownership.
+    return sCloud.created && gMain.callback2 == CB2_Overworld
+        && !(gPaletteFade.active && gPaletteFade.mode == 2 /* HARDWARE_FADE */)
+        && GetGpuReg(REG_OFFSET_WIN0H) == 0x00FF
+        && GetGpuReg(REG_OFFSET_WIN0V) == 0x00FF
+        && GetGpuReg(REG_OFFSET_WIN1V) == 0xFFFF;
+}
+
+static void UpdateShadowWindowVBlank(void)
+{
+    if (KyotoCloud_UsesShadowWindow())
+    {
+        // Semi-transparent cloud OBJs always use BLDALPHA. In contrast,
+        // shadow OBJ windows darken only the BG underneath their pixel mask.
+        // Do not alter the register manager: menus, fades and other weather
+        // must retain their own saved register values.
+        REG_DISPCNT = (GetGpuReg(REG_OFFSET_DISPCNT) & ~(DISPCNT_WIN0_ON | DISPCNT_WIN1_ON)) | DISPCNT_OBJWIN_ON;
+        REG_WINOUT = 0x3F1F; // all layers; brightness only inside a shadow
+        REG_BLDCNT = (GetGpuReg(REG_OFFSET_BLDCNT) & BLDCNT_TGT2_ALL)
+                   | BLDCNT_EFFECT_DARKEN | BLDCNT_TGT1_BG1 | BLDCNT_TGT1_BG2 | BLDCNT_TGT1_BG3;
+        REG_BLDY = OW_SHADOW_INTENSITY;
+        sShadowWindowActive = TRUE;
+    }
+    else if (sShadowWindowActive)
+    {
+        REG_DISPCNT = GetGpuReg(REG_OFFSET_DISPCNT);
+        REG_WINOUT = GetGpuReg(REG_OFFSET_WINOUT);
+        REG_BLDCNT = GetGpuReg(REG_OFFSET_BLDCNT);
+        REG_BLDY = GetGpuReg(REG_OFFSET_BLDY);
+        sShadowWindowActive = FALSE;
+    }
+}
 
 static void CloudSpriteCallback(struct Sprite *sprite);
 static const struct OamData sCloudOam =
@@ -190,15 +227,16 @@ void KyotoCloud_OnCallbackChange(void (*callback)(void))
 
 void KyotoCloud_SetFieldLoading(void)
 {
-    if (sCloud.holdBlack)
-        sCloud.fieldLoading = TRUE;
+    // Every map rebuild needs this guard, including clear-weather maps.
+    // Start-menu reconstruction spans several frames before its fade starts.
+    sCloud.fieldLoading = TRUE;
 }
 
 void KyotoCloud_BeforePaletteTransfer(void)
 {
     // UpdatePaletteFade clears the selection mask before the field callback
     // hands control to Bag. Field reconstruction must remain black until ready.
-    if ((sCloud.holdBlack && sCloud.fieldLoading)
+    if (sCloud.fieldLoading
      || (sCloud.created && gMain.callback2 == CB2_Overworld
       && gPaletteFade.y == 16 && gPaletteFade.blendColor == 0
       && (gPaletteFadeSelectedPalettes == 0
@@ -284,10 +322,15 @@ static void PrepareShadows(u32 *code)
 void KyotoCloud_Prepare(void)
 {
     u32 code[KYOTO_CLOUD_CODE_BUFFER_WORDS];
-    if (!sCloud.created || gWeatherPtr->currWeather != WEATHER_SUNNY_CLOUDS || gMain.callback2 != CB2_Overworld)
+    if (gMain.callback2 != CB2_Overworld)
         return;
+    // Field reconstruction also completes when the destination has no clouds.
+    // Keeping this latch until cloud sprites exist would black out indoor maps
+    // and other weather permanently after leaving a cloud map.
     sCloud.fieldLoading = FALSE;
     sCloud.holdBlack = FALSE;
+    if (!sCloud.created || gWeatherPtr->currWeather != WEATHER_SUNNY_CLOUDS)
+        return;
     if (sCloud.paused)
     {
         if (sCloud.tickBase == sCloud.pauseTickBase)
@@ -307,6 +350,7 @@ void KyotoCloud_Prepare(void)
 void KyotoCloud_VBlank(void)
 {
     u32 base;
+    UpdateShadowWindowVBlank();
     if (!sCloud.created || sCloud.buffer == NULL || gMain.callback2 != CB2_Overworld)
         return;
     base = GetSpriteTileStartByTag(GFXTAG_CLOUD);
