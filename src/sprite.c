@@ -1,4 +1,5 @@
 #include "global.h"
+#include "field_weather.h"
 #include "kyoto_lighting.h"
 #include "kyoto_icons.h"
 #include "sprite.h"
@@ -277,6 +278,7 @@ EWRAM_DATA bool8 gAffineAnimsDisabled = FALSE;
 
 void ResetSpriteData(void)
 {
+    FireflyShade_Reset();
     KyotoLight_Reset();
     KyotoIconReset(TRUE);
     ResetOamRange(0, 128);

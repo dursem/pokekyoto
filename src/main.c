@@ -1,4 +1,5 @@
 #include "global.h"
+#include "field_weather.h"
 #include "kyoto_lighting.h"
 #include "kyoto_lamp_mask.h"
 #include "kyoto_cloud_layers.h"
@@ -210,6 +211,8 @@ static void CallCallbacks(void)
 
 void SetMainCallback2(MainCallback callback)
 {
+    if (gMain.callback2 == CB2_Overworld && callback != CB2_Overworld)
+        FireflyShade_Reset();
     if (callback != CB2_Overworld)
         Glide_Reset();
     if (callback != CB2_Overworld)
