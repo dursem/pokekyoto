@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_icons.h"
 #include "malloc.h"
 #include "battle.h"
 #include "battle_anim.h"
@@ -4381,6 +4382,7 @@ static void CreatePartyMonIconSprite(struct Pokemon *mon, struct PartyMenuBox *m
     enum Species species = GetMonData(mon, MON_DATA_SPECIES);
     bool32 isEgg = GetMonData(mon, MON_DATA_IS_EGG);
     CreatePartyMonIconSpriteParameterized(species, GetMonData(mon, MON_DATA_PERSONALITY), isEgg, menuBox, 1);
+    KyotoIconApplyMon(&gSprites[menuBox->monSpriteId], mon);
     UpdatePartyMonHPBar(menuBox->monSpriteId, mon);
 }
 
@@ -6770,6 +6772,7 @@ static void Task_TryItemUseFormChange(u8 taskId)
         {
             FreeAndDestroyMonIconSprite(icon);
             CreatePartyMonIconSpriteParameterized(gTasks[taskId].tTargetSpecies, GetMonData(mon, MON_DATA_PERSONALITY), FALSE, &sPartyMenuBoxes[gPartyMenu.slotId], 1);
+            KyotoIconApply(&gSprites[sPartyMenuBoxes[gPartyMenu.slotId].monSpriteId], gTasks[taskId].tTargetSpecies, GetMonData(mon, MON_DATA_IS_SHINY), GetMonData(mon, MON_DATA_PERSONALITY), FALSE);
             icon->oam.mosaic = TRUE;
             icon->data[0] = 10;
             icon->data[1] = 1;
@@ -6969,6 +6972,7 @@ void TryItemHoldFormChange(struct Pokemon *mon, s8 slotId, enum BattleTrainer tr
         PlayCry_NormalNoDucking(species, 0, CRY_VOLUME_RS, CRY_VOLUME_RS);
         FreeAndDestroyMonIconSprite(&gSprites[sPartyMenuBoxes[slotId].monSpriteId]);
         CreatePartyMonIconSpriteParameterized(species, GetMonData(mon, MON_DATA_PERSONALITY), FALSE, &sPartyMenuBoxes[slotId], 1);
+        KyotoIconApplyMon(&gSprites[sPartyMenuBoxes[slotId].monSpriteId], mon);
         UpdatePartyMonHeldItemSprite(mon, &sPartyMenuBoxes[slotId]);
     }
 }

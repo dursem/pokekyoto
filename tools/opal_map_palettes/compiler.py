@@ -49,6 +49,16 @@ def palette(path):
         rgb = [int(c) for c in line.split()]
         require(len(rgb) == 3 and all(0 <= c <= 255 for c in rgb), f"{path}: invalid RGB colour")
         result.append(sum((c >> 3) << (5 * i) for i, c in enumerate(rgb)))
+    # Preserve Merrp/DNS light flags for logical palettes 14..17 too.
+    light_flags = path.with_suffix(".pla")
+    if light_flags.exists():
+        for number, line in enumerate(light_flags.read_text().splitlines(), 1):
+            entry = line.split("#", 1)[0].strip()
+            if not entry:
+                continue
+            require(entry.isdecimal() and 0 <= int(entry) < 16,
+                    f"{light_flags}:{number}: expected a colour index 0..15")
+            result[int(entry)] |= 0x8000
     return result
 
 

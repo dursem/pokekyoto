@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_icons.h"
 #include "malloc.h"
 #include "battle.h"
 #include "battle_gfx_sfx_util.h"
@@ -120,7 +121,7 @@ struct ContestResults
     struct ContestMonResults (*monResults)[CONTESTANT_COUNT];
     u8 *unusedBg; // Allocated/freed, never used
     u8 *tilemapBuffers[4];
-    u8 *unused; // Allocated/freed, never used
+    u8 iconSpriteIds[CONTESTANT_COUNT];
 };
 
 static EWRAM_DATA struct ContestResults *sContestResults = NULL;
@@ -1081,23 +1082,24 @@ static void Task_FlashStarsAndHearts(u8 taskId)
         sContestResults->data->pointsFlashing = TRUE;
 }
 
+// Source icons can be 40x30: render complete OBJ pieces instead of cropping
+// the top eight pixels to fit the old 32x24 BG rectangle.
 static void LoadContestMonIcon(enum Species species, u8 monIndex, u8 srcOffset, u8 useDmaNow, u32 personality)
 {
-    const u8 *iconPtr;
-    u16 var0, var1;
-
-    iconPtr = GetMonIconPtr(species, personality);
-    iconPtr += srcOffset * 0x200 + 0x80;
     if (useDmaNow)
     {
-        RequestDma3Copy(iconPtr, (void *)BG_CHAR_ADDR(1) + monIndex * 0x200, 0x180, 1);
-        var0 = ((monIndex + 10) << 12);
-        var1 = (monIndex * 0x10 + 0x200);
-        WriteSequenceToBgTilemapBuffer(1, var1 | var0, 3, monIndex * 3 + 4, 4, 3, 17, 1);
-    }
-    else
-    {
-        RequestDma3Copy(iconPtr, (void *)BG_CHAR_ADDR(1) + monIndex * 0x200, 0x180, 1);
+        u8 id;
+        LoadMonIconPalettePersonality(species, personality);
+        id = CreateMonIcon(species, SpriteCB_MonIcon, 40, 40 + monIndex * 24, 10, personality);
+        sContestResults->iconSpriteIds[monIndex] = id;
+        if (id != MAX_SPRITES)
+        {
+            KyotoIconApply(&gSprites[id], species, gContestMons[monIndex].isShiny, personality, FALSE);
+            gSprites[id].oam.priority = 0;
+            // The results UI masks OBJ outside its scrolling text windows.
+            // A matching OBJ-window copy admits only this icon's own pixels.
+            gSprites[id].copyToObjWin = TRUE;
+        }
     }
 }
 
@@ -1109,13 +1111,7 @@ static void LoadAllContestMonIcons(u8 srcOffset, bool8 useDmaNow)
 
 static void LoadAllContestMonIconPalettes(void)
 {
-    enum Species species;
-
-    for (u32 i = 0; i < CONTESTANT_COUNT; i++)
-    {
-        species = gContestMons[i].species;
-        LoadPalette(gMonIconPalettes[gSpeciesInfo[GetIconSpecies(species, 0)].iconPalIndex], BG_PLTT_ID(10 + i), PLTT_SIZE_4BPP);
-    }
+    // Each complete icon now owns an OBJ palette, including its shiny colors.
 }
 
 static void TryCreateWirelessSprites(void)
@@ -1864,7 +1860,7 @@ static void AllocContestResults(void)
     sContestResults->tilemapBuffers[1] = AllocZeroed(BG_SCREEN_SIZE);
     sContestResults->tilemapBuffers[2] = AllocZeroed(BG_SCREEN_SIZE);
     sContestResults->tilemapBuffers[3] = AllocZeroed(BG_SCREEN_SIZE);
-    sContestResults->unused = AllocZeroed(0x1000);
+    memset(sContestResults->iconSpriteIds, MAX_SPRITES, sizeof(sContestResults->iconSpriteIds));
     AllocateMonSpritesGfx();
 }
 
@@ -1877,7 +1873,9 @@ static void FreeContestResults(void)
     FREE_AND_SET_NULL(sContestResults->tilemapBuffers[1]);
     FREE_AND_SET_NULL(sContestResults->tilemapBuffers[2]);
     FREE_AND_SET_NULL(sContestResults->tilemapBuffers[3]);
-    FREE_AND_SET_NULL(sContestResults->unused);
+    for (u32 i = 0; i < CONTESTANT_COUNT; i++)
+        if (sContestResults->iconSpriteIds[i] != MAX_SPRITES)
+            FreeAndDestroyMonIconSprite(&gSprites[sContestResults->iconSpriteIds[i]]);
     FREE_AND_SET_NULL(sContestResults);
     FreeMonSpritesGfx();
 }
