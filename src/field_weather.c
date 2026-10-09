@@ -139,7 +139,7 @@ static const struct WeatherCallbacks sWeatherFuncs[] =
     [WEATHER_SANDSTORM]          = {Sandstorm_InitVars,     Sandstorm_Main,     Sandstorm_InitAll,     Sandstorm_Finish},
     [WEATHER_FOG_DIAGONAL]       = {FogDiagonal_InitVars,   FogDiagonal_Main,   FogDiagonal_InitAll,   FogDiagonal_Finish},
     [WEATHER_UNDERWATER]         = {FogHorizontal_InitVars, FogHorizontal_Main, FogHorizontal_InitAll, FogHorizontal_Finish},
-    [WEATHER_SHADE]              = {Shade_InitVars,         Shade_Main,         Shade_InitAll,         Shade_Finish},
+    [WEATHER_SHADE]              = {FireflyShade_InitVars,   FireflyShade_Main,   FireflyShade_InitAll,   FireflyShade_Finish},
     [WEATHER_DROUGHT]            = {Drought_InitVars,       Drought_Main,       Drought_InitAll,       Drought_Finish},
     [WEATHER_DOWNPOUR]           = {Downpour_InitVars,      Thunderstorm_Main,  Downpour_InitAll,      Thunderstorm_Finish},
     [WEATHER_UNDERWATER_BUBBLES] = {Bubbles_InitVars,       Bubbles_Main,       Bubbles_InitAll,       Bubbles_Finish},
@@ -366,7 +366,6 @@ static void FadeInScreenWithWeather(void)
     case WEATHER_RAIN:
     case WEATHER_RAIN_THUNDERSTORM:
     case WEATHER_DOWNPOUR:
-    case WEATHER_SHADE:
         if (FadeInScreen_RainShowShade() == FALSE)
         {
             gWeatherPtr->colorMapIndex = 3;
@@ -773,7 +772,6 @@ void FadeSelectedPals(u8 mode, s8 delay, u32 selectedPalettes)
     case WEATHER_RAIN_THUNDERSTORM:
     case WEATHER_DOWNPOUR:
     case WEATHER_FOG_HORIZONTAL:
-    case WEATHER_SHADE:
     case WEATHER_DROUGHT:
         useWeatherPal = TRUE;
         break;
@@ -920,10 +918,6 @@ void ApplyWeatherToNewMapPalette(u32 bank)
         case WEATHER_RAIN:
         case WEATHER_RAIN_THUNDERSTORM:
         case WEATHER_DOWNPOUR:
-            ApplyColorMapWithBlend(bank, 1, 3, coeff, gWeatherPtr->fadeDestColor);
-            return;
-        case WEATHER_SHADE:
-            // Kyoto's stock shade fade shares the same gamma/color-map path as rain.
             ApplyColorMapWithBlend(bank, 1, 3, coeff, gWeatherPtr->fadeDestColor);
             return;
         case WEATHER_DROUGHT:
@@ -1249,7 +1243,7 @@ static const u8 sWeatherNames[WEATHER_COUNT][24] = {
     [WEATHER_SANDSTORM]          = _("SANDSTORM"),
     [WEATHER_FOG_DIAGONAL]       = _("FOG DIAGONAL"),
     [WEATHER_UNDERWATER]         = _("UNDERWATER"),
-    [WEATHER_SHADE]              = _("SHADE"),
+    [WEATHER_SHADE]              = _("FIREFLIES"),
     [WEATHER_DROUGHT]            = _("DROUGHT"),
     [WEATHER_DOWNPOUR]           = _("DOWNPOUR"),
     [WEATHER_UNDERWATER_BUBBLES] = _("UNDERWATER BUBBLES"),

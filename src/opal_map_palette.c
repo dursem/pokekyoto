@@ -454,6 +454,7 @@ void OpalMapPalettesEndFrame(void)
         Prepare();
     KyotoLight_Prepare();
     KyotoCloud_Prepare();
+    FireflyShade_Prepare();
     sInFrame = FALSE;
 }
 

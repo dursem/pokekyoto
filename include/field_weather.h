@@ -14,10 +14,13 @@ enum {
     GFXTAG_SANDSTORM,
     GFXTAG_BUBBLE,
     GFXTAG_RAIN,
+    GFXTAG_FIREFLY,
+    GFXTAG_FIREFLY_LIGHT,
 };
 enum {
     PALTAG_WEATHER = TAG_WEATHER_START,
-    PALTAG_WEATHER_2
+    PALTAG_WEATHER_2,
+    PALTAG_FIREFLY = 0x9202, // Blend-immune: retain the yellow glow at night.
 };
 
 #define NUM_WEATHER_COLOR_MAPS 19
@@ -143,6 +146,12 @@ extern const u16 gFogPalette[];
 extern const u8 gWeatherFogHorizontalTiles[];
 
 void StartWeather(void);
+void FireflyShade_InitVars(void);
+void FireflyShade_Main(void);
+void FireflyShade_InitAll(void);
+bool8 FireflyShade_Finish(void);
+void FireflyShade_Reset(void);
+void FireflyShade_Prepare(void);
 void SetNextWeather(u8 weather);
 void SetCurrentAndNextWeather(u8 weather);
 void SetCurrentAndNextWeatherNoDelay(u8 weather);
