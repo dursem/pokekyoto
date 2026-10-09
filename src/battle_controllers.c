@@ -3082,7 +3082,7 @@ static void LaunchKOAnimation(enum BattlerId battlerId, u16 animId, bool32 isFro
     {
         LaunchAnimationTaskForFrontSprite(&gSprites[spriteId], animId);
 
-        if (HasTwoFramesAnimation(species))
+        if (B_KYOTO_MON_SPRITE_ANIMATIONS && HasTwoFramesAnimation(species))
             StartSpriteAnim(&gSprites[spriteId], 1);
     }
     else
