@@ -20,6 +20,26 @@
       ],
       "effects": [],
       "dynamic_metatiles": []
+    },
+    {
+      "tileset": "gTileset_Rustboro",
+      "palette_refs": "data/tilesets/secondary/rustboro/palette_refs.json",
+      "palettes": [
+        {
+          "day": "data/tilesets/secondary/rustboro/palettes/extra_0.pal"
+        },
+        {
+          "day": "data/tilesets/secondary/rustboro/palettes/extra_1.pal"
+        },
+        {
+          "day": "data/tilesets/secondary/rustboro/palettes/extra_2.pal"
+        },
+        {
+          "day": "data/tilesets/secondary/rustboro/palettes/extra_3.pal"
+        }
+      ],
+      "effects": [],
+      "dynamic_metatiles": []
     }
   ]
 }

@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_icons.h"
 #include "battle.h"
 #include "battle_hold_effects.h"
 #include "battle_message.h"
@@ -4417,6 +4418,8 @@ static bool8 SlideOutLevelUpBanner(void)
 static void PutMonIconOnLvlUpBanner(void)
 {
     u8 spriteId;
+    u8 ALIGNED(4) tiles[KYOTO_ICON_FRAME_BYTES];
+    enum SpeciesIconType type = NORMAL_ICON;
     struct SpriteSheet iconSheet;
     struct SpritePalette iconPalSheet;
 
@@ -4424,17 +4427,23 @@ static void PutMonIconOnLvlUpBanner(void)
     enum Species species = GetMonData(mon, MON_DATA_SPECIES);
     u32 personality = GetMonData(mon, MON_DATA_PERSONALITY);
 
-    iconSheet.data = GetMonIconPtr(species, personality);
-    iconSheet.size = 0x200;
+    species = GetIconSpecies(species, personality);
+#if P_GENDER_DIFFERENCES
+    if (IsPersonalityFemale(species, personality)) type = FEMALE_ICON;
+#endif
+    KyotoIconCopyTiles(tiles, GetMonIconPtr(species, personality), species, type, GetMonData(mon, MON_DATA_IS_SHINY), sizeof(tiles));
+    iconSheet.data = tiles;
+    iconSheet.size = sizeof(tiles);
     iconSheet.tag = TAG_LVLUP_BANNER_MON_ICON;
 
-    iconPalSheet.data = GetValidMonIconPalettePtr(species);
+    iconPalSheet.data = KyotoIconPalette(species, GetMonData(mon, MON_DATA_IS_SHINY), personality, FALSE);
     iconPalSheet.tag = TAG_LVLUP_BANNER_MON_ICON;
 
     LoadSpriteSheet(&iconSheet);
     LoadSpritePalette(&iconPalSheet);
 
     spriteId = CreateSprite(&sSpriteTemplate_MonIconOnLvlUpBanner, 256, 10, 0);
+    KyotoIconSetSubsprites(&gSprites[spriteId]);
     gSprites[spriteId].sDestroy = FALSE;
     gSprites[spriteId].sXOffset = gBattle_BG2_X;
 }

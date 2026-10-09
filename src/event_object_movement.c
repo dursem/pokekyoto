@@ -2756,7 +2756,6 @@ void UpdateLightSprite(struct Sprite *sprite)
         DestroySprite(sprite);
         FieldEffectFreeTilesIfUnused(sheetTileStart);
         FieldEffectFreePaletteIfUnused(paletteNum);
-        Weather_SetBlendCoeffs(7, BASE_SHADOW_INTENSITY); // TODO: Restore original blend coeffs at dawn
         return;
     }
 
@@ -2766,29 +2765,8 @@ void UpdateLightSprite(struct Sprite *sprite)
         return;
     }
 
-    if (sprite->sLightType == LIGHT_TYPE_BALL)
-    {
-        if (gPaletteFade.active) // if palette fade is active, don't flicker since the timer won't be updated
-        {
-            sprite->invisible = FALSE;
-        }
-        else if (gPlayerAvatar.tileTransitionState)
-        {
-            sprite->invisible = FALSE;
-            if (GetSpritePaletteTagByPaletteNum(sprite->oam.paletteNum) == OBJ_EVENT_PAL_TAG_LIGHT_2)
-                LoadSpritePaletteInSlot(&sObjectEventSpritePalettes[FindObjectEventPaletteIndexByTag(OBJ_EVENT_PAL_TAG_LIGHT)], sprite->oam.paletteNum);
-        }
-        else if ((sprite->invisible = gTimeUpdateCounter & 1))
-        {
-            sprite->invisible = FALSE;
-            if (GetSpritePaletteTagByPaletteNum(sprite->oam.paletteNum) == OBJ_EVENT_PAL_TAG_LIGHT_2)
-                LoadSpritePaletteInSlot(&sObjectEventSpritePalettes[FindObjectEventPaletteIndexByTag(OBJ_EVENT_PAL_TAG_LIGHT)], sprite->oam.paletteNum);
-        }
-    } else {
-        sprite->invisible = FALSE;
-    }
-    // Note: Don't set window registers during hardware fade!
-    Weather_SetBlendCoeffs(7, BASE_SHADOW_INTENSITY);
+    // Stable glow without relying on emulator interframe blending.
+    sprite->invisible = FALSE;
 }
 
 // Spawn a light at a map coordinate
@@ -2806,11 +2784,10 @@ static void SpawnLightSprite(s16 x, s16 y, s16 camX, s16 camY, u32 lightType)
     lightType = min(lightType, ARRAY_COUNT(gFieldEffectLightTemplates) - 1); // bounds checking
     template = gFieldEffectLightTemplates[lightType];
     LoadSpriteSheetByTemplate(template, 0, 0);
-    sprite = &gSprites[CreateSprite(template, 0, 0, 0)];
-    if (lightType == 0 && (i = IndexOfSpritePaletteTag(template->paletteTag + 1)) < 16)
-        sprite->oam.paletteNum = i;
-    else
-        UpdateSpritePaletteByTemplate(template, sprite);
+    i = CreateSprite(template, 0, 0, 0);
+    if (i == MAX_SPRITES) return;
+    sprite = &gSprites[i];
+    UpdateSpritePaletteByTemplate(template, sprite);
     GetMapCoordsFromSpritePos(x + camX, y + camY, &sprite->x, &sprite->y);
     sprite->sLightType = lightType;
     sprite->sLightXPos = x;
@@ -2825,6 +2802,8 @@ static void SpawnLightSprite(s16 x, s16 y, s16 camX, s16 camY, u32 lightType)
         sprite->centerToCornerVecX = -(32 >> 1);
         sprite->centerToCornerVecY = -(32 >> 1);
         sprite->oam.priority = 1;
+        // Lamp caps receive glow; visible actor pixels are cut out at frame end.
+        sprite->subpriority = 0xFF;
         sprite->oam.objMode = ST_OAM_OBJ_BLEND;
         sprite->oam.affineMode = ST_OAM_AFFINE_NORMAL;
         sprite->x += 8;

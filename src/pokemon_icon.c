@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_icons.h"
 #include "graphics.h"
 #include "mail.h"
 #include "palette.h"
@@ -404,6 +405,7 @@ const u16 *GetValidMonIconPalettePtr(enum Species species)
 u8 UpdateMonIconFrame(struct Sprite *sprite)
 {
     u8 result = 0;
+    u32 frameBytes = KyotoIconManaged(sprite) ? KYOTO_ICON_FRAME_BYTES : sSpriteImageSizes[sprite->oam.shape][sprite->oam.size];
 
     if (sprite->animDelayCounter == 0)
     {
@@ -427,9 +429,9 @@ u8 UpdateMonIconFrame(struct Sprite *sprite)
                     // pointer arithmetic is needed to get the correct pointer to perform the sprite copy on.
                     // because sprite->images is a struct def, it has to be casted to (u8 *) before any
                     // arithmetic can be performed.
-                    (u8 *)sprite->images + (sSpriteImageSizes[sprite->oam.shape][sprite->oam.size] * frame),
+                    (u8 *)sprite->images + (frameBytes * frame),
                     (u8 *)(OBJ_VRAM0 + sprite->oam.tileNum * TILE_SIZE_4BPP),
-                    sSpriteImageSizes[sprite->oam.shape][sprite->oam.size]);
+                    frameBytes);
             }
             sprite->animDelayCounter = sprite->anims[sprite->animNum][sprite->animCmdIndex].frame.duration & 0xFF;
             sprite->animCmdIndex++;
@@ -448,7 +450,7 @@ static u8 CreateMonIconSprite(struct MonIconSpriteTemplate *iconTemplate, s16 x,
 {
     u8 spriteId;
 
-    struct SpriteFrameImage image = { NULL, sSpriteImageSizes[iconTemplate->oam->shape][iconTemplate->oam->size] };
+    struct SpriteFrameImage image = { NULL, KYOTO_ICON_FRAME_BYTES };
 
     struct SpriteTemplate spriteTemplate =
     {
@@ -470,7 +472,7 @@ static u8 CreateMonIconSprite(struct MonIconSpriteTemplate *iconTemplate, s16 x,
 
 static void FreeAndDestroyMonIconSprite_(struct Sprite *sprite)
 {
-    struct SpriteFrameImage image = { NULL, sSpriteImageSizes[sprite->oam.shape][sprite->oam.size] };
+    struct SpriteFrameImage image = { NULL, KYOTO_ICON_FRAME_BYTES };
     sprite->images = &image;
     DestroySprite(sprite);
 }

@@ -1,4 +1,6 @@
 #include "global.h"
+#include "kyoto_lighting.h"
+#include "kyoto_lamp_mask.h"
 #include "kyoto_cloud_layers.h"
 #include "glide.h"
 #include "opal_map_palette.h"
@@ -210,6 +212,8 @@ void SetMainCallback2(MainCallback callback)
 {
     if (callback != CB2_Overworld)
         Glide_Reset();
+    if (callback != CB2_Overworld)
+        KyotoLight_Reset();
     KyotoCloud_OnCallbackChange(callback);
     gMain.callback2 = callback;
     gMain.state = 0;
@@ -386,6 +390,7 @@ static void VBlankIntr(void)
         CopyBufferedValuesToGpuRegs();
         ProcessDma3Requests();
         KyotoCloud_VBlank();
+        KyotoLamp_VBlank();
     }
 
     gPcmDmaCounter = gSoundInfo.pcmDmaCounter;

@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_cloud_layers.h"
 #include "event_object_movement.h"
 #include "field_camera.h"
 #include "field_effect.h"
@@ -386,6 +387,7 @@ void UpdateShadowFieldEffect(struct Sprite *sprite)
     {
         struct ObjectEvent *objectEvent = &gObjectEvents[objectEventId];
         struct Sprite *linkedSprite = &gSprites[objectEvent->spriteId];
+        sprite->oam.objMode = KyotoCloud_UsesShadowWindow() ? ST_OAM_OBJ_WINDOW : ST_OAM_OBJ_BLEND;
         sprite->oam.priority = linkedSprite->oam.priority;
         sprite->x = linkedSprite->x;
         #if OW_LARGE_OW_SUPPORT

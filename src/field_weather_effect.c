@@ -63,6 +63,8 @@ void Clouds_Main(void)
         gWeatherPtr->initStep++;
         break;
     case 1:
+        // Keep the approved foreground opacity and silhouette contrast.
+        // Ground shadows use an OBJ window, not these alpha coefficients.
         Weather_SetTargetBlendCoeffs(14, 2, 1);
         gWeatherPtr->initStep++;
         break;

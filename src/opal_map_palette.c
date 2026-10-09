@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_lighting.h"
 #include "kyoto_cloud_layers.h"
 #include "opal_map_palette.h"
 #include "bg.h"
@@ -451,6 +452,7 @@ void OpalMapPalettesEndFrame(void)
 {
     if (sState && sState->dirty)
         Prepare();
+    KyotoLight_Prepare();
     KyotoCloud_Prepare();
     sInFrame = FALSE;
 }
@@ -505,6 +507,15 @@ u32 OpalMapPalettesTilemapsPrepared(void)
 u32 OpalMapPalettesTilemapsCommitted(void)
 {
     return sTilemapsCommitted;
+}
+
+const u8 *OpalMapPalettesGetTileGraphics(u32 tile)
+{
+    if (sState)
+        for (u32 i = 0; i < sState->tileCopyCount; i++)
+            if (sState->tileIds[i] == tile)
+                return sState->tileSources[i];
+    return (const u8 *)(BG_VRAM + TILE_OFFSET_4BPP(tile));
 }
 
 bool32 OpalMapPalettesQueueTile(const void *source, u32 tile)
