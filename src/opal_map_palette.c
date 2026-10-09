@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_cloud_layers.h"
 #include "opal_map_palette.h"
 #include "bg.h"
 #include "field_weather.h"
@@ -450,6 +451,7 @@ void OpalMapPalettesEndFrame(void)
 {
     if (sState && sState->dirty)
         Prepare();
+    KyotoCloud_Prepare();
     sInFrame = FALSE;
 }
 

@@ -1,4 +1,6 @@
 #include "global.h"
+#include "kyoto_cloud_layers.h"
+#include "glide.h"
 #include "opal_map_palette.h"
 #include "overworld.h"
 #include "battle_pyramid.h"
@@ -1859,6 +1861,7 @@ static void OverworldBasic(void)
     ScriptContext_RunScript();
     RunTasks();
     AnimateSprites();
+    Glide_Update();
     CameraUpdate();
     UpdateCameraPanning();
     BuildOamBuffer();
@@ -2507,6 +2510,8 @@ static void ResetMirageTowerAndSaveBlockPtrs(void)
 
 static void ResetScreenForMapLoad(void)
 {
+    Glide_Reset();
+    KyotoCloud_SetFieldLoading();
     SetGpuReg(REG_OFFSET_DISPCNT, 0);
     ScanlineEffect_Stop();
 

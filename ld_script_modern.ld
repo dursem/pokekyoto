@@ -139,3 +139,8 @@ SECTIONS {
         *(*);
     }
 }
+
+ASSERT(KyotoCloudShadePixelsEnd - KyotoCloudShadePixels <= 832, "Cloud shader exceeds stack buffer")
+
+/* Cloud silhouette code must leave room for field/menu call stacks. */
+ASSERT(ADDR(.iwram.bss) + SIZEOF(.iwram.bss) <= 0x03007300, "Cloud integration requires at least 3 KiB of IWRAM stack headroom")

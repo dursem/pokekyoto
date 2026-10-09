@@ -1,4 +1,6 @@
 #include "global.h"
+#include "kyoto_cloud_layers.h"
+#include "glide.h"
 #include "opal_map_palette.h"
 #include "crt0.h"
 #include "malloc.h"
@@ -206,6 +208,9 @@ static void CallCallbacks(void)
 
 void SetMainCallback2(MainCallback callback)
 {
+    if (callback != CB2_Overworld)
+        Glide_Reset();
+    KyotoCloud_OnCallbackChange(callback);
     gMain.callback2 = callback;
     gMain.state = 0;
 }
@@ -380,6 +385,7 @@ static void VBlankIntr(void)
     {
         CopyBufferedValuesToGpuRegs();
         ProcessDma3Requests();
+        KyotoCloud_VBlank();
     }
 
     gPcmDmaCounter = gSoundInfo.pcmDmaCounter;

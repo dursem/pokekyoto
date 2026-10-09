@@ -1,4 +1,5 @@
 #include "global.h"
+#include "glide.h"
 #include "malloc.h"
 #include "battle_anim.h"
 #include "battle_pyramid.h"
@@ -6415,6 +6416,8 @@ enum Collision GetCollisionAtCoords(struct ObjectEvent *objectEvent, s16 x, s16 
     #endif
 
     objectEvent->directionOverwrite = DIR_NONE;
+    if (Glide_GetCollision(objectEvent, x, y, &collision))
+        return collision;
 
     //sideways stairs checks
     if (MetatileBehavior_IsSidewaysStairsLeftSideTop(nextBehavior) && dir == DIR_EAST)
