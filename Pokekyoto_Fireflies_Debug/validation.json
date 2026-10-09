@@ -1,0 +1,56 @@
+{
+  "source": "user-provided pokepeach.zip, 2026-09-30",
+  "emulator": "mGBA 0.10.5",
+  "yellow_palette_matches_original_day_and_night": true,
+  "ten_particles_and_ten_light_masks": true,
+  "b_held_start_opens_debug_and_weather_submenu": true,
+  "menus": {
+    "fireflies_day_party": {
+      "ui": "CB2_UpdatePartyMenu",
+      "returned": true,
+      "particles": 10,
+      "black_frames": 38,
+      "palette_restored": true
+    },
+    "fireflies_day_bag": {
+      "ui": "CB2_BagMenuRun",
+      "returned": true,
+      "particles": 10,
+      "black_frames": 38,
+      "palette_restored": true
+    },
+    "fireflies_day_options": {
+      "ui": "0x8198f1d",
+      "returned": true,
+      "particles": 10,
+      "black_frames": 38,
+      "palette_restored": true
+    },
+    "fireflies_night_party": {
+      "ui": "CB2_UpdatePartyMenu",
+      "returned": true,
+      "particles": 10,
+      "black_frames": 38,
+      "palette_restored": true
+    },
+    "fireflies_night_bag": {
+      "ui": "CB2_BagMenuRun",
+      "returned": true,
+      "particles": 10,
+      "black_frames": 38,
+      "palette_restored": true
+    },
+    "fireflies_night_options": {
+      "ui": "0x8198f1d",
+      "returned": true,
+      "particles": 10,
+      "black_frames": 37,
+      "palette_restored": true
+    }
+  },
+  "field_updates_in_600_video_frames": 600,
+  "weather_transitions_fireflies_clouds_clear_fireflies": true,
+  "clear_map_lantern_smoke_test": true,
+  "limits": "Representative menu paths and debug weather submenu tested; not every debug action or map. Test boot, party, clock and warp hooks are not included in the deliverable.",
+  "debug_picker_11_changes_clear_weather_to_fireflies": true
+}
