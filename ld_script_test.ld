@@ -79,6 +79,7 @@ SECTIONS {
         KEEP(*.o(.text.header_rhh));
         KEEP(*.o(.text.consts));
         src/*.o(.text);
+        asm/*.o(.text*);
     } > ROM =0
 
     script_data :

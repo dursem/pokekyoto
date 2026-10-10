@@ -4,7 +4,7 @@
 // Masks/shifts for blocks in the map grid
 // Map grid blocks consist of an 11 bit metatile id, a 1 bit collision value, and a 4 bit elevation value
 // This is the data stored in each data/layouts/*/map.bin file.
-// Bit 10 was borrowed from the old 2-bit collision field; Kyoto/Opal wide maps only use collision 0/1.
+// Bit 10 was borrowed from the old 2-bit collision field; maps only use collision 0/1.
 #define MAPGRID_METATILE_ID_MASK 0x07FF // Bits 0-10
 #define MAPGRID_COLLISION_MASK   0x0800 // Bit 11
 #define MAPGRID_ELEVATION_MASK   0xF000 // Bits 12-15
@@ -50,11 +50,13 @@ enum
 #define UNPACK_BEHAVIOR(data) UNPACK(data, METATILE_ATTR_BEHAVIOR_SHIFT, METATILE_ATTR_BEHAVIOR_MASK)
 #define UNPACK_LAYER_TYPE(data) UNPACK(data, METATILE_ATTR_LAYER_SHIFT, METATILE_ATTR_LAYER_MASK)
 
+// Metatiles hold all three layers (bottom, middle, top), and the field draws all three regardless of
+// the layer type. The layer type only tells independent renderers (the shop's map view, decoration
+// sprites) which two layers a metatile authored in the old two-layer format used.
 enum {
-    METATILE_LAYER_TYPE_NORMAL,  // Metatile uses middle and top bg layers
-    METATILE_LAYER_TYPE_COVERED, // Metatile uses bottom and middle bg layers
-    METATILE_LAYER_TYPE_SPLIT,   // Metatile uses bottom and top bg layers
-    METATILE_LAYER_TYPE_TRIPLE,  // Metatile uses bottom, middle and top bg layers
+    METATILE_LAYER_TYPE_NORMAL,  // Authored on the middle and top layers
+    METATILE_LAYER_TYPE_COVERED, // Authored on the bottom and middle layers
+    METATILE_LAYER_TYPE_SPLIT,   // Authored on the bottom and top layers
 };
 
 #define METATILE_ID(tileset, name) (METATILE_##tileset##_##name)

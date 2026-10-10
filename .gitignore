@@ -66,3 +66,8 @@ tools/aif2pcm/aif2pcm
 *.smolTM
 __pycache__
 .map_version
+
+# Generated from the map data by tools/tilesetcap and tools/map_palettes
+src/data/tilesets/tile_cache_info.h
+src/data/tilesets/map_palettes.generated.h
+tools/porytiles/build/

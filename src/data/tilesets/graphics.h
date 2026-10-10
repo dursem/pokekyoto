@@ -1625,6 +1625,10 @@ const u16 gTilesetPalettes_UnionRoom[][16] =
 
 const u32 gTilesetTiles_UnionRoom[] = INCGFX_U32("data/tilesets/secondary/union_room/tiles.png", ".4bpp.fastSmol");
 
+// Streamed tileset test fixtures; see tools/tilesetcap/make_test_tilesets.py.
+const u32 gTilesetTiles_TileCacheTestPrimary[] = INCGFX_U32("data/tilesets/primary/tile_cache_test/tiles.png", ".4bpp");
+const u32 gTilesetTiles_TileCacheTest[] = INCGFX_U32("data/tilesets/secondary/tile_cache_test/tiles.png", ".4bpp");
+
 #else
 
 const u32 gTilesetTiles_Building_Frlg[] = INCGFX_U32("data/tilesets/primary/building_frlg/tiles.png", ".4bpp.smol");

@@ -10,6 +10,8 @@ Tileset capacity tooling.
             constants from one grid format to another.
   gen       Validate the capacity limits and write src/data/tilesets/tile_cache_info.h (run by make).
   check     Report capacity problems; --verbose also prints each streamed layout's tile cache use.
+
+The eight-word to twelve-subtile metatile conversion lives in metatile_format.py.
 """
 
 import argparse
@@ -187,9 +189,36 @@ def migrate_prefabs(file, src, dst, regions):
     print('%s: %d prefab cells shifted' % (file, shifted))
 
 
+def grid_inconsistency(fmt):
+    """How many map/border cells reference a metatile their tilesets don't have, read in this format."""
+    counts = {}
+    for symbol, info in tileset_table().items():
+        if info['metatiles'] and info['attributes'] and os.path.exists(path(info['attributes'])):
+            counts[symbol] = os.path.getsize(path(info['metatiles'])) // (2 * TILES_PER_METATILE)
+    bad = 0
+    for layout in load_layouts():
+        split = primary_count(fmt, is_frlg_layout(layout))
+        for key in ('blockdata_filepath', 'border_filepath'):
+            for block in read_u16(path(layout[key])):
+                metatile = unpack_block(block, fmt)[0]
+                if metatile == (1 << fmt['id_bits']) - 1:
+                    continue
+                if metatile < split:
+                    bad += metatile >= counts.get(layout['primary_tileset'], 0)
+                else:
+                    bad += metatile - split >= counts.get(layout['secondary_tileset'], 0)
+    return bad
+
+
 def cmd_migrate(args):
     src, dst = FORMATS[args.src], FORMATS[args.dst]
     regions = tileset_regions()
+    if src is not dst and not args.prefabs_only:
+        # A grid already in the destination format reads consistently in it and not in the source one.
+        as_src, as_dst = grid_inconsistency(src), grid_inconsistency(dst)
+        if as_dst < as_src:
+            sys.exit('the map data reads as the %s format (%d out-of-range cells, %d as %s); it looks converted already, '
+                     'nothing was changed' % (args.dst, as_dst, as_src, args.src))
     if args.prefabs_only:
         migrate_prefabs(args.prefabs_only, src, dst, regions)
         return
@@ -238,7 +267,7 @@ def cmd_migrate(args):
             count += 1
             return '0x%03X' % new
         for i, line in enumerate(lines):
-            if re.search(r'\bsetmetatile\b|const\s+METATILE_\w+\s*=|#define\s+METATILE_\w+', line):
+            if re.search(r'setmetatile\s*\(|const\s+METATILE_\w+\s*=|#define\s+METATILE_\w+', line):
                 lines[i] = re.sub(r'0x[0-9A-Fa-f]{3}\b', repl, line)
         open(file, 'w').write('\n'.join(lines))
         print('%s: %d raw metatile ids shifted' % (os.path.relpath(file, ROOT), count))
@@ -256,13 +285,13 @@ MAX_METATILES_IN_PRIMARY = FORMATS['wide']['primary']
 MAX_METATILES_IN_SECONDARY = (1 << FORMATS['wide']['id_bits']) - MAX_METATILES_IN_PRIMARY - 1
 TILE_CACHE_POOL_SLOTS = 995 - LEGACY_TILES_IN_PRIMARY
 TILE_CACHE_WARN_SLOTS = TILE_CACHE_POOL_SLOTS - 48
-TILES_PER_METATILE = 8
-TILES_PER_TRIPLE_LAYER = 4
-EXT_TILE_HIGH_SHIFT = 5
-EXT_TILE_HIGH_MASK = 0x3
+DOOR_SLOTS = range(LEGACY_TILES_TOTAL - 16, LEGACY_TILES_TOTAL)
+TILES_PER_METATILE = 12
 # The smol header stores the image size in 14 bits of 4-byte units (include/decompress.h).
 MAX_SMOL_IMAGE_BYTES = ((1 << 14) - 1) * 4
 TILE_SIZE_4BPP = 32
+EXT_TILE_HIGH_SHIFT = 5
+EXT_TILE_HIGH_MASK = 0x3
 WINDOW = 18
 MAP_OFFSET = 7
 
@@ -293,43 +322,22 @@ class TilesetData:
         ext_file = path(self.dir, 'metatile_tiles_ext.bin')
         self.extPath = os.path.join(self.dir, 'metatile_tiles_ext.bin') if os.path.exists(ext_file) else None
         self.ext = open(ext_file, 'rb').read() if self.extPath else None
-
-        third_file = path(self.dir, 'metatile_third_layer.bin')
-        self.thirdPath = os.path.join(self.dir, 'metatile_third_layer.bin') if os.path.exists(third_file) else None
-        self.third = read_u16(third_file) if self.thirdPath else None
-
-        third_ext_file = path(self.dir, 'metatile_third_layer_ext.bin')
-        self.thirdExtPath = os.path.join(self.dir, 'metatile_third_layer_ext.bin') if os.path.exists(third_ext_file) else None
-        self.thirdExt = open(third_ext_file, 'rb').read() if self.thirdExtPath else None
-
-        self.attributes = read_u16(path(info['attributes'])) if info.get('attributes') else []
-        self.tripleMetatiles = [
-            i for i, value in enumerate(self.attributes)
-            if ((value >> 12) & 0xF) == 3
-        ]
+        self.numAttributes = 0
+        if info['attributes'] and os.path.exists(path(info['attributes'])):
+            self.numAttributes = os.path.getsize(path(info['attributes'])) // 2
+        self.obsoleteFiles = [f for f in ('metatile_third_layer.bin', 'metatile_third_layer_ext.bin')
+                              if os.path.exists(path(self.dir, f))]
 
     @property
     def extended(self):
-        return self.ext is not None or self.thirdExt is not None
+        # Only the extension sidecar can hold tile id bits 10-11, so without it every reference is a legacy one.
+        return self.ext is not None
 
     def virtual_tiles(self, local):
         """The virtual tile ids referenced by one metatile."""
         words = self.metatiles[local * TILES_PER_METATILE:(local + 1) * TILES_PER_METATILE]
         high = self.ext[local * TILES_PER_METATILE:(local + 1) * TILES_PER_METATILE] if self.ext else bytes(TILES_PER_METATILE)
-        result = [(w & 0x3FF) | (((h >> EXT_TILE_HIGH_SHIFT) & EXT_TILE_HIGH_MASK) << 10) for w, h in zip(words, high)]
-
-        if self.third is not None:
-            third = self.third[local * TILES_PER_TRIPLE_LAYER:(local + 1) * TILES_PER_TRIPLE_LAYER]
-            third_high = (
-                self.thirdExt[local * TILES_PER_TRIPLE_LAYER:(local + 1) * TILES_PER_TRIPLE_LAYER]
-                if self.thirdExt else bytes(TILES_PER_TRIPLE_LAYER)
-            )
-            result.extend(
-                (w & 0x3FF) | (((h >> EXT_TILE_HIGH_SHIFT) & EXT_TILE_HIGH_MASK) << 10)
-                for w, h in zip(third, third_high)
-            )
-
-        return result
+        return [(w & 0x3FF) | (((h >> EXT_TILE_HIGH_SHIFT) & EXT_TILE_HIGH_MASK) << 10) for w, h in zip(words, high)]
 
 
 def virtual_tile_to_local(tile):
@@ -403,11 +411,12 @@ def pool_tiles_by_metatile(primary, secondary):
 
     def lookup(metatile):
         if metatile not in cache:
+            # field_camera.c draws a metatile its tilesets lack (a connected map's strip) as metatile 0.
             if metatile < MAX_METATILES_IN_PRIMARY:
-                tiles = primary.virtual_tiles(metatile) if metatile < primary.numMetatiles else []
+                tiles = primary.virtual_tiles(metatile if metatile < primary.numMetatiles else 0)
             else:
                 local = metatile - MAX_METATILES_IN_PRIMARY
-                tiles = secondary.virtual_tiles(local) if local < secondary.numMetatiles else []
+                tiles = secondary.virtual_tiles(local) if local < secondary.numMetatiles else primary.virtual_tiles(0)
             cache[metatile] = frozenset(t for t in tiles if t >= LEGACY_TILES_IN_PRIMARY)
         return cache[metatile]
     return lookup
@@ -467,28 +476,18 @@ def analyse(report, verbose=False):
             report.error('%s: %d tiles exceeds the %s limit of %d' % (ts.symbol, ts.numTiles, kind, max_tiles))
         if not ts.metatileSizeValid:
             report.error('%s: metatiles.bin is not a whole number of %d-tile metatiles' % (ts.symbol, TILES_PER_METATILE))
+        elif ts.numAttributes and ts.numMetatiles != ts.numAttributes:
+            report.error('%s: metatiles.bin holds %d twelve-subtile metatiles but metatile_attributes.bin has %d entries; '
+                         'eight-word data must be converted with tools/tilesetcap/metatile_format.py migrate'
+                         % (ts.symbol, ts.numMetatiles, ts.numAttributes))
+        if ts.obsoleteFiles:
+            report.error('%s: %s belong to the retired third-layer format; convert with tools/tilesetcap/metatile_format.py'
+                         % (ts.symbol, ', '.join(ts.obsoleteFiles)))
         if ts.numMetatiles > max_metatiles:
             report.error('%s: %d metatiles exceeds the %s limit of %d' % (ts.symbol, ts.numMetatiles, kind, max_metatiles))
         if ts.ext is not None and len(ts.ext) != ts.numMetatiles * TILES_PER_METATILE:
             report.error('%s: metatile_tiles_ext.bin has %d entries but metatiles.bin has %d'
                          % (ts.symbol, len(ts.ext), ts.numMetatiles * TILES_PER_METATILE))
-
-        if ts.third is not None and len(ts.third) != ts.numMetatiles * TILES_PER_TRIPLE_LAYER:
-            report.error('%s: metatile_third_layer.bin has %d words but expected %d'
-                         % (ts.symbol, len(ts.third), ts.numMetatiles * TILES_PER_TRIPLE_LAYER))
-
-        if ts.thirdExt is not None and ts.third is None:
-            report.error('%s: metatile_third_layer_ext.bin requires metatile_third_layer.bin'
-                         % ts.symbol)
-
-        if ts.thirdExt is not None and len(ts.thirdExt) != ts.numMetatiles * TILES_PER_TRIPLE_LAYER:
-            report.error('%s: metatile_third_layer_ext.bin has %d entries but expected %d'
-                         % (ts.symbol, len(ts.thirdExt), ts.numMetatiles * TILES_PER_TRIPLE_LAYER))
-
-        if ts.tripleMetatiles and ts.third is None:
-            report.error('%s: uses TRIPLE layer metatiles but has no metatile_third_layer.bin'
-                         % ts.symbol)
-
         if ts.extended and not ts.isSecondary and ts.info['isCompressed']:
             report.error('%s: an extended primary tileset must be uncompressed (.isCompressed = FALSE, ".4bpp" tiles)' % ts.symbol)
         if ts.info['isCompressed'] and ts.numTiles * TILE_SIZE_4BPP > MAX_SMOL_IMAGE_BYTES:
@@ -512,22 +511,30 @@ def analyse(report, verbose=False):
             streamed_pairs.add((primary.symbol, secondary.symbol))
             streamed_layouts.append((layout, primary, secondary))
 
+    anims = tileset_animation_slots()
     for layout, primary, secondary in streamed_layouts:
+        padding = 0
         for metatile_owner, count in ((primary, primary.numMetatiles), (secondary, secondary.numMetatiles)):
             for local in range(count):
                 for tile in metatile_owner.virtual_tiles(local):
                     is_secondary, index = virtual_tile_to_local(tile)
                     owner = secondary if is_secondary else primary
-                    if index >= owner.numTiles:
-                        # KYOTO_OPAL_ALLOW_LEGACY_PADDING_BLANK
-                        # Stock Emerald sometimes points at an unused physical tile slot below 1024.
-                        # The stock load leaves that tail transparent, so M2 models it as a zero tile.
-                        # Extended virtual references (>=1024) remain strict and must have source art.
-                        if tile < LEGACY_TILES_TOTAL:
-                            continue
-                        report.error('%s metatile %d references tile %d, but %s has %d tiles'
-                                     % (metatile_owner.symbol, local, tile, owner.symbol, owner.numTiles))
-                        break
+                    if index < owner.numTiles:
+                        continue
+                    # A legacy (10 bit) reference past the end of a sheet was an empty slot under the stock
+                    # loader, and the tile cache draws it empty. An extended reference must have its tile.
+                    if tile < LEGACY_TILES_TOTAL:
+                        padding += 1
+                        continue
+                    report.error('%s metatile %d references extended tile %d, but %s has %d tiles'
+                                 % (metatile_owner.symbol, local, tile, owner.symbol, owner.numTiles))
+                    break
+        if padding and verbose:
+            print('%s: %d legacy references past the end of a sheet are drawn as empty padding' % (layout['id'], padding))
+        door_anims = sorted(set(DOOR_SLOTS) & anims.get(secondary.symbol, set()))
+        if door_anims:
+            report.warn('%s: %s animates tile slots %d-%d, which door animations on streamed maps also use'
+                        % (layout['id'], secondary.symbol, door_anims[0], door_anims[-1]))
         grid = stitched_grid(layout, layouts_by_id, maps_by_layout, maps)
         lookup = pool_tiles_by_metatile(primary, secondary)
         for row in grid:
@@ -544,6 +551,7 @@ def analyse(report, verbose=False):
             print(message)
 
     streamed_ids = {layout['id'] for layout, _, _ in streamed_layouts}
+    check_reload_crossings(report, streamed_layouts, layouts_by_id, maps_by_layout, maps, tilesets, verbose)
     for layout, primary, secondary in streamed_layouts:
         for map_data in maps_by_layout.get(layout['id'], []):
             for connection in map_data.get('connections') or []:
@@ -568,6 +576,162 @@ def analyse(report, verbose=False):
 
     raw_tilesets = sorted({symbol for pair in streamed_pairs for symbol in pair})
     return tilesets, raw_tilesets
+
+
+ANIM_CONSTANTS = {'NUM_TILES_IN_PRIMARY': str(LEGACY_TILES_IN_PRIMARY), 'TILE_SIZE_4BPP': '32'}
+
+
+def constant_expression(expr, what):
+    """Value of a simple constant expression from src/tileset_anims.c."""
+    text = re.sub(r'\b[A-Za-z_]\w*\b', lambda m: ANIM_CONSTANTS.get(m.group(0), m.group(0)), expr)
+    if not re.fullmatch(r'[\s\dxXa-fA-F+*()]+', text):
+        raise ValueError('src/tileset_anims.c: cannot evaluate %s %r' % (what, expr.strip()))
+    return eval(text)
+
+
+def slot_number(expr):
+    return constant_expression(expr, 'animation slot')
+
+
+def call_arguments(text, start):
+    """The comma-separated arguments of the call whose '(' is at text[start]."""
+    args, depth, begin = [], 0, start + 1
+    for i in range(start, len(text)):
+        if text[i] == '(':
+            depth += 1
+        elif text[i] == ')':
+            depth -= 1
+            if depth == 0:
+                args.append(text[begin:i])
+                return args
+        elif text[i] == ',' and depth == 1:
+            args.append(text[begin:i])
+            begin = i + 1
+    raise ValueError('src/tileset_anims.c: unterminated call')
+
+
+def animation_slots_by_init():
+    """InitTilesetAnim_* function -> every BG tile slot its animations write, from src/tileset_anims.c."""
+    text = open(path('src/tileset_anims.c')).read()
+    for name, value in re.findall(r'^#define\s+(\w+)\s+(\w+)\s*$', text, re.M):
+        ANIM_CONSTANTS.setdefault(name, value)
+    tables = {}
+    for m in re.finditer(r'u16 \*const (\w+)\[\] =\s*\{(.*?)\};', text, re.S):
+        tables[m.group(1)] = [slot_number(e) for e in re.findall(r'TILE_OFFSET_4BPP\(([^()]*)\)', m.group(2))]
+    bodies = {}
+    for m in re.finditer(r'^(?:static )?void (\w+)\([^)]*\)\s*\{', text, re.M):
+        depth, i = 1, m.end()
+        while depth:
+            depth += {'{': 1, '}': -1}.get(text[i], 0)
+            i += 1
+        bodies[m.group(1)] = text[m.end():i - 1]
+    direct = {}
+    for name, body in bodies.items():
+        slots = set()
+        if name != 'AppendTilesetAnimToBuffer':
+            for call in re.finditer(r'\bAppendTilesetAnimToBuffer\s*\(', body):
+                args = call_arguments(body, call.end() - 1)
+                if len(args) != 3:
+                    raise ValueError('src/tileset_anims.c: %s: unexpected animation transfer' % name)
+                dest = args[1].strip()
+                count = (constant_expression(args[2], 'animation size') + 31) // 32
+                fixed = re.search(r'TILE_OFFSET_4BPP\(([^()]*)\)\)\s*$', dest)
+                if fixed:
+                    firsts = [slot_number(fixed.group(1))]
+                else:
+                    table = re.search(r'(\w+)\[[^\]]*\]\s*$', dest)
+                    if not table or table.group(1) not in tables:
+                        raise ValueError('src/tileset_anims.c: %s: cannot resolve animation destination %r' % (name, dest))
+                    firsts = tables[table.group(1)]
+                for first in firsts:
+                    slots.update(range(first, first + count))
+        direct[name] = slots
+    result = {}
+
+    def closure(name, seen):
+        if name in seen or name not in bodies:
+            return set()
+        seen.add(name)
+        slots = set(direct[name])
+        for callee in re.findall(r'\b(\w+)\b', bodies[name]):
+            if callee in bodies and callee != name:
+                slots |= closure(callee, seen)
+        return slots
+    for name in bodies:
+        if name.startswith('InitTilesetAnim_'):
+            result[name] = closure(name, set())
+    return result
+
+
+def tileset_callbacks():
+    hdr = open(path('src/data/tilesets/headers.h')).read()
+    return {m.group(1): (re.search(r'\.callback\s*=\s*(\w+)', m.group(2)) or [None, None])[1]
+            for m in re.finditer(r'const struct Tileset (\w+)\s*=\s*\{(.*?)\};', hdr, re.S)}
+
+
+def tileset_animation_slots():
+    """Tileset symbol -> the BG tile slots its animations write."""
+    by_init = animation_slots_by_init()
+    return {symbol: by_init.get(callback, set()) for symbol, callback in tileset_callbacks().items() if callback}
+
+
+def pool_slots_near_edge(layout, primary, secondary, direction, layouts_by_id, maps_by_layout, maps):
+    """Tile cache slots the field can show from a layout's cells within a camera ring of an edge.
+
+    Physical slots for a layout that doesn't stream, virtual tiles for one that does; either way each
+    is one pool slot still referenced on screen when the player crosses that edge."""
+    grid = stitched_grid(layout, layouts_by_id, maps_by_layout, maps)
+    grid_h, grid_w = len(grid), len(grid[0])
+    lookup = pool_tiles_by_metatile(primary, secondary)
+    band = WINDOW + MAP_OFFSET
+    rows, cols = range(grid_h), range(grid_w)
+    if direction == 'up':
+        rows = range(0, min(band, grid_h))
+    elif direction == 'down':
+        rows = range(max(0, grid_h - band), grid_h)
+    elif direction == 'left':
+        cols = range(0, min(band, grid_w))
+    else:
+        cols = range(max(0, grid_w - band), grid_w)
+    slots = set()
+    for y in rows:
+        for x in cols:
+            for tile in lookup(grid[y][x]):
+                if primary.extended or secondary.extended or tile < TILE_CACHE_POOL_SLOTS + LEGACY_TILES_IN_PRIMARY:
+                    slots.add(tile)
+    return slots
+
+
+def check_reload_crossings(report, streamed_layouts, layouts_by_id, maps_by_layout, maps, tilesets, verbose):
+    """Crossing into a streamed layout from another secondary tileset redraws the whole view, but the
+    previous map's cells keep their tile cache slots until that redraw reaches VRAM. Both must fit."""
+    for layout, primary, secondary in streamed_layouts:
+        grid = stitched_grid(layout, layouts_by_id, maps_by_layout, maps)
+        demand = worst_window(grid, pool_tiles_by_metatile(primary, secondary))[0]
+        for origin in maps.values():
+            source = layouts_by_id.get(origin.get('layout'))
+            if source is None or source['secondary_tileset'] == layout['secondary_tileset']:
+                continue
+            for connection in origin.get('connections') or []:
+                target_map = maps.get(connection['map'])
+                if connection['direction'] not in ('up', 'down', 'left', 'right') or not target_map \
+                        or target_map.get('layout') != layout['id']:
+                    continue
+                if source['primary_tileset'] != layout['primary_tileset']:
+                    continue
+                src_primary, src_secondary = tilesets.get(source['primary_tileset']), tilesets.get(source['secondary_tileset'])
+                if not src_primary or not src_secondary:
+                    continue
+                held = len(pool_slots_near_edge(source, src_primary, src_secondary, connection['direction'],
+                                                layouts_by_id, maps_by_layout, maps))
+                message = ('%s -> %s: crossing needs %d cached tiles while %d slots still show %s; the tile cache holds %d'
+                           % (origin['id'], connection['map'], demand, held, origin['id'], TILE_CACHE_POOL_SLOTS))
+                if demand + held > TILE_CACHE_POOL_SLOTS:
+                    report.error(message)
+                elif demand + held > TILE_CACHE_WARN_SLOTS:
+                    report.warn(message)
+                elif verbose:
+                    print(message)
 
 
 def cmd_gen(args):
@@ -596,13 +760,8 @@ def cmd_gen(args):
             out.append('static const u32 %s[] = INCGFX_U32("%s/tiles.png", ".4bpp");' % (raw_names[symbol], ts.dir))
     for symbol in sorted(tilesets):
         ts = tilesets[symbol]
-        name = c_identifier(symbol)
         if ts.extPath:
-            out.append('static const u8 sMetatileTileExt_%s[] = INCBIN_U8("%s");' % (name, ts.extPath))
-        if ts.thirdPath:
-            out.append('static const u16 sMetatileThirdLayer_%s[] = INCBIN_U16("%s");' % (name, ts.thirdPath))
-        if ts.thirdExtPath:
-            out.append('static const u8 sMetatileThirdLayerExt_%s[] = INCBIN_U8("%s");' % (name, ts.thirdExtPath))
+            out.append('static const u8 sMetatileTileExt_%s[] = INCBIN_U8("%s");' % (c_identifier(symbol), ts.extPath))
     out += ['', 'const struct TilesetCapacityInfo gTilesetCapacityInfo[] =', '{']
     for symbol in sorted(tilesets):
         ts = tilesets[symbol]
@@ -611,8 +770,6 @@ def cmd_gen(args):
                 '        .tileset = &%s,' % symbol,
                 '        .rawTiles = %s,' % raw_names.get(symbol, 'NULL'),
                 '        .tileExt = %s,' % ('sMetatileTileExt_' + name if ts.extPath else 'NULL'),
-                '        .thirdLayer = %s,' % ('sMetatileThirdLayer_' + name if ts.thirdPath else 'NULL'),
-                '        .thirdLayerExt = %s,' % ('sMetatileThirdLayerExt_' + name if ts.thirdExtPath else 'NULL'),
                 '        .numTiles = %d,' % ts.numTiles,
                 '        .numMetatiles = %d,' % ts.numMetatiles,
                 '        .streamed = %s,' % ('TRUE' if ts.extended else 'FALSE'),

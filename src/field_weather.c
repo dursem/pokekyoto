@@ -1,5 +1,5 @@
 #include "global.h"
-#include "opal_map_palette.h"
+#include "map_palette.h"
 #include "constants/songs.h"
 #include "constants/weather.h"
 #include "constants/rgb.h"
@@ -171,7 +171,7 @@ static const u8 ALIGNED(2) sBasePaletteColorMapTypes[32] =
     COLOR_MAP_DARK_CONTRAST,
     COLOR_MAP_DARK_CONTRAST,
     COLOR_MAP_DARK_CONTRAST,
-    COLOR_MAP_NONE,
+    COLOR_MAP_DARK_CONTRAST,
     COLOR_MAP_NONE,
     COLOR_MAP_NONE,
     // sprite palettes
@@ -481,7 +481,7 @@ static void ApplyColorMap(u8 startPalIndex, u8 numPalettes, s8 colorMapIndex)
         while (curPalIndex < numPalettes)
         {
             // don't blend special palettes immune to blending
-            if (OpalMapPalettesWeatherType(curPalIndex, sPaletteColorMapTypes[curPalIndex]) == COLOR_MAP_NONE || IsSpritePalTagBlendImmune(curPalIndex))
+            if (MapPalettesWeatherType(curPalIndex, sPaletteColorMapTypes[curPalIndex]) == COLOR_MAP_NONE || IsSpritePalTagBlendImmune(curPalIndex))
             {
                 // No palette change.
                 palOffset += 16;
@@ -490,7 +490,7 @@ static void ApplyColorMap(u8 startPalIndex, u8 numPalettes, s8 colorMapIndex)
             {
                 u8 r, g, b;
 
-                if (OpalMapPalettesWeatherType(curPalIndex, sPaletteColorMapTypes[curPalIndex]) == COLOR_MAP_CONTRAST || curPalIndex - 16 == gWeatherPtr->contrastColorMapSpritePalIndex)
+                if (MapPalettesWeatherType(curPalIndex, sPaletteColorMapTypes[curPalIndex]) == COLOR_MAP_CONTRAST || curPalIndex - 16 == gWeatherPtr->contrastColorMapSpritePalIndex)
                     colorMap = sContrastColorMaps[colorMapIndex];
                 else
                     colorMap = sDarkenedContrastColorMaps[colorMapIndex];
@@ -519,7 +519,7 @@ static void ApplyColorMap(u8 startPalIndex, u8 numPalettes, s8 colorMapIndex)
 
         while (curPalIndex < numPalettes)
         {
-            if (OpalMapPalettesWeatherType(curPalIndex, sPaletteColorMapTypes[curPalIndex]) == COLOR_MAP_NONE || IsSpritePalTagBlendImmune(curPalIndex))
+            if (MapPalettesWeatherType(curPalIndex, sPaletteColorMapTypes[curPalIndex]) == COLOR_MAP_NONE || IsSpritePalTagBlendImmune(curPalIndex))
             {
                 // No palette change.
                 CpuFastCopy(&gPlttBufferUnfaded[palOffset], &gPlttBufferFaded[palOffset], PLTT_SIZE_4BPP);
@@ -573,7 +573,7 @@ static void ApplyColorMapWithBlend(u8 startPalIndex, u8 numPalettes, s8 colorMap
         UpdateAltBgPalettes((1 << (palOffset >> 4)) & PALETTES_BG);
         CpuFastCopy(gPlttBufferUnfaded + palOffset, gPlttBufferFaded + palOffset, 16 * sizeof(u16));
         UpdatePalettesWithTime(1 << (palOffset >> 4)); // Apply TOD blend
-        if (OpalMapPalettesWeatherType(curPalIndex, sPaletteColorMapTypes[curPalIndex]) == COLOR_MAP_NONE || IsSpritePalTagBlendImmune(curPalIndex))
+        if (MapPalettesWeatherType(curPalIndex, sPaletteColorMapTypes[curPalIndex]) == COLOR_MAP_NONE || IsSpritePalTagBlendImmune(curPalIndex))
         {
             // No color map. Simply blend the colors.
             BlendPalettesFine(1, gPlttBufferFaded + palOffset, gPlttBufferFaded + palOffset, blendCoeff, blendColor);
@@ -583,7 +583,7 @@ static void ApplyColorMapWithBlend(u8 startPalIndex, u8 numPalettes, s8 colorMap
         {
             const u8 *colorMap;
 
-            if (OpalMapPalettesWeatherType(curPalIndex, sPaletteColorMapTypes[curPalIndex]) == COLOR_MAP_DARK_CONTRAST)
+            if (MapPalettesWeatherType(curPalIndex, sPaletteColorMapTypes[curPalIndex]) == COLOR_MAP_DARK_CONTRAST)
                 colorMap = sDarkenedContrastColorMaps[colorMapIndex];
             else
                 colorMap = sContrastColorMaps[colorMapIndex];
@@ -625,7 +625,7 @@ static void ApplyDroughtColorMapWithBlend(s8 colorMapIndex, u8 blendCoeff, u32 b
     palOffset = 0;
     for (curPalIndex = 0; curPalIndex < 32; curPalIndex++)
     {
-        if (OpalMapPalettesWeatherType(curPalIndex, sPaletteColorMapTypes[curPalIndex]) == COLOR_MAP_NONE|| IsSpritePalTagBlendImmune(curPalIndex))
+        if (MapPalettesWeatherType(curPalIndex, sPaletteColorMapTypes[curPalIndex]) == COLOR_MAP_NONE|| IsSpritePalTagBlendImmune(curPalIndex))
         {
             // No color map. Simply blend the colors.
             BlendPalette(palOffset, 16, blendCoeff, blendColor);
@@ -1193,7 +1193,7 @@ void SetWeatherPalStateIdle(void)
 const u8 *SetPaletteColorMapType(u8 paletteIndex, enum ColorMapType colorMapType)
 {
     if (paletteIndex < NUM_PALS_TOTAL)
-        OpalMapPalettesPin(paletteIndex);
+        MapPalettesPin(paletteIndex);
 
     if (sPaletteColorMapTypes[paletteIndex] == colorMapType)
         return sPaletteColorMapTypes;

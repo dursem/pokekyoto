@@ -1,5 +1,5 @@
 #include "global.h"
-#include "opal_map_palette.h"
+#include "map_palette.h"
 #include "battle_pyramid.h"
 #include "bg.h"
 #include "fieldmap.h"
@@ -22,7 +22,7 @@
 #include "constants/metatile_behaviors_frlg.h"
 #include "wild_encounter.h"
 
-// Saves made before the 11-bit Kyoto/Opal map-grid migration store mapView blocks in the old format.
+// Saves made before the map grid gained an 11th metatile id bit store blocks in the old format.
 #define MAP_VIEW_FORMAT_INDEX (ARRAY_COUNT(gSaveBlock1Ptr->mapView) - 1)
 #define MAP_VIEW_FORMAT_TAG   0x0B11
 STATIC_ASSERT(MAP_OFFSET_W * MAP_OFFSET_H < ARRAY_COUNT(((struct SaveBlock1 *)0)->mapView), MapViewHasSpareEntry)
@@ -1060,11 +1060,36 @@ static void LoadPrimaryTilesetPalette(struct MapLayout const *mapLayout)
 
 void LoadSecondaryTilesetPalette(struct MapLayout const *mapLayout, bool8 skipFaded)
 {
-    OpalMapPalettesLoad(mapLayout);
-    if (OpalMapPalettesActive())
+    MapPalettesLoad(mapLayout);
+    if (MapPalettesActive())
         return;
 
     LoadTilesetPalette(mapLayout->secondaryTileset, GetNumPalsInPrimary(mapLayout) * 16, (NUM_PALS_TOTAL - GetNumPalsInPrimary(mapLayout)) * PLTT_SIZE_4BPP, skipFaded, GetNumPalsInPrimary(mapLayout));
+}
+
+/*
+ * Used when walking into a connected map, while cells of the previous map are still on screen.
+ * Within one extended palette library the allocation carries over and those cells stay valid
+ * (tools/map_palettes certifies these connections). Any other change into or out of an
+ * extended library leaves those cells with bank numbers of the old allocation, and an extended
+ * allocation may have moved primary palettes, so every map bank is reloaded and the whole view is
+ * redrawn this frame; VBlank then publishes palettes and tilemaps together. Returns the first map
+ * palette bank that was reloaded.
+ */
+u32 LoadConnectedMapTilesetPalettes(struct MapLayout const *mapLayout)
+{
+    bool32 wasExtended = MapPalettesActive();
+    bool32 continues = MapPalettesCanContinue(mapLayout);
+
+    LoadSecondaryTilesetPalette(mapLayout, TRUE);
+    if (continues || (!wasExtended && !MapPalettesActive()))
+        return GetNumPalsInPrimary(mapLayout);
+
+    TileCache_RequestRedraw();
+    if (MapPalettesActive())
+        return GetNumPalsInPrimary(mapLayout);
+    LoadTilesetPalette(mapLayout->primaryTileset, 0, GetNumPalsInPrimary(mapLayout) * PLTT_SIZE_4BPP, TRUE, GetNumPalsInPrimary(mapLayout));
+    return 0;
 }
 
 void CopyMapTilesetsToVram(struct MapLayout const *mapLayout)
@@ -1084,7 +1109,7 @@ void CopyMapTilesetsToVram(struct MapLayout const *mapLayout)
 
 void LoadMapTilesetPalettes(struct MapLayout const *mapLayout)
 {
-    OpalMapPalettesReset();
+    MapPalettesReset();
 
     if (mapLayout)
     {

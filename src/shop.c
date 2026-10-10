@@ -1,5 +1,5 @@
 #include "global.h"
-#include "opal_map_palette.h"
+#include "map_palette.h"
 #include "bg.h"
 #include "data.h"
 #include "decompress.h"
@@ -141,7 +141,7 @@ static void BuyMenuCollectObjectEventData(void);
 static void BuyMenuDrawObjectEvents(void);
 static void BuyMenuDrawMapBg(void);
 static bool8 BuyMenuCheckForOverlapWithMenuBg(int, int);
-static void BuyMenuDrawMapMetatile(s16, s16, const u16 *, u8);
+static void BuyMenuDrawMapMetatile(s16, s16, const u16 *, u8, bool32);
 static void BuyMenuDrawMapMetatileLayer(u16 *dest, s16 offset1, s16 offset2, const u16 *src);
 static bool8 BuyMenuCheckIfObjectEventOverlapsMenuBg(s16 *);
 static void ExitBuyMenu(u8 taskId);
@@ -763,7 +763,7 @@ static void BuyMenuDecompressBgGraphics(void)
 {
     DecompressAndCopyTileDataToVram(1, gShopMenu_Gfx, 0x3A0, 0x3E3, 0);
     DecompressDataWithHeaderWram(gShopMenu_Tilemap, sShopData->tilemapBuffers[0]);
-    OpalMapPalettesReserve(1u << SHOP_MENU_PALETTE_ID);
+    MapPalettesReserve(1u << SHOP_MENU_PALETTE_ID);
     LoadPalette(gShopMenu_Pal, BG_PLTT_ID(SHOP_MENU_PALETTE_ID), PLTT_SIZE_4BPP);
 }
 
@@ -771,8 +771,7 @@ static void BuyMenuInitWindows(void)
 {
     InitWindows(sShopBuyMenuWindowTemplates);
     DeactivateAllTextPrinters();
-    // Bank 13 is UI-only and outside Kyoto M3, so this reservation masks to a no-op.
-    OpalMapPalettesReserve(1u << 13);
+    MapPalettesReserve(1u << 13);
     LoadUserWindowBorderGfx(WIN_MONEY, 1, BG_PLTT_ID(13));
     LoadMessageBoxGfx(WIN_MONEY, 0xA, BG_PLTT_ID(14));
     PutWindowTilemap(WIN_MONEY);
@@ -823,6 +822,7 @@ static void BuyMenuDrawMapBg(void)
     u16 metatile;
     u16 numMetatilesInPrimary;
     u8 metatileLayerType;
+    bool32 allLayers;
 
     mapLayout = gMapHeader.mapLayout;
     numMetatilesInPrimary = GetNumMetatilesInPrimary(mapLayout);
@@ -835,10 +835,8 @@ static void BuyMenuDrawMapBg(void)
         for (i = 0; i < 15; i++)
         {
             metatile = MapGridGetMetatileIdAt(x + i, y + j);
-            if (BuyMenuCheckForOverlapWithMenuBg(i, j) == TRUE)
-                metatileLayerType = MapGridGetMetatileLayerTypeAt(x + i, y + j);
-            else
-                metatileLayerType = METATILE_LAYER_TYPE_COVERED;
+            metatileLayerType = MapGridGetMetatileLayerTypeAt(x + i, y + j);
+            allLayers = BuyMenuCheckForOverlapWithMenuBg(i, j);
 
             if (metatile < numMetatilesInPrimary)
             {
@@ -849,38 +847,55 @@ static void BuyMenuDrawMapBg(void)
                 tileset = mapLayout->secondaryTileset;
                 metatile -= numMetatilesInPrimary;
             }
+            if (metatile >= GetTilesetNumMetatiles(tileset, metatile + 1))
+            {
+                tileset = mapLayout->primaryTileset;
+                metatile = 0;
+            }
             tiles = tileset->metatiles + metatile * NUM_TILES_PER_METATILE;
+
+            // The field left the map's tiles in VRAM; streamed ones are wherever the tile cache put them, and
+            // extended palettes are in whichever banks the field assigned them.
             ext = TileCache_GetMetatileExt(tileset, metatile);
-            references = OpalMapPalettesGetReferences(tileset, metatile);
+            references = MapPalettesGetReferences(tileset, metatile);
             for (u32 k = 0; k < NUM_TILES_PER_METATILE; k++)
             {
                 u16 tile = TileCache_Resolve(tiles[k], ext != NULL ? ext[k] : 0);
-                u32 logical = references != NULL ? references[k] : (tiles[k] >> 12);
-                resolvedTiles[k] = OpalMapPalettesResolve(tile, logical);
+                resolvedTiles[k] = MapPalettesResolve(tile, references != NULL ? references[k] : tiles[k] >> 12);
             }
-            BuyMenuDrawMapMetatile(i, j, resolvedTiles, metatileLayerType);
+            BuyMenuDrawMapMetatile(i, j, resolvedTiles, metatileLayerType, allLayers);
         }
     }
 }
 
-static void BuyMenuDrawMapMetatile(s16 x, s16 y, const u16 *src, u8 metatileLayerType)
+// Where the menu covers BG1, only BG2 and BG3 are free, so a metatile shows the two layers it was
+// authored on in the two-layer format (see METATILE_LAYER_TYPE_*).
+static void BuyMenuDrawMapMetatile(s16 x, s16 y, const u16 *src, u8 metatileLayerType, bool32 allLayers)
 {
     u16 offset1 = x * 2;
     u16 offset2 = y * 64;
 
+    if (allLayers)
+    {
+        BuyMenuDrawMapMetatileLayer(sShopData->tilemapBuffers[2], offset1, offset2, src + 0);
+        BuyMenuDrawMapMetatileLayer(sShopData->tilemapBuffers[3], offset1, offset2, src + 4);
+        BuyMenuDrawMapMetatileLayer(sShopData->tilemapBuffers[1], offset1, offset2, src + 8);
+        return;
+    }
+
     switch (metatileLayerType)
     {
-    case METATILE_LAYER_TYPE_NORMAL:
-        BuyMenuDrawMapMetatileLayer(sShopData->tilemapBuffers[3], offset1, offset2, src);
-        BuyMenuDrawMapMetatileLayer(sShopData->tilemapBuffers[1], offset1, offset2, src + 4);
-        break;
     case METATILE_LAYER_TYPE_COVERED:
-        BuyMenuDrawMapMetatileLayer(sShopData->tilemapBuffers[2], offset1, offset2, src);
+        BuyMenuDrawMapMetatileLayer(sShopData->tilemapBuffers[2], offset1, offset2, src + 0);
         BuyMenuDrawMapMetatileLayer(sShopData->tilemapBuffers[3], offset1, offset2, src + 4);
         break;
     case METATILE_LAYER_TYPE_SPLIT:
-        BuyMenuDrawMapMetatileLayer(sShopData->tilemapBuffers[2], offset1, offset2, src);
-        BuyMenuDrawMapMetatileLayer(sShopData->tilemapBuffers[1], offset1, offset2, src + 4);
+        BuyMenuDrawMapMetatileLayer(sShopData->tilemapBuffers[2], offset1, offset2, src + 0);
+        BuyMenuDrawMapMetatileLayer(sShopData->tilemapBuffers[3], offset1, offset2, src + 8);
+        break;
+    default:
+        BuyMenuDrawMapMetatileLayer(sShopData->tilemapBuffers[2], offset1, offset2, src + 4);
+        BuyMenuDrawMapMetatileLayer(sShopData->tilemapBuffers[3], offset1, offset2, src + 8);
         break;
     }
 }

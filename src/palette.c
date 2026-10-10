@@ -1,6 +1,6 @@
 #include "global.h"
 #include "kyoto_cloud_layers.h"
-#include "opal_map_palette.h"
+#include "map_palette.h"
 #include "palette.h"
 #include "util.h"
 #include "decompress.h"
@@ -36,7 +36,7 @@ ALIGNED(4) EWRAM_DATA u16 gPlttBufferFaded[PLTT_BUFFER_SIZE] = {0};
 EWRAM_DATA struct PaletteFadeControl gPaletteFade = {0};
 static EWRAM_DATA u32 sPlttBufferTransferPending = 0;
 
-// M3 remembers the current software map fade so a logical palette that moves
+// The current software map fade is remembered so a logical palette that moves
 // into a new physical bank can be reconstructed without popping for a frame.
 static EWRAM_DATA u32 sMapFadeMask;
 static EWRAM_DATA u16 sMapFadeColor;
@@ -203,7 +203,7 @@ bool32 BeginNormalPaletteFade(u32 selectedPalettes, s8 delay, u8 startY, u8 targ
 
         temp = gPaletteFade.bufferTransferDisabled;
         gPaletteFade.bufferTransferDisabled = FALSE;
-        if (!OpalMapPalettesActive())
+        if (!MapPalettesActive())
             CpuCopy32(gPlttBufferFaded, (void *)PLTT, PLTT_SIZE);
         sPlttBufferTransferPending = FALSE;
         if (gPaletteFade.mode == HARDWARE_FADE && gPaletteFade.active)
@@ -251,7 +251,7 @@ bool32 BeginTimeOfDayPaletteFade(u32 selectedPalettes, s8 delay, u8 startY, u8 t
 
     temp = gPaletteFade.bufferTransferDisabled;
     gPaletteFade.bufferTransferDisabled = 0;
-    if (!OpalMapPalettesActive())
+    if (!MapPalettesActive())
         CpuCopy32(gPlttBufferFaded, (void *)PLTT, PLTT_SIZE);
     sPlttBufferTransferPending = 0;
     if (gPaletteFade.mode == HARDWARE_FADE && gPaletteFade.active)
@@ -310,8 +310,8 @@ static u8 UpdateTimeOfDayPaletteFade(void)
 
     RecordMapFade(gPaletteFadeSelectedPalettes);
 
-    // First apply TOD blend to the physical map-bank subset currently controlled by M3.
-    timePalettes = gPaletteFadeSelectedPalettes & OpalMapPalettesMask();
+    // First apply TOD blend to the map palette banks the allocator currently controls.
+    timePalettes = gPaletteFadeSelectedPalettes & MapPalettesMask();
     // Sprite palettes, don't blend those with tags
     u32 i;
     u32 j = 1 << 16;

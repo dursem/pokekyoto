@@ -5,7 +5,7 @@
 #include "field_camera.h"
 #include "gpu_regs.h"
 #include "main.h"
-#include "opal_map_palette.h"
+#include "map_palette.h"
 #include "sprite.h"
 #include "kyoto_lamp_mask.h"
 
@@ -61,7 +61,7 @@ static bool32 BehindMap(u32 x, u32 y, u32 priority, s16 scrollX, s16 scrollY)
         entry = map[(y / 8) * 32 + x / 8];
         if (entry & 0x400) tx ^= 7;
         if (entry & 0x800) ty ^= 7;
-        if (Pixel4(OpalMapPalettesGetTileGraphics((entry & 1023) + ((cnt >> 2) & 3) * 512), 8, tx, ty))
+        if (Pixel4(MapPalettesGetTileGraphics((entry & 1023) + ((cnt >> 2) & 3) * 512), 8, tx, ty))
             return TRUE;
     }
     return FALSE;

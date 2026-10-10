@@ -1,11 +1,13 @@
 #include "global.h"
-#include "opal_map_palette.h"
+#include "map_palette.h"
 #include "event_data.h"
 #include "field_door.h"
 #include "field_camera.h"
 #include "fieldmap.h"
 #include "metatile_behavior.h"
 #include "task.h"
+#include "tile_cache.h"
+#include "tileset_anims.h"
 #include "tilesets.h"
 #include "constants/songs.h"
 #include "constants/metatile_labels.h"
@@ -1029,37 +1031,105 @@ static const struct DoorGraphics sDoorAnimGraphicsTable[] =
     {},
 };
 
-// NOTE: The tiles of a door's animation must be copied to VRAM because they are not already part of any given tileset.
-//       This means that if there are any pre-existing tiles in this copied region that are visible when the door
-//       animation is played they will be overwritten.
-#define DOOR_TILE_START_SIZE1 (NUM_TILES_TOTAL - 8)
-#define DOOR_TILE_START_SIZE2 (NUM_TILES_TOTAL - 16)
+/*
+ * The tiles of a door's animation are not part of any tileset, so they must be copied into the
+ * map's tile region of VRAM while the door is open or animating. Vanilla copied them to fixed
+ * slots at the end of the primary/secondary tile ranges, which corrupts tilesets that actually
+ * use those slots. Instead, the current layout's metatiles are scanned for tile IDs that no
+ * metatile references, and the door tiles are copied into those slots. The chosen IDs may be
+ * scattered, so tiles are copied and referenced individually. Tile animation destinations count as
+ * used too. If a layout ever references every tile ID, the vanilla slots are used as a fallback. A
+ * map whose tiles stream through the tile cache has no fixed unused IDs, so it always uses the
+ * vanilla slots, which the cache never fills.
+ */
+#define NUM_DOOR_TILES 16
+#define DOOR_TILE_START_FALLBACK (NUM_TILES_TOTAL - NUM_DOOR_TILES)
+STATIC_ASSERT(DOOR_TILE_START_FALLBACK >= TILE_CACHE_END_SLOT, DoorTilesOutsideTileCache)
+#define TILEMAP_TILE_MASK 0x3FF
 
-static void CopyDoorTilesToVram(const struct DoorGraphics *gfx, const struct DoorAnimFrame *frame)
+static const struct MapLayout *sDoorTileAllocLayout = NULL;
+static u16 sDoorTileIds[NUM_DOOR_TILES];
+
+static void MarkTilesUsedByTileset(const struct Tileset *tileset, u32 numMetatiles, u32 *usedTiles)
 {
-    u32 numTiles;
-    u32 firstTile;
+    if (tileset == NULL || tileset->metatiles == NULL)
+        return;
 
-    if (gfx->size == DOOR_SIZE_2x2_LEFT || gfx->size == DOOR_SIZE_2x2_RIGHT)
+    numMetatiles = MapPalettesMetatileCount(tileset, numMetatiles);
+    for (u32 i = 0; i < numMetatiles * NUM_TILES_PER_METATILE; i++)
     {
-        numTiles = 16;
-        firstTile = DOOR_TILE_START_SIZE2;
-    }
-    else
-    {
-        numTiles = 8;
-        firstTile = DOOR_TILE_START_SIZE1;
-    }
-
-    for (u32 i = 0; i < numTiles; i++)
-    {
-        const void *source = gfx->tiles + frame->offset + i * TILE_SIZE_4BPP;
-        if (!OpalMapPalettesQueueTile(source, firstTile + i))
-            CpuFastCopy(source, (void *)(VRAM + TILE_OFFSET_4BPP(firstTile + i)), TILE_SIZE_4BPP);
+        u32 tileId = tileset->metatiles[i] & TILEMAP_TILE_MASK;
+        usedTiles[tileId / 32] |= 1u << (tileId % 32);
     }
 }
 
-static void BuildDoorTiles(u16 *tiles, u16 tileNum, const u8 *paletteNums)
+static void EnsureDoorTilesAllocated(void)
+{
+    const struct MapLayout *layout = gMapHeader.mapLayout;
+    if (layout == NULL || layout == sDoorTileAllocLayout)
+        return;
+
+    u32 usedTiles[NUM_TILES_TOTAL / 32] = {0};
+    u32 numPrimaryMetatiles = GetNumMetatilesInPrimary(layout);
+    u32 found = 0;
+
+    if (TileCache_LayoutIsStreamed(layout))
+    {
+        for (u32 i = 0; i < NUM_DOOR_TILES; i++)
+            sDoorTileIds[i] = DOOR_TILE_START_FALLBACK + i;
+        sDoorTileAllocLayout = layout;
+        return;
+    }
+
+    MarkTilesUsedByTileset(layout->primaryTileset, GetTilesetNumMetatiles(layout->primaryTileset, numPrimaryMetatiles), usedTiles);
+    MarkTilesUsedByTileset(layout->secondaryTileset, GetTilesetNumMetatiles(layout->secondaryTileset, NUM_METATILES_TOTAL - numPrimaryMetatiles), usedTiles);
+    // Animations write their slots every few frames, which would overwrite a door's frames.
+    TilesetAnims_DiscoverVramSlots(layout, usedTiles, usedTiles);
+
+    for (s32 tileId = NUM_TILES_TOTAL - 1; tileId >= 0 && found < NUM_DOOR_TILES; tileId--)
+    {
+        if (!(usedTiles[tileId / 32] & (1u << (tileId % 32))))
+            sDoorTileIds[found++] = tileId;
+    }
+
+    if (found < NUM_DOOR_TILES)
+    {
+        if (MapPalettesActive())
+        {
+            MapPalettesReset();
+            fatalf("Extended map needs sixteen unused door tile slots");
+        }
+        for (u32 i = 0; i < NUM_DOOR_TILES; i++)
+            sDoorTileIds[i] = DOOR_TILE_START_FALLBACK + i;
+    }
+
+    sDoorTileAllocLayout = layout;
+}
+
+static u32 GetNumDoorTiles(const struct DoorGraphics *gfx)
+{
+    if (gfx->size == DOOR_SIZE_2x2_LEFT || gfx->size == DOOR_SIZE_2x2_RIGHT)
+        return 16;
+    else if (gfx->size == DOOR_SIZE_1x2)
+        return 8;
+    else
+        return 4;
+}
+
+static void CopyDoorTilesToVram(const struct DoorGraphics *gfx, const struct DoorAnimFrame *frame)
+{
+    u32 numTiles = GetNumDoorTiles(gfx);
+
+    EnsureDoorTilesAllocated();
+    for (u32 i = 0; i < numTiles; i++)
+    {
+        const void *source = gfx->tiles + frame->offset + i * TILE_SIZE_4BPP;
+        if (!MapPalettesQueueTile(source, sDoorTileIds[i]))
+            CpuFastCopy(source, (void *)(VRAM + TILE_OFFSET_4BPP(sDoorTileIds[i])), TILE_SIZE_4BPP);
+    }
+}
+
+static void BuildDoorTiles(u16 *tiles, u16 firstTileIdx, const u8 *paletteNums)
 {
     int i;
     u16 tile;
@@ -1068,7 +1138,7 @@ static void BuildDoorTiles(u16 *tiles, u16 tileNum, const u8 *paletteNums)
     for (i = 0; i < 4; i++)
     {
         tile = *(paletteNums++) << 12;
-        tiles[i] = tile | (tileNum + i);
+        tiles[i] = tile | sDoorTileIds[firstTileIdx + i];
     }
 
     // The remaining layers are left as tile 0 (with the same palette)
@@ -1087,50 +1157,50 @@ static void DrawCurrentDoorAnimFrame(const struct DoorGraphics *gfx, u32 x, u32 
     {
     case DOOR_SIZE_2x2_LEFT:
         // Top left metatile
-        BuildDoorTiles(&tiles[8], DOOR_TILE_START_SIZE2 + 0, &paletteNums[0]);
+        BuildDoorTiles(&tiles[8], 0, &paletteNums[0]);
         DrawDoorMetatileAt(x, y - 1, &tiles[8]);
 
         // Bottom left metatile
-        BuildDoorTiles(&tiles[8], DOOR_TILE_START_SIZE2 + 4, &paletteNums[4]);
+        BuildDoorTiles(&tiles[8], 4, &paletteNums[4]);
         DrawDoorMetatileAt(x, y, &tiles[8]);
 
         // Top right metatile
-        BuildDoorTiles(&tiles[8], DOOR_TILE_START_SIZE2 + 8, &paletteNums[8]);
+        BuildDoorTiles(&tiles[8], 8, &paletteNums[8]);
         DrawDoorMetatileAt(x + 1, y - 1, &tiles[8]);
 
         // Bottom right metatile
-        BuildDoorTiles(&tiles[8], DOOR_TILE_START_SIZE2 + 12, &paletteNums[12]);
+        BuildDoorTiles(&tiles[8], 12, &paletteNums[12]);
         DrawDoorMetatileAt(x + 1, y, &tiles[8]);
         break;
     case DOOR_SIZE_2x2_RIGHT:
         // Top left metatile
-        BuildDoorTiles(&tiles[8], DOOR_TILE_START_SIZE2 + 0, &paletteNums[0]);
+        BuildDoorTiles(&tiles[8], 0, &paletteNums[0]);
         DrawDoorMetatileAt(x - 1, y - 1, &tiles[8]);
 
         // Bottom left metatile
-        BuildDoorTiles(&tiles[8], DOOR_TILE_START_SIZE2 + 4, &paletteNums[4]);
+        BuildDoorTiles(&tiles[8], 4, &paletteNums[4]);
         DrawDoorMetatileAt(x - 1, y, &tiles[8]);
 
         // Top right metatile
-        BuildDoorTiles(&tiles[8], DOOR_TILE_START_SIZE2 + 8, &paletteNums[8]);
+        BuildDoorTiles(&tiles[8], 8, &paletteNums[8]);
         DrawDoorMetatileAt(x, y - 1, &tiles[8]);
 
         // Bottom right metatile
-        BuildDoorTiles(&tiles[8], DOOR_TILE_START_SIZE2 + 12, &paletteNums[12]);
+        BuildDoorTiles(&tiles[8], 12, &paletteNums[12]);
         DrawDoorMetatileAt(x, y, &tiles[8]);
         break;
     case DOOR_SIZE_1x2:
         // Top metatile
-        BuildDoorTiles(&tiles[0], DOOR_TILE_START_SIZE1 + 0, &paletteNums[0]);
+        BuildDoorTiles(&tiles[0], 0, &paletteNums[0]);
         DrawDoorMetatileAt(x, y - 1, &tiles[0]);
 
         // Bottom metatile
-        BuildDoorTiles(&tiles[0], DOOR_TILE_START_SIZE1 + 4, &paletteNums[4]);
+        BuildDoorTiles(&tiles[0], 4, &paletteNums[4]);
         DrawDoorMetatileAt(x, y, &tiles[0]);
         break;
     default:
     case DOOR_SIZE_1x1:
-        BuildDoorTiles(&tiles[0], DOOR_TILE_START_SIZE1 + 0, &paletteNums[0]);
+        BuildDoorTiles(&tiles[0], 0, &paletteNums[0]);
         DrawDoorMetatileAt(x, y, &tiles[0]);
         break;
     }

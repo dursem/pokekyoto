@@ -8,6 +8,7 @@ void TransferTilesetAnimsBuffer(void);
 void TilesetAnims_DiscoverVramSlots(const struct MapLayout *layout, u32 *primarySlots, u32 *secondarySlots);
 
 void InitTilesetAnim_General(void);
+void InitTilesetAnim_TileCacheTest(void);
 void InitTilesetAnim_Petalburg(void);
 void InitTilesetAnim_Rustboro(void);
 void InitTilesetAnim_Dewford(void);

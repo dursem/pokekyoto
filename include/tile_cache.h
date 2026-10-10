@@ -23,6 +23,9 @@
  *
  * Animated tiles keep the VRAM slots tileset_anims.c writes them to, so a streamed map pins those
  * slots to the tiles they belong to.
+ *
+ * A legacy reference (below 1024) past the end of its sheet draws as an empty tile, as the stock
+ * loader left it; an extended reference past the end of its sheet is rejected by tilesetcap.py.
  */
 
 #define NUM_TILES_IN_PRIMARY_EXTENDED   1024
@@ -35,6 +38,7 @@
 #define METATILE_EXT_TILE_HIGH_MASK  (3 << METATILE_EXT_TILE_HIGH_SHIFT)
 
 // shop.c overwrites the last 29 map tile slots with its menu graphics, and doors use the last 16.
+// Stock secondary animations that write into these slots keep them, mapped directly (tile_cache.c).
 #define TILE_CACHE_FIRST_SLOT NUM_TILES_IN_PRIMARY
 #define TILE_CACHE_END_SLOT   995
 #define TILE_CACHE_NUM_SLOTS  (TILE_CACHE_END_SLOT - TILE_CACHE_FIRST_SLOT)
@@ -45,8 +49,6 @@ struct TilesetCapacityInfo
     const struct Tileset *tileset;
     const u32 *rawTiles;
     const u8 *tileExt;
-    const u16 *thirdLayer;
-    const u8 *thirdLayerExt;
     u16 numTiles;
     u16 numMetatiles;
     bool8 streamed;
@@ -65,8 +67,6 @@ bool32 TileCache_Disable(void);
 void TileCache_RequestRedraw(void);
 bool32 TileCache_TakeRedrawRequest(void);
 const u8 *TileCache_GetMetatileExt(const struct Tileset *tileset, u32 metatile);
-const u16 *TileCache_GetMetatileThirdLayer(const struct Tileset *tileset, u32 metatile);
-const u8 *TileCache_GetMetatileThirdLayerExt(const struct Tileset *tileset, u32 metatile);
 void TileCache_WriteCell(u16 *cell, u16 tile, u32 ext);
 void TileCache_WriteCellPhysical(u16 *cell, u16 tile);
 u16 TileCache_Resolve(u16 tile, u32 ext);

@@ -1,5 +1,5 @@
 #include "global.h"
-#include "opal_map_palette.h"
+#include "map_palette.h"
 #include "malloc.h"
 #include "bg.h"
 #include "event_data.h"
@@ -252,7 +252,7 @@ EWRAM_DATA static struct MirageTowerPulseBlend *sMirageTowerPulseBlend = NULL;
 
 static void UpdateMirageTowerPulseBlend(u8 taskId)
 {
-    OpalMapPalettesPin(6);
+    MapPalettesPin(6);
     UpdatePulseBlend(&sMirageTowerPulseBlend->pulseBlend);
 }
 

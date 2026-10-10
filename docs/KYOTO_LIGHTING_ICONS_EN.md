@@ -24,7 +24,7 @@ The preceding local-lighting update placed ball glows at priority 2, which left 
 
 Each visible ball glow uses fixed 32x32 art without a shared affine transform. A private 512-byte OBJ sheet is allocated only when a cutout is needed and cached until field cleanup. The source bitmap and palette are unchanged. Up to sixteen CPU masks reserve 8,192 bytes of EWRAM, plus 128 bytes of metadata. VBlank uploads the used masks behind the existing complete-frame transfer gate. Tagged sheets are released when leaving the field or resetting sprites. If private OBJ tile allocation fails, that glow is hidden for the frame so it cannot erase an actor.
 
-The mask reads queued sprite frames and queued map-tile graphics as well as the current camera offset. `OpalMapPalettesGetTileGraphics()` exposes pending tile bytes for that purpose. This avoids masking against the previous camera/animation frame. No new palettes are reserved. Empty mask slots skip tag searches, preserving the prior cloud-weather update rate.
+The mask reads queued sprite frames and queued map-tile graphics as well as the current camera offset. `MapPalettesGetTileGraphics()` exposes pending tile bytes for that purpose. This avoids masking against the previous camera/animation frame. No new palettes are reserved. Empty mask slots skip tag searches, preserving the prior cloud-weather update rate.
 
 mGBA checks for this correction: both lantern caps are visibly brighter; all 214 opaque pixels of the resting player match the preceding actor-lighting build; daytime lantern pixels are identical; the player and a nearby NPC retain independent local lighting; the five night-menu returns remain clean; and Bag cleanup releases actor palettes. At rest, the night fixture updates on all 600 sampled frames, while the cloud fixture advances on 546/600 frames (comparable to the previous 549/600).
 
@@ -70,7 +70,7 @@ The helper releases its tile/palette allocations on destruction, sprite reset an
 
 Kyoto's existing RTC and day/night tinting remain: `OW_ENABLE_DNS` is enabled and `OW_USE_FAKE_RTC` is unchanged. Followers remain disabled. This package does not introduce a second clock or change save layouts.
 
-The previous Rustboro lighting additions remain: 17 lamp events and emissive window metatiles 58, 66, 88, 92, 93 and 120–124. Four additional logical palettes preserve the original tile colors while `.pla` flags mark glass indices 9 and 10. The Opal compiler preserves those flags and checks the 13-bank physical BG limit. Lamps use the original brighter palette, without alternating frames. Player/NPC illumination uses private rendered palettes as explained below. They do not overwrite weather alpha.
+The previous Rustboro lighting additions remain: 17 lamp events and emissive window metatiles 58, 66, 88, 92, 93 and 120–124. Four additional logical palettes preserve the original tile colors while `.pla` flags mark glass indices 9 and 10. The map palette compiler preserves those flags and checks the 14-bank physical BG limit. Lamps use the original brighter palette, without alternating frames. Player/NPC illumination uses private rendered palettes as explained below. They do not overwrite weather alpha.
 
 The checkout already contains Gen 1–7 ball assets. They remain separate from enabling followers; no duplicate ball system is installed.
 
@@ -88,4 +88,4 @@ Current revision tested in mGBA: all five menu return paths above on daytime, ni
 
 ## Credits
 
-PokéSprite images are © Nintendo / Creatures Inc. / GAME FREAK Inc.; community shiny and variant artwork is credited in the included upstream `CONTRIBUTORS.md`. The upstream code license is included as `LICENSE.txt`. Source: msikma/pokesprite. The PC palette-streaming approach and selected UI resources derive from PokemonSanFran/merrp's icons work. Kyoto's map/Opal/cloud/paraglider systems and existing assets remain in place.
+PokéSprite images are © Nintendo / Creatures Inc. / GAME FREAK Inc.; community shiny and variant artwork is credited in the included upstream `CONTRIBUTORS.md`. The upstream code license is included as `LICENSE.txt`. Source: msikma/pokesprite. The PC palette-streaming approach and selected UI resources derive from PokemonSanFran/merrp's icons work. Kyoto's map/palette/cloud/paraglider systems and existing assets remain in place.

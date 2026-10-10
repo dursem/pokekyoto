@@ -1,4 +1,5 @@
 #include "global.h"
+#include "map_palette.h"
 #include "malloc.h"
 #include "decompress.h"
 #include "decoration.h"
@@ -775,6 +776,7 @@ static void ReturnToDecorationActionsAfterInvalidSelection(u8 taskId)
 
 static void SecretBasePC_PrepMenuForSelectingStoredDecors(u8 taskId)
 {
+    MapPalettesReserve(1u << 13);
     LoadPalette(sDecorationMenuPalette, BG_PLTT_ID(13), sizeof(sDecorationMenuPalette));
     ClearDialogWindowAndFrame(0, FALSE);
     RemoveDecorationWindow(WINDOW_MAIN_MENU);
@@ -921,6 +923,7 @@ static void ReturnToActionsMenuFromCategories(u8 taskId)
 
 void ShowDecorationCategoriesWindow(u8 taskId)
 {
+    MapPalettesReserve(1u << 13);
     LoadPalette(sDecorationMenuPalette, BG_PLTT_ID(13), sizeof(sDecorationMenuPalette));
     ClearDialogWindowAndFrame(0, FALSE);
     gTasks[taskId].tDecorationMenuCommand = DECOR_MENU_TRADE;
@@ -2006,9 +2009,15 @@ static void SetDecorSelectionBoxTiles(struct PlaceDecorationGraphicsDataBuffer *
         CopyTile(&data->image[i * TILE_SIZE_4BPP], data->tiles[i]);
 }
 
-static u16 GetMetatile(u16 tile)
+// The selection box shows the upper of the two layers a decoration metatile was authored on, which
+// is its middle layer when it covers the bottom layer and its top layer otherwise.
+static const u16 *GetDecorUpperLayer(u16 metatile)
 {
-    return gTilesetPointer_SecretBaseRedCave->metatiles[tile] & 0xFFF;
+    const struct Tileset *tileset = gTilesetPointer_SecretBaseRedCave;
+    u32 layerType = UNPACK_LAYER_TYPE(tileset->metatileAttributes[metatile]);
+
+    return &tileset->metatiles[metatile * NUM_TILES_PER_METATILE
+                               + (layerType == METATILE_LAYER_TYPE_COVERED ? 1 : 2) * 4];
 }
 
 static void SetDecorSelectionMetatiles(struct PlaceDecorationGraphicsDataBuffer *data)
@@ -2019,7 +2028,8 @@ static void SetDecorSelectionMetatiles(struct PlaceDecorationGraphicsDataBuffer 
     shape = data->decoration->shape;
     for (i = 0; i < sDecorTilemaps[shape].size; i++)
     {
-        data->tiles[sDecorTilemaps[shape].tiles[i]] = GetMetatile(data->decoration->tiles[sDecorTilemaps[shape].y[i]] * NUM_TILES_PER_METATILE + sDecorTilemaps[shape].x[i]);
+        const u16 *layer = GetDecorUpperLayer(data->decoration->tiles[sDecorTilemaps[shape].y[i]]);
+        data->tiles[sDecorTilemaps[shape].tiles[i]] = layer[sDecorTilemaps[shape].x[i] - 4] & 0xFFF;
     }
 }
 
@@ -2079,7 +2089,7 @@ static u8 gpu_pal_decompress_alloc_tag_and_upload(struct PlaceDecorationGraphics
     SetDecorSelectionMetatiles(data);
     SetDecorSelectionBoxOamAttributes(data->decoration->shape);
     SetDecorSelectionBoxTiles(data);
-    CopyPalette(data->palette, gTilesetPointer_SecretBaseRedCave->metatiles[(data->decoration->tiles[0] * NUM_TILES_PER_METATILE) + 7] >> 12);
+    CopyPalette(data->palette, GetDecorUpperLayer(data->decoration->tiles[0])[3] >> 12);
     LoadSpritePalette(&sSpritePal_PlaceDecoration);
     return CreateSprite(&sDecorationSelectorSpriteTemplate, 0, 0, 0);
 }
@@ -2143,7 +2153,7 @@ static u8 AddDecorationIconObjectFromObjectEvent(u16 tilesTag, u16 paletteTag, u
         SetDecorSelectionMetatiles(&sPlaceDecorationGraphicsDataBuffer);
         SetDecorSelectionBoxOamAttributes(sPlaceDecorationGraphicsDataBuffer.decoration->shape);
         SetDecorSelectionBoxTiles(&sPlaceDecorationGraphicsDataBuffer);
-        CopyPalette(sPlaceDecorationGraphicsDataBuffer.palette, gTilesetPointer_SecretBaseRedCave->metatiles[(sPlaceDecorationGraphicsDataBuffer.decoration->tiles[0] * NUM_TILES_PER_METATILE) + 7] >> 12);
+        CopyPalette(sPlaceDecorationGraphicsDataBuffer.palette, GetDecorUpperLayer(sPlaceDecorationGraphicsDataBuffer.decoration->tiles[0])[3] >> 12);
         sheet.data = sPlaceDecorationGraphicsDataBuffer.image;
         sheet.size = sDecorShapes[sPlaceDecorationGraphicsDataBuffer.decoration->shape].size * TILE_SIZE_4BPP;
         sheet.tag = tilesTag;

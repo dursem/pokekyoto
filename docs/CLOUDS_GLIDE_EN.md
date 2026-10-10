@@ -1,7 +1,7 @@
 # Kyoto foreground cloud weather and Paraglider
 
 Native source integration for `dursem/pokekyoto`, based on master
-`17149d664f15f4edb50dd050d90818bdeb603ed6` (the Kyoto/Opal triple-metatile fork of
+`17149d664f15f4edb50dd050d90818bdeb603ed6` (the triple-metatile fork of
 pokeemerald-expansion 1.17.0).
 
 This revision keeps the three foreground cloud shapes, player/NPC silhouettes,
@@ -97,7 +97,7 @@ recreation on returning to the field. Custom menus that allocate before
 changing callback2 need the same early cleanup entry point as Bag/Trainer Card.
 The fade guard keeps field reconstruction black until the foreground is ready.
 
-Silhouettes are prepared after the Opal frame transaction from current OAM and
+Silhouettes are prepared after the map palette frame transaction from current OAM and
 pending sprite animation uploads, then transferred after native VBlank/DMA.
 The ARM pixel shader executes in an 832-byte stack buffer with a linker size
 assertion. The lower-layer IWRAM raster routine has been removed; a stack

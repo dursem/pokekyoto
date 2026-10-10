@@ -4,7 +4,7 @@
 #include "kyoto_lamp_mask.h"
 #include "kyoto_cloud_layers.h"
 #include "glide.h"
-#include "opal_map_palette.h"
+#include "map_palette.h"
 #include "crt0.h"
 #include "malloc.h"
 #include "link.h"
@@ -196,9 +196,18 @@ static void InitMainCallbacks(void)
     gPokemonStoragePtr = &gPokemonStorage.block;
 }
 
+// Actor lighting, cloud shadows and the firefly shade read the frame's final OAM, tilemaps and queued map
+// tiles, so they run after the callbacks and before the map palette transaction is sealed for VBlank.
+static void PrepareFieldEffects(void)
+{
+    KyotoLight_Prepare();
+    KyotoCloud_Prepare();
+    FireflyShade_Prepare();
+}
+
 static void CallCallbacks(void)
 {
-    OpalMapPalettesBeginFrame();
+    MapPalettesBeginFrame();
 
     if (gMain.callback1)
         gMain.callback1();
@@ -206,7 +215,8 @@ static void CallCallbacks(void)
     if (gMain.callback2)
         gMain.callback2();
 
-    OpalMapPalettesEndFrame();
+    PrepareFieldEffects();
+    MapPalettesEndFrame();
 }
 
 void SetMainCallback2(MainCallback callback)
@@ -378,10 +388,10 @@ static void VBlankIntr(void)
     if (gTrainerHillVBlankCounter && *gTrainerHillVBlankCounter < 0xFFFFFFFF)
         (*gTrainerHillVBlankCounter)++;
 
-    bool32 blockVideo = OpalMapPalettesBlockTransfer();
+    bool32 blockVideo = MapPalettesBlockTransfer();
     if (!blockVideo)
     {
-        OpalMapPalettesCommit();
+        MapPalettesCommit();
         if (gMain.vblankCallback)
             gMain.vblankCallback();
     }

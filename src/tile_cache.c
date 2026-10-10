@@ -1,10 +1,10 @@
 #include "global.h"
-#include "opal_map_palette.h"
 #include "tile_cache.h"
 #include "bg.h"
 #include "dma3.h"
 #include "fieldmap.h"
 #include "main.h"
+#include "map_palette.h"
 #include "overworld.h"
 #include "tileset_anims.h"
 #include "data/tilesets/tile_cache_info.h"
@@ -18,8 +18,8 @@
  * A slot whose last tilemap reference is overwritten can't be reused straight away: the tilemap
  * copy that removes the reference from VRAM is only queued, and the DMA manager may delay it by
  * frames (it stops at 40 KiB per VBlank). Each frame's released slots therefore wait until every
- * DMA request queued by the end of that frame has been processed. M3 palette remapping is deliberately
- * not part of this M1+M2 package; when M3 is added its publication barrier extends this ticket rule.
+ * DMA request queued by the end of that frame has been processed. On maps with extended palettes,
+ * map_palette.c transfers the field tilemaps itself, so its commit has to have happened too.
  */
 struct PendingReleases
 {
@@ -52,34 +52,34 @@ struct TileCache
 
 static EWRAM_DATA struct TileCache sTileCache = {0};
 
-/* KYOTO_OPAL_LEGACY_PADDING_BLANK
- * Vanilla Emerald tilesets sometimes reference unused slots in the legacy
- * 0..1023 physical tile window as transparent padding.  Those slots were
- * effectively blank in the stock renderer even when the PNG ended earlier.
- * A streamed map must preserve that behaviour instead of treating the
- * reference as a missing extended source tile.
- */
-static const u32 sLegacyPaddingBlankTile[TILE_SIZE_4BPP / sizeof(u32)] = {0};
+// The stock loader copies only a sheet's own tiles, so a legacy (10 bit) reference past the end of a
+// sheet showed an empty slot. Streamed maps draw those references with this tile instead of failing.
+static const u32 sLegacyPaddingTile[TILE_SIZE_4BPP / sizeof(u32)] = {0};
 
 #define BIT_SET(bitmap, i)   ((bitmap)[(i) / 32] |= 1u << ((i) % 32))
 #define BIT_CLEAR(bitmap, i) ((bitmap)[(i) / 32] &= ~(1u << ((i) % 32)))
 #define BIT_TEST(bitmap, i)  ((bitmap)[(i) / 32] & (1u << ((i) % 32)))
 
+// Lookups alternate between a map's primary and secondary tileset, so the last two results are kept.
 const struct TilesetCapacityInfo *GetTilesetCapacityInfo(const struct Tileset *tileset)
 {
-    static const struct TilesetCapacityInfo *sLastFound = NULL;
+    static const struct TilesetCapacityInfo *sLastFound[2] = {NULL};
 
     if (tileset == NULL)
         return NULL;
-    if (sLastFound != NULL && sLastFound->tileset == tileset)
-        return sLastFound;
+    for (u32 i = 0; i < ARRAY_COUNT(sLastFound); i++)
+    {
+        if (sLastFound[i] != NULL && sLastFound[i]->tileset == tileset)
+            return sLastFound[i];
+    }
 
     for (u32 i = 0; i < gTilesetCapacityInfoCount; i++)
     {
         if (gTilesetCapacityInfo[i].tileset == tileset)
         {
-            sLastFound = &gTilesetCapacityInfo[i];
-            return sLastFound;
+            sLastFound[1] = sLastFound[0];
+            sLastFound[0] = &gTilesetCapacityInfo[i];
+            return sLastFound[0];
         }
     }
     return NULL;
@@ -158,15 +158,8 @@ static const u32 *GetTileSource(u32 tile)
 
     if (info == NULL || info->rawTiles == NULL)
         return NULL;
-
     if (local >= info->numTiles)
-    {
-        // Preserve stock Emerald's transparent padding in the physical 0..1023 tile window.
-        if (tile < NUM_TILES_TOTAL)
-            return sLegacyPaddingBlankTile;
-        return NULL;
-    }
-
+        return tile < NUM_TILES_TOTAL ? sLegacyPaddingTile : NULL;
     return info->rawTiles + local * (TILE_SIZE_4BPP / sizeof(u32));
 }
 
@@ -240,7 +233,7 @@ static void SealReleasesThisFrame(void)
     for (u32 i = 0; i < SLOT_BITMAP_WORDS; i++)
         target->slots[i] |= sTileCache.releasedThisFrame[i];
     target->dmaTicket = GetDma3RequestsQueued();
-    target->tilemapTicket = OpalMapPalettesTilemapsPrepared();
+    target->tilemapTicket = MapPalettesTilemapsPrepared();
     CpuFill32(0, sTileCache.releasedThisFrame, sizeof(sTileCache.releasedThisFrame));
     sTileCache.hasReleasesThisFrame = FALSE;
 }
@@ -248,7 +241,7 @@ static void SealReleasesThisFrame(void)
 static void CommitReleases(void)
 {
     u32 dmaDone = GetDma3RequestsDone();
-    u32 tilemapsDone = OpalMapPalettesTilemapsCommitted();
+    u32 tilemapsDone = MapPalettesTilemapsCommitted();
     u32 committed = 0;
 
     while (committed < sTileCache.numPending
@@ -305,7 +298,7 @@ static u32 AcquireTile(u32 tile)
     slot = sTileCache.virtualToSlot[tile - NUM_TILES_IN_PRIMARY];
     if (slot != SLOT_NONE)
     {
-        // Animation slots outside the allocatable pool are direct-mapped and never reused by the cache.
+        // Animation slots past the pool are mapped directly and never handed to another tile.
         if (IsPoolSlot(slot))
         {
             index = slot - TILE_CACHE_FIRST_SLOT;
@@ -420,26 +413,6 @@ const u8 *TileCache_GetMetatileExt(const struct Tileset *tileset, u32 metatile)
     return info->tileExt + metatile * NUM_TILES_PER_METATILE;
 }
 
-const u16 *TileCache_GetMetatileThirdLayer(const struct Tileset *tileset, u32 metatile)
-{
-    const struct TilesetCapacityInfo *info = GetTilesetCapacityInfo(tileset);
-
-    if (info == NULL || info->thirdLayer == NULL || metatile >= info->numMetatiles)
-        return NULL;
-
-    return info->thirdLayer + metatile * NUM_TILES_PER_METATILE_LAYER;
-}
-
-const u8 *TileCache_GetMetatileThirdLayerExt(const struct Tileset *tileset, u32 metatile)
-{
-    const struct TilesetCapacityInfo *info = GetTilesetCapacityInfo(tileset);
-
-    if (info == NULL || info->thirdLayerExt == NULL || metatile >= info->numMetatiles)
-        return NULL;
-
-    return info->thirdLayerExt + metatile * NUM_TILES_PER_METATILE_LAYER;
-}
-
 bool32 TileCache_AllowsAnimDest(u32 firstSlot, u32 numSlots)
 {
     if (!sTileCache.active)
@@ -447,11 +420,7 @@ bool32 TileCache_AllowsAnimDest(u32 firstSlot, u32 numSlots)
 
     for (u32 slot = firstSlot; slot < firstSlot + numSlots; slot++)
     {
-        if (slot < TILE_CACHE_FIRST_SLOT)
-            continue;
-        // Slots above the allocation pool are reserved from cache reuse. Stock animation/door/shop
-        // behavior may still write them exactly as it did before streaming was enabled.
-        if (!IsPoolSlot(slot))
+        if (slot < TILE_CACHE_FIRST_SLOT || slot >= TILE_CACHE_END_SLOT)
             continue;
         if (!BIT_TEST(sTileCache.pinned, slot - TILE_CACHE_FIRST_SLOT))
             return FALSE;
@@ -468,19 +437,29 @@ static void SlotsToPins(const u32 *slots, u32 *pins)
     }
 }
 
-static void DirectMapExternalSecondaryAnimSlots(const u32 *slots)
+// Stock secondary animations may write the slots past the pool (shared with doors and the shop, as
+// they always were). Those slots are never allocated, so their tiles are mapped to them directly.
+static void MapReservedAnimSlots(const u32 *slots)
 {
     for (u32 slot = TILE_CACHE_END_SLOT; slot < NUM_TILES_TOTAL; slot++)
     {
+        const u32 *src;
+
         if (!BIT_TEST(slots, slot))
             continue;
-
-        // A stock secondary animation that targets a reserved physical slot must keep that exact slot.
-        // The cache never allocates this range, so the mapping is stable and cannot collide with a cache victim.
-        const u32 *src = GetTileSource(slot);
+        src = GetTileSource(slot);
         sTileCache.virtualToSlot[slot - NUM_TILES_IN_PRIMARY] = slot;
         if (src != NULL)
             CpuFastCopy(src, SlotVram(slot), TILE_SIZE_4BPP);
+    }
+}
+
+static void ForgetReservedAnimSlots(void)
+{
+    for (u32 tile = NUM_TILES_IN_PRIMARY; tile < NUM_TILES_TOTAL; tile++)
+    {
+        if (sTileCache.virtualToSlot[tile - NUM_TILES_IN_PRIMARY] >= TILE_CACHE_END_SLOT)
+            sTileCache.virtualToSlot[tile - NUM_TILES_IN_PRIMARY] = SLOT_NONE;
     }
 }
 
@@ -493,7 +472,7 @@ static void DiscoverAnimatedSlots(const struct MapLayout *layout, u32 *primaryPi
     if (primaryPins != NULL)
         SlotsToPins(primarySlots, primaryPins);
     SlotsToPins(secondarySlots, secondaryPins);
-    DirectMapExternalSecondaryAnimSlots(secondarySlots);
+    MapReservedAnimSlots(secondarySlots);
 }
 
 static void RebuildRefsFromTilemaps(void)
@@ -582,13 +561,7 @@ void TileCache_SwitchLayout(const struct MapLayout *layout)
             if (owner != 0 && (owner < NUM_TILES_TOTAL || owner >= NUM_TILES_TOTAL + NUM_TILES_IN_PRIMARY))
                 ForgetOwner(index);
         }
-        // Drop direct mappings for reserved secondary animation slots from the previous connected map.
-        for (u32 tile = NUM_TILES_IN_PRIMARY; tile < NUM_TILES_TOTAL; tile++)
-        {
-            u32 slot = sTileCache.virtualToSlot[tile - NUM_TILES_IN_PRIMARY];
-            if (slot >= TILE_CACHE_END_SLOT)
-                sTileCache.virtualToSlot[tile - NUM_TILES_IN_PRIMARY] = SLOT_NONE;
-        }
+        ForgetReservedAnimSlots();
     }
 
     sTileCache.secondary = GetTilesetCapacityInfo(layout->secondaryTileset);

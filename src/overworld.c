@@ -1,7 +1,7 @@
 #include "global.h"
 #include "kyoto_cloud_layers.h"
 #include "glide.h"
-#include "opal_map_palette.h"
+#include "map_palette.h"
 #include "overworld.h"
 #include "battle_pyramid.h"
 #include "battle_setup.h"
@@ -875,6 +875,8 @@ bool8 SetDiveWarpDive(u16 x, u16 y)
 
 void LoadMapFromCameraTransition(u8 mapGroup, u8 mapNum)
 {
+    u32 firstReloadedPalette;
+
     SetWarpDestination(mapGroup, mapNum, WARP_ID_NONE, -1, -1);
 
     // Dont transition map music between BF Outside West/East
@@ -904,9 +906,9 @@ void LoadMapFromCameraTransition(u8 mapGroup, u8 mapNum)
     RunOnTransitionMapScript();
     InitMap();
     CopySecondaryTilesetToVramUsingHeap(gMapHeader.mapLayout);
-    LoadSecondaryTilesetPalette(gMapHeader.mapLayout, TRUE); // skip copying to Faded, gamma shift will take care of it
+    firstReloadedPalette = LoadConnectedMapTilesetPalettes(gMapHeader.mapLayout); // skip copying to Faded, gamma shift will take care of it
 
-    ApplyWeatherColorMapToPals(GetNumPalsInPrimary(gMapHeader.mapLayout), NUM_PALS_TOTAL - GetNumPalsInPrimary(gMapHeader.mapLayout)); // palettes [6,12]
+    ApplyWeatherColorMapToPals(firstReloadedPalette, NUM_PALS_TOTAL - firstReloadedPalette); // palettes [6,13], or [0,13] after a library change
 
     InitSecondaryTilesetAnimation();
     UpdateLocationHistoryForRoamer();
@@ -1635,7 +1637,7 @@ static void InitOverworldBgs_NoResetHeap(void)
 
 void CleanupOverworldWindowsAndTilemaps(void)
 {
-    OpalMapPalettesReset();
+    MapPalettesReset();
     ClearMirageTowerPulseBlendEffect();
     FreeAllOverworldWindowBuffers();
     TRY_FREE_AND_SET_NULL(gOverworldTilemapBuffer_Bg3);
@@ -1798,9 +1800,9 @@ bool32 CurrentMapHasShadows(void)
 // Update & mix day / night bg palettes (into unfaded)
 void UpdateAltBgPalettes(u16 palettes)
 {
-    if (OpalMapPalettesActive())
+    if (MapPalettesActive())
     {
-        OpalMapPalettesUpdateAlternates(palettes);
+        MapPalettesUpdateAlternates(palettes);
         return;
     }
 
@@ -1811,7 +1813,7 @@ void UpdateAltBgPalettes(u16 palettes)
         return;
     palettes &= ~((1 << GetNumPalsInPrimary(gMapHeader.mapLayout)) - 1) | primary->swapPalettes;
     palettes &= ((1 << GetNumPalsInPrimary(gMapHeader.mapLayout)) - 1) | (secondary->swapPalettes << GetNumPalsInPrimary(gMapHeader.mapLayout));
-    palettes &= PALETTES_MAP ^ (1 << 0); // don't blend palette 0, [13,15]
+    palettes &= PALETTES_MAP ^ (1 << 0); // don't blend palette 0, [14,15]
     palettes >>= 1; // start at palette 1
     if (!palettes)
         return;
@@ -1842,7 +1844,7 @@ void UpdatePalettesWithTime(u32 palettes)
                 palettes &= ~(mask);
         }
 
-    palettes &= OpalMapPalettesMask() | PALETTES_OBJECTS; // Don't blend UI pals
+    palettes &= MapPalettesMask() | PALETTES_OBJECTS; // Don't blend UI pals
     if (!palettes)
         return;
     TimeMixPalettes(palettes, gPlttBufferUnfaded, gPlttBufferFaded, &gTimeBlend.startBlend, &gTimeBlend.endBlend, gTimeBlend.weight);

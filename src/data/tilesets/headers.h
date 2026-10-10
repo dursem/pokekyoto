@@ -833,6 +833,29 @@ const struct Tileset gTileset_UnionRoom =
     .callback = NULL,
 };
 
+// Streamed tileset test fixtures; see tools/tilesetcap/make_test_tilesets.py.
+const struct Tileset gTileset_TileCacheTestPrimary =
+{
+    .isCompressed = FALSE,
+    .isSecondary = FALSE,
+    .tiles = gTilesetTiles_TileCacheTestPrimary,
+    .palettes = gTilesetPalettes_General,
+    .metatiles = gMetatiles_TileCacheTestPrimary,
+    .metatileAttributes = gMetatileAttributes_TileCacheTestPrimary,
+    .callback = InitTilesetAnim_General,
+};
+
+const struct Tileset gTileset_TileCacheTest =
+{
+    .isCompressed = FALSE,
+    .isSecondary = TRUE,
+    .tiles = gTilesetTiles_TileCacheTest,
+    .palettes = gTilesetPalettes_Fortree,
+    .metatiles = gMetatiles_TileCacheTest,
+    .metatileAttributes = gMetatileAttributes_TileCacheTest,
+    .callback = InitTilesetAnim_TileCacheTest,
+};
+
 #else
 
 // FRLG tilesets

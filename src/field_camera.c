@@ -1,5 +1,5 @@
 #include "global.h"
-#include "opal_map_palette.h"
+#include "map_palette.h"
 #include "berry.h"
 #include "bike.h"
 #include "field_camera.h"
@@ -32,7 +32,7 @@ static void RedrawMapSliceWest(struct FieldCameraOffset *, const struct MapLayou
 static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *, s32, s32);
 static void DrawWholeMapViewInternal(int, int, const struct MapLayout *);
 static void DrawMetatileAt(const struct MapLayout *, u16, int, int);
-static void DrawMetatile(s32, const u16 *, const u8 *, const u16 *, const u8 *, u16, bool32, const u8 *);
+static void DrawMetatile(s32, const u16 *, const u8 *, u16, const u8 *);
 static void CameraPanningCB_PanAhead(void);
 
 static struct FieldCameraOffset sFieldCameraOffset;
@@ -220,7 +220,7 @@ void DrawDoorMetatileAt(int x, int y, u16 *tiles)
 
     if (offset >= 0)
     {
-        DrawMetatile(METATILE_LAYER_TYPE_COVERED, tiles, NULL, NULL, NULL, offset, TRUE, NULL);
+        DrawMetatile(0xFF, tiles, NULL, offset, NULL);
         sFieldCameraOffset.copyBGToVRAM = TRUE;
     }
 }
@@ -241,139 +241,96 @@ static void DrawMetatileAt(const struct MapLayout *mapLayout, u16 offset, int x,
         tileset = mapLayout->secondaryTileset;
         metatileId -= GetNumMetatilesInPrimary(mapLayout);
     }
-    DrawMetatile(MapGridGetMetatileLayerTypeAt(x, y),
-                 tileset->metatiles + metatileId * NUM_TILES_PER_METATILE,
-                 TileCache_GetMetatileExt(tileset, metatileId),
-                 TileCache_GetMetatileThirdLayer(tileset, metatileId),
-                 TileCache_GetMetatileThirdLayerExt(tileset, metatileId),
-                 offset, FALSE,
-                 OpalMapPalettesGetReferences(tileset, metatileId));
+    // A connected map's strip is drawn with this map's tilesets, which may not have every metatile it names.
+    if (metatileId >= GetTilesetNumMetatiles(tileset, metatileId + 1))
+    {
+        tileset = mapLayout->primaryTileset;
+        metatileId = 0;
+    }
+    DrawMetatile(MapGridGetMetatileLayerTypeAt(x, y), tileset->metatiles + metatileId * NUM_TILES_PER_METATILE, TileCache_GetMetatileExt(tileset, metatileId), offset,
+                 MapPalettesGetReferences(tileset, metatileId));
 }
 
-static void SetCachedCell(u16 *tilemap, u32 cell, const u16 *tiles, const u8 *ext, s32 tileIndex, bool32 physical)
+// Door animation frames (layer type 0xFF) already hold VRAM tile slots rather than tileset tiles.
+static void SetCachedCell(u16 *tilemap, u32 cell, const u16 *tiles, const u8 *ext, s32 tileIndex, bool32 isDoor)
 {
     if (tileIndex < 0)
         TileCache_WriteCellPhysical(&tilemap[cell], 0);
-    else if (physical)
+    else if (isDoor)
         TileCache_WriteCellPhysical(&tilemap[cell], tiles[tileIndex]);
     else
         TileCache_WriteCell(&tilemap[cell], tiles[tileIndex], ext != NULL ? ext[tileIndex] : 0);
 }
 
-static void DrawMetatileCached(s32 metatileLayerType, const u16 *tiles, const u8 *ext, const u16 *thirdTiles, const u8 *thirdExt, u16 offset, bool32 isDoor, const u8 *paletteRefs)
+static void DrawMetatileCached(s32 metatileLayerType, const u16 *tiles, const u8 *ext, u16 offset, const u8 *references)
 {
-    static const u8 offsets[] = {0, 1, 0x20, 0x21};
+    static const u8 sCellOffsets[] = {0, 1, 0x20, 0x21};
+    bool32 isDoor = (metatileLayerType == 0xFF);
 
-    for (u32 i = 0; i < ARRAY_COUNT(offsets); i++)
+    for (u32 i = 0; i < ARRAY_COUNT(sCellOffsets); i++)
     {
-        u32 cell = offset + offsets[i];
-        switch (metatileLayerType)
-        {
-        case METATILE_LAYER_TYPE_SPLIT:
-            SetCachedCell(gOverworldTilemapBuffer_Bg3, cell, tiles, ext, i, isDoor);
-            TileCache_WriteCellPhysical(&gOverworldTilemapBuffer_Bg2[cell], 0);
-            SetCachedCell(gOverworldTilemapBuffer_Bg1, cell, tiles, ext, 4 + i, isDoor);
-            break;
-        case METATILE_LAYER_TYPE_TRIPLE:
-            SetCachedCell(gOverworldTilemapBuffer_Bg3, cell, tiles, ext, i, isDoor);
-            SetCachedCell(gOverworldTilemapBuffer_Bg2, cell, tiles, ext, 4 + i, isDoor);
-            if (thirdTiles != NULL)
-                SetCachedCell(gOverworldTilemapBuffer_Bg1, cell, thirdTiles, thirdExt, i, isDoor);
-            else
-                TileCache_WriteCellPhysical(&gOverworldTilemapBuffer_Bg1[cell], 0);
-            break;
-        case METATILE_LAYER_TYPE_COVERED:
-            SetCachedCell(gOverworldTilemapBuffer_Bg3, cell, tiles, ext, i, isDoor);
-            SetCachedCell(gOverworldTilemapBuffer_Bg2, cell, tiles, ext, 4 + i, isDoor);
-            TileCache_WriteCellPhysical(&gOverworldTilemapBuffer_Bg1[cell], 0);
-            break;
-        case METATILE_LAYER_TYPE_NORMAL:
-            // Preserve Emerald's stock garbage/fill entry on BG3; it references resident primary tile 0x14.
-            TileCache_WriteCellPhysical(&gOverworldTilemapBuffer_Bg3[cell], 0x3014);
-            SetCachedCell(gOverworldTilemapBuffer_Bg2, cell, tiles, ext, i, isDoor);
-            SetCachedCell(gOverworldTilemapBuffer_Bg1, cell, tiles, ext, 4 + i, isDoor);
-            break;
-        }
+        u32 cell = offset + sCellOffsets[i];
+        SetCachedCell(gOverworldTilemapBuffer_Bg3, cell, tiles, ext, i, isDoor);
+        SetCachedCell(gOverworldTilemapBuffer_Bg2, cell, tiles, ext, isDoor ? -1 : (s32)(4 + i), isDoor);
+        SetCachedCell(gOverworldTilemapBuffer_Bg1, cell, tiles, ext, (isDoor ? 4 : 8) + i, isDoor);
     }
+    MapPalettesSetMetatile(offset, metatileLayerType, tiles, references);
     ScheduleBgCopyTilemapToVram(1);
     ScheduleBgCopyTilemapToVram(2);
     ScheduleBgCopyTilemapToVram(3);
-    OpalMapPalettesSetMetatile(offset, metatileLayerType, tiles, paletteRefs, thirdTiles);
 }
 
-static void DrawMetatile(s32 metatileLayerType, const u16 *tiles, const u8 *ext, const u16 *thirdTiles, const u8 *thirdExt, u16 offset, bool32 isDoor, const u8 *paletteRefs)
+static void DrawMetatile(s32 metatileLayerType, const u16 *tiles, const u8 *ext, u16 offset, const u8 *references)
 {
     if (TileCache_IsActive())
     {
-        DrawMetatileCached(metatileLayerType, tiles, ext, thirdTiles, thirdExt, offset, isDoor, paletteRefs);
+        DrawMetatileCached(metatileLayerType, tiles, ext, offset, references);
         return;
     }
 
-    switch (metatileLayerType)
+    if (metatileLayerType == 0xFF)
     {
-    case METATILE_LAYER_TYPE_SPLIT:
+        // A door animation frame: its tiles go to the bottom layer, the middle layer is cleared and the
+        // top layer gets tile 0 in the frame's palettes.
         gOverworldTilemapBuffer_Bg3[offset] = tiles[0];
         gOverworldTilemapBuffer_Bg3[offset + 1] = tiles[1];
         gOverworldTilemapBuffer_Bg3[offset + 0x20] = tiles[2];
         gOverworldTilemapBuffer_Bg3[offset + 0x21] = tiles[3];
+
         gOverworldTilemapBuffer_Bg2[offset] = 0;
         gOverworldTilemapBuffer_Bg2[offset + 1] = 0;
         gOverworldTilemapBuffer_Bg2[offset + 0x20] = 0;
         gOverworldTilemapBuffer_Bg2[offset + 0x21] = 0;
+
         gOverworldTilemapBuffer_Bg1[offset] = tiles[4];
         gOverworldTilemapBuffer_Bg1[offset + 1] = tiles[5];
         gOverworldTilemapBuffer_Bg1[offset + 0x20] = tiles[6];
         gOverworldTilemapBuffer_Bg1[offset + 0x21] = tiles[7];
-        break;
-    case METATILE_LAYER_TYPE_TRIPLE:
-        gOverworldTilemapBuffer_Bg3[offset] = tiles[0];
-        gOverworldTilemapBuffer_Bg3[offset + 1] = tiles[1];
-        gOverworldTilemapBuffer_Bg3[offset + 0x20] = tiles[2];
-        gOverworldTilemapBuffer_Bg3[offset + 0x21] = tiles[3];
-
-        gOverworldTilemapBuffer_Bg2[offset] = tiles[4];
-        gOverworldTilemapBuffer_Bg2[offset + 1] = tiles[5];
-        gOverworldTilemapBuffer_Bg2[offset + 0x20] = tiles[6];
-        gOverworldTilemapBuffer_Bg2[offset + 0x21] = tiles[7];
-
-        gOverworldTilemapBuffer_Bg1[offset] = thirdTiles ? thirdTiles[0] : 0;
-        gOverworldTilemapBuffer_Bg1[offset + 1] = thirdTiles ? thirdTiles[1] : 0;
-        gOverworldTilemapBuffer_Bg1[offset + 0x20] = thirdTiles ? thirdTiles[2] : 0;
-        gOverworldTilemapBuffer_Bg1[offset + 0x21] = thirdTiles ? thirdTiles[3] : 0;
-        break;
-    case METATILE_LAYER_TYPE_COVERED:
-        gOverworldTilemapBuffer_Bg3[offset] = tiles[0];
-        gOverworldTilemapBuffer_Bg3[offset + 1] = tiles[1];
-        gOverworldTilemapBuffer_Bg3[offset + 0x20] = tiles[2];
-        gOverworldTilemapBuffer_Bg3[offset + 0x21] = tiles[3];
-        gOverworldTilemapBuffer_Bg2[offset] = tiles[4];
-        gOverworldTilemapBuffer_Bg2[offset + 1] = tiles[5];
-        gOverworldTilemapBuffer_Bg2[offset + 0x20] = tiles[6];
-        gOverworldTilemapBuffer_Bg2[offset + 0x21] = tiles[7];
-        gOverworldTilemapBuffer_Bg1[offset] = 0;
-        gOverworldTilemapBuffer_Bg1[offset + 1] = 0;
-        gOverworldTilemapBuffer_Bg1[offset + 0x20] = 0;
-        gOverworldTilemapBuffer_Bg1[offset + 0x21] = 0;
-        break;
-    case METATILE_LAYER_TYPE_NORMAL:
-        gOverworldTilemapBuffer_Bg3[offset] = 0x3014;
-        gOverworldTilemapBuffer_Bg3[offset + 1] = 0x3014;
-        gOverworldTilemapBuffer_Bg3[offset + 0x20] = 0x3014;
-        gOverworldTilemapBuffer_Bg3[offset + 0x21] = 0x3014;
-        gOverworldTilemapBuffer_Bg2[offset] = tiles[0];
-        gOverworldTilemapBuffer_Bg2[offset + 1] = tiles[1];
-        gOverworldTilemapBuffer_Bg2[offset + 0x20] = tiles[2];
-        gOverworldTilemapBuffer_Bg2[offset + 0x21] = tiles[3];
-        gOverworldTilemapBuffer_Bg1[offset] = tiles[4];
-        gOverworldTilemapBuffer_Bg1[offset + 1] = tiles[5];
-        gOverworldTilemapBuffer_Bg1[offset + 0x20] = tiles[6];
-        gOverworldTilemapBuffer_Bg1[offset + 0x21] = tiles[7];
-        break;
     }
+    else
+    {
+        // Draw metatile's bottom layer to the bottom background layer.
+        gOverworldTilemapBuffer_Bg3[offset] = tiles[0];
+        gOverworldTilemapBuffer_Bg3[offset + 1] = tiles[1];
+        gOverworldTilemapBuffer_Bg3[offset + 0x20] = tiles[2];
+        gOverworldTilemapBuffer_Bg3[offset + 0x21] = tiles[3];
+
+        // Draw metatile's middle layer to the middle background layer.
+        gOverworldTilemapBuffer_Bg2[offset] = tiles[4];
+        gOverworldTilemapBuffer_Bg2[offset + 1] = tiles[5];
+        gOverworldTilemapBuffer_Bg2[offset + 0x20] = tiles[6];
+        gOverworldTilemapBuffer_Bg2[offset + 0x21] = tiles[7];
+
+        // Draw metatile's top layer to the top background layer, which covers object event sprites.
+        gOverworldTilemapBuffer_Bg1[offset] = tiles[8];
+        gOverworldTilemapBuffer_Bg1[offset + 1] = tiles[9];
+        gOverworldTilemapBuffer_Bg1[offset + 0x20] = tiles[10];
+        gOverworldTilemapBuffer_Bg1[offset + 0x21] = tiles[11];
+    }
+    MapPalettesSetMetatile(offset, metatileLayerType, tiles, references);
     ScheduleBgCopyTilemapToVram(1);
     ScheduleBgCopyTilemapToVram(2);
     ScheduleBgCopyTilemapToVram(3);
-    OpalMapPalettesSetMetatile(offset, metatileLayerType, tiles, paletteRefs, thirdTiles);
 }
 
 static s32 MapPosToBgTilemapOffset(struct FieldCameraOffset *cameraOffset, s32 x, s32 y)

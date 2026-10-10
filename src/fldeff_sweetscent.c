@@ -56,7 +56,7 @@ void StartSweetScentFieldEffect(void)
 {
     void *palBuffer;
     u32 taskId;
-    u32 palettes = ~(1 << (gSprites[GetPlayerAvatarSpriteId()].oam.paletteNum + 16) | (1 << 13) | (1 << 14) | (1 << 15));
+    u32 palettes = ~(1 << (gSprites[GetPlayerAvatarSpriteId()].oam.paletteNum + 16) | (1 << 14) | (1 << 15));
 
     PlaySE(SE_M_SWEET_SCENT);
     palBuffer = Alloc(PLTT_SIZE);

@@ -9323,6 +9323,17 @@
       "border_height": 2,
       "border_width": 2,
       "layout_version": "frlg"
+    },
+    {
+      "id": "LAYOUT_TILE_CACHE_TEST",
+      "name": "TileCacheTest_Layout",
+      "width": 40,
+      "height": 100,
+      "primary_tileset": "gTileset_TileCacheTestPrimary",
+      "secondary_tileset": "gTileset_TileCacheTest",
+      "border_filepath": "data/layouts/TileCacheTest/border.bin",
+      "blockdata_filepath": "data/layouts/TileCacheTest/map.bin",
+      "layout_version": "emerald"
     }
   ]
 }

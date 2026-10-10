@@ -1,5 +1,5 @@
 #include "global.h"
-#include "opal_map_palette.h"
+#include "map_palette.h"
 #include "graphics.h"
 #include "palette.h"
 #include "util.h"
@@ -46,6 +46,7 @@ static void TilesetAnim_MauvilleGym(u16);
 static void TilesetAnim_BikeShop(u16);
 static void TilesetAnim_BattlePyramid(u16);
 static void TilesetAnim_BattleDome(u16);
+static void TilesetAnim_TileCacheTest(u16);
 static void QueueAnimTiles_General_Flower(u16);
 static void QueueAnimTiles_General_Water(u16);
 static void QueueAnimTiles_General_SandWaterEdge(u16);
@@ -1224,7 +1225,7 @@ static void BlendAnimPalette_BattleDome_FloorLights(u16 timer)
 {
     if (sAnimDiscoverySlots != NULL)
         return;
-    OpalMapPalettesPin(8);
+    MapPalettesPin(8);
     CpuCopy16(sTilesetAnims_BattleDomeFloorLightPals[timer % ARRAY_COUNT(sTilesetAnims_BattleDomeFloorLightPals)], &gPlttBufferUnfaded[BG_PLTT_ID(8)], PLTT_SIZE_4BPP);
     BlendPalette(BG_PLTT_ID(8), 16, gPaletteFade.y, gPaletteFade.blendColor & 0x7FFF);
     if ((u8)FindTaskIdByFunc(Task_BattleTransition_Intro) != TASK_NONE)
@@ -1238,7 +1239,7 @@ static void BlendAnimPalette_BattleDome_FloorLightsNoBlend(u16 timer)
 {
     if (sAnimDiscoverySlots != NULL)
         return;
-    OpalMapPalettesPin(8);
+    MapPalettesPin(8);
     CpuCopy16(sTilesetAnims_BattleDomeFloorLightPals[timer % ARRAY_COUNT(sTilesetAnims_BattleDomeFloorLightPals)], &gPlttBufferUnfaded[BG_PLTT_ID(8)], PLTT_SIZE_4BPP);
     if ((u8)FindTaskIdByFunc(Task_BattleTransition_Intro) == TASK_NONE)
     {
@@ -1493,3 +1494,20 @@ void InitTilesetAnim_CeladonGym(void)
     sSecondaryTilesetAnimCallback = TilesetAnim_CeladonGym;
 }
 
+extern const u32 gTilesetTiles_TileCacheTest[];
+
+#define TILE_CACHE_TEST_ANIM_TILES 8
+
+void InitTilesetAnim_TileCacheTest(void)
+{
+    sSecondaryTilesetAnimCounter = 0;
+    sSecondaryTilesetAnimCounterMax = sPrimaryTilesetAnimCounterMax;
+    sSecondaryTilesetAnimCallback = TilesetAnim_TileCacheTest;
+}
+
+// Rewrites some of the tileset's tiles with their own pixels, so a streamed map's animation slots get used without changing how it looks.
+static void TilesetAnim_TileCacheTest(u16 timer)
+{
+    if (timer % 16 == 0)
+        AppendTilesetAnimToBuffer((const u16 *)gTilesetTiles_TileCacheTest, (u16 *)(BG_VRAM + TILE_OFFSET_4BPP(NUM_TILES_IN_PRIMARY)), TILE_CACHE_TEST_ANIM_TILES * TILE_SIZE_4BPP);
+}

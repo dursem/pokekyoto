@@ -1,6 +1,6 @@
 #include "global.h"
 #include "kyoto_icons.h"
-#include "opal_map_palette.h"
+#include "map_palette.h"
 #include "malloc.h"
 #if TESTING
 #include "test/test.h"
@@ -151,7 +151,7 @@ static void *AllocZeroedInternal(void *heapStart, u32 size, const char *location
 
 void InitHeap(void *heapStart, u32 heapSize)
 {
-    OpalMapPalettesOnHeapReset();
+    MapPalettesOnHeapReset();
     KyotoIconReset(FALSE);
     sHeapStart = heapStart;
     sHeapSize = heapSize;

@@ -1,0 +1,6 @@
+# Project settings for Porytiles (tools/porytiles, docs/PORYTILES_TUTORIAL.md).
+# Per-tileset settings go in porytiles/tilesets/<gTileset_Name>/config.yaml.
+
+fieldmap:
+  # Kyoto declares both the Emerald and FRLG metatile attribute layouts; tilesets use Emerald's.
+  metatile_attribute_size: 2
