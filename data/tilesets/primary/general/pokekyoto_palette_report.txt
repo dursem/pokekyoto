@@ -1,0 +1,21 @@
+Pokekyoto Primary tile palette verification
+Image: 128x1024; total tiles: 2048; candidate ambiguities: 1412
+Palette tile counts: {0: 1579, 1: 204, 2: 84, 3: 38, 4: 31, 5: 112}
+Changes relative to historical CSV: 15
+tile (9,33): previous palette 3 -> new palette 0
+tile (10,40): previous palette 3 -> new palette 0
+tile (11,40): previous palette 3 -> new palette 0
+tile (10,41): previous palette 3 -> new palette 0
+tile (11,41): previous palette 3 -> new palette 0
+tile (0,53): previous palette 0 -> new palette 1
+tile (1,53): previous palette 4 -> new palette 0
+tile (2,53): previous palette 4 -> new palette 0
+tile (3,53): previous palette 4 -> new palette 0
+tile (4,53): previous palette 4 -> new palette 0
+tile (5,53): previous palette 4 -> new palette 1
+tile (0,54): previous palette 4 -> new palette 1
+tile (5,54): previous palette 4 -> new palette 1
+tile (0,55): previous palette 4 -> new palette 1
+tile (5,55): previous palette 4 -> new palette 1
+Pixels that differ in 8-bit RGB from nearest saved .pal while matching in GBA 5-bit: 3080
+IMPORTANT: indexed PNG uses 4bpp pixel indices 0..15; its global RGB palette is only placeholder palette 0. Assign palette slots in metatile records using CSV. Do not overwrite original game project without validating animations, metatiles and transparency index 0.
