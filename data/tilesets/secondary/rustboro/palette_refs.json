@@ -1,6 +1,5 @@
 {
-    "version": 1,
-    "metatiles_sha256": "622af64ace7f7de1ca6cddbc5a5c93322344198c857dbacfbc89e23adbd6129a",
+    "metatiles_sha256": "db31ff6c9bf63c45fd9b8eaa86584f3ec0bceb2831f3f923ac41942b4ec6393c",
     "palettes": [
         [
             3,
@@ -4902,5 +4901,6 @@
             0,
             0
         ]
-    ]
+    ],
+    "version": 1
 }
