@@ -5520,7 +5520,7 @@
       "name": "Route2_Layout",
       "width": 24,
       "height": 80,
-      "primary_tileset": "gTileset_General_Frlg",
+      "primary_tileset": "gTileset_General",
       "secondary_tileset": "gTileset_ViridianCity",
       "border_filepath": "data/layouts/Route2_Frlg/border.bin",
       "blockdata_filepath": "data/layouts/Route2_Frlg/map.bin",
