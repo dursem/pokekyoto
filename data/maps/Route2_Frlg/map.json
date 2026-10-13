@@ -22,11 +22,6 @@
       "map": "MAP_VIRIDIAN_CITY",
       "offset": -12,
       "direction": "down"
-    },
-    {
-      "map": "MAP_LITTLEROOT_TOWN",
-      "offset": -18,
-      "direction": "up"
     }
   ],
   "object_events": [
