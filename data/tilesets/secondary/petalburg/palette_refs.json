@@ -1,5 +1,4 @@
 {
-    "version": 1,
     "metatiles_sha256": "63d303b3197f01a851f3a3a266c112ff8e296be08dba02b16585a110007f8352",
     "palettes": [
         [
@@ -19252,5 +19251,6 @@
             0,
             0
         ]
-    ]
+    ],
+    "version": 1
 }
