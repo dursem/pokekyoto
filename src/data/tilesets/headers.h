@@ -32,7 +32,7 @@ const struct Tileset *const gTilesetPointer_SecretBaseRedCave = &gTileset_Secret
 
 const struct Tileset gTileset_General =
 {
-    .isCompressed = TRUE,
+    .isCompressed = FALSE,
     .isSecondary = FALSE,
     .tiles = gTilesetTiles_General,
     .palettes = gTilesetPalettes_General,

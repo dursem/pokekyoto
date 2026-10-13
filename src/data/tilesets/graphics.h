@@ -1,3 +1,5 @@
+const u32 gTilesetTiles_General[] = INCGFX_U32("data/tilesets/primary/general/tiles.png", ".4bpp");
+
 const u32 gTilesetTiles_SecretBase[] = INCGFX_U32("data/tilesets/primary/secret_base/tiles.png", ".4bpp");
 
 const u16 gTilesetPalettes_SecretBase[][16] =
