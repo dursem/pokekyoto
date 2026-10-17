@@ -140,7 +140,12 @@ static const u32 *GetTileSource(u32 tile)
     const struct TilesetCapacityInfo *info;
     u32 local;
 
-    if (tile < NUM_TILES_TOTAL)
+    if (tile < NUM_TILES_IN_PRIMARY)
+    {
+        info = sTileCache.primary;
+        local = tile;
+    }
+    else if (tile < NUM_TILES_TOTAL)
     {
         info = sTileCache.secondary;
         local = tile - NUM_TILES_IN_PRIMARY;
@@ -150,10 +155,16 @@ static const u32 *GetTileSource(u32 tile)
         info = sTileCache.primary;
         local = tile - NUM_TILES_IN_PRIMARY;
     }
-    else
+    else if (tile < VIRTUAL_PRIMARY_EXTRA_START)
     {
         info = sTileCache.secondary;
         local = tile - NUM_TILES_TOTAL;
+    }
+    else
+    {
+        // Primary 1024-2047 goes last, so all old secondary references stay valid.
+        info = sTileCache.primary;
+        local = tile - NUM_TILES_IN_SECONDARY_EXTENDED;
     }
 
     if (info == NULL || info->rawTiles == NULL)
@@ -558,7 +569,10 @@ void TileCache_SwitchLayout(const struct MapLayout *layout)
         for (u32 index = 0; index < TILE_CACHE_NUM_SLOTS; index++)
         {
             u32 owner = sTileCache.slotOwner[index];
-            if (owner != 0 && (owner < NUM_TILES_TOTAL || owner >= NUM_TILES_TOTAL + NUM_TILES_IN_PRIMARY))
+            // A connected map keeps the same primary. Discard secondary cached tiles only;
+            // the new virtual primary range at 3072-4095 must stay mapped as primary.
+            if (owner != 0 && ((owner < NUM_TILES_TOTAL)
+                || (owner >= NUM_TILES_TOTAL + NUM_TILES_IN_PRIMARY && owner < VIRTUAL_PRIMARY_EXTRA_START)))
                 ForgetOwner(index);
         }
         ForgetReservedAnimSlots();

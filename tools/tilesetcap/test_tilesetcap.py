@@ -15,18 +15,20 @@ import tilesetcap as tc
 class VirtualTileTests(unittest.TestCase):
     def test_every_virtual_id_names_one_sheet_tile(self):
         seen = set()
-        for tile in range(3072):
+        for tile in range(4096):
             secondary, local = tc.virtual_tile_to_local(tile)
-            self.assertLess(local, 2048 if secondary else 1024)
+            self.assertLess(local, tc.MAX_TILES_IN_SECONDARY if secondary else tc.MAX_TILES_IN_PRIMARY)
             seen.add((secondary, local))
             word, ext = tile & 0x3FF, (tile >> 10) << tc.EXT_TILE_HIGH_SHIFT
             self.assertEqual(ext & ~(tc.EXT_TILE_HIGH_MASK << tc.EXT_TILE_HIGH_SHIFT), 0)
             self.assertEqual(word | (((ext >> tc.EXT_TILE_HIGH_SHIFT) & tc.EXT_TILE_HIGH_MASK) << 10), tile)
-        self.assertEqual(len(seen), 3072)
+        self.assertEqual(len(seen), 4096)
 
     def test_boundaries(self):
-        cases = {511: (False, 511), 1024: (False, 512), 1535: (False, 1023),
-                 1023: (True, 511), 1536: (True, 512), 2047: (True, 1023), 2048: (True, 1024), 3071: (True, 2047)}
+        cases = {0: (False, 0), 511: (False, 511), 1024: (False, 512), 1535: (False, 1023),
+                 1023: (True, 511), 1536: (True, 512), 2047: (True, 1023),
+                 2048: (True, 1024), 3071: (True, 2047),
+                 3072: (False, 1024), 4095: (False, 2047)}
         for tile, expected in cases.items():
             self.assertEqual(tc.virtual_tile_to_local(tile), expected)
 

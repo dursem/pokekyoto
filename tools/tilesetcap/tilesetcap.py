@@ -279,7 +279,7 @@ def cmd_migrate(args):
 # Capacity limits. These mirror include/fieldmap.h and include/tile_cache.h.
 LEGACY_TILES_IN_PRIMARY = 512
 LEGACY_TILES_TOTAL = 1024
-MAX_TILES_IN_PRIMARY = 1024
+MAX_TILES_IN_PRIMARY = 2048
 MAX_TILES_IN_SECONDARY = 2048
 MAX_METATILES_IN_PRIMARY = FORMATS['wide']['primary']
 MAX_METATILES_IN_SECONDARY = (1 << FORMATS['wide']['id_bits']) - MAX_METATILES_IN_PRIMARY - 1
@@ -348,7 +348,11 @@ def virtual_tile_to_local(tile):
         return True, tile - LEGACY_TILES_IN_PRIMARY
     if tile < LEGACY_TILES_TOTAL + LEGACY_TILES_IN_PRIMARY:
         return False, tile - LEGACY_TILES_IN_PRIMARY
-    return True, tile - LEGACY_TILES_TOTAL
+    if tile < LEGACY_TILES_TOTAL + MAX_TILES_IN_SECONDARY:
+        return True, tile - LEGACY_TILES_TOTAL
+    if tile < MAX_TILES_IN_PRIMARY + MAX_TILES_IN_SECONDARY:
+        return False, tile - MAX_TILES_IN_SECONDARY
+    raise ValueError('invalid virtual tile ID %d' % tile)
 
 
 def load_maps():

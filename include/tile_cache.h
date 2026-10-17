@@ -20,6 +20,11 @@
  *   [ 512, 1024) secondary tiles 0-511
  *   [1024, 1536) primary tiles 512-1023
  *   [1536, 3072) secondary tiles 512-2047
+ *   [3072, 4096) primary tiles 1024-2047
+ *
+ * The final primary bank extends the existing virtual namespace without changing the IDs
+ * of any existing primary or secondary tile. The 12-bit tile index and two high bits in
+ * metatile_tiles_ext.bin can address all 4096 logical source tiles.
  *
  * Animated tiles keep the VRAM slots tileset_anims.c writes them to, so a streamed map pins those
  * slots to the tiles they belong to.
@@ -28,9 +33,11 @@
  * loader left it; an extended reference past the end of its sheet is rejected by tilesetcap.py.
  */
 
-#define NUM_TILES_IN_PRIMARY_EXTENDED   1024
+#define NUM_TILES_IN_PRIMARY_EXTENDED   2048
 #define NUM_TILES_IN_SECONDARY_EXTENDED 2048
 #define NUM_VIRTUAL_TILES (NUM_TILES_IN_PRIMARY_EXTENDED + NUM_TILES_IN_SECONDARY_EXTENDED)
+// Preserve every pre-expansion virtual tile ID (secondary extension ends at 3072).
+#define VIRTUAL_PRIMARY_EXTRA_START (NUM_TILES_TOTAL + NUM_TILES_IN_SECONDARY_EXTENDED)
 
 #define TILEMAP_TILE_NUM_MASK 0x3FF
 
