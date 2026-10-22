@@ -95,14 +95,22 @@ static u32 MixChannel(u32 a, u32 b, u32 amount)
     return (a * (256 - amount) + b * amount + 128) >> 8;
 }
 
+// Exact (31 - channel) / 5. ARM7 otherwise calls the software divider
+// twice per palette entry; the green lift is this value divided by two.
+static const u8 sWarmLift[32] =
+{
+    6, 6, 5, 5, 5, 5, 5, 4, 4, 4, 4, 4, 3, 3, 3, 3,
+    3, 2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0,
+};
+
 static u16 LitColor(u16 source, u16 daylight, u32 amount)
 {
     u32 r = daylight & 31;
     u32 g = (daylight >> 5) & 31;
     u32 b = (daylight >> 10) & 31;
     // Lift the night tint toward the original colors, with a warm lamp cast.
-    r += (31 - r) / 5;
-    g += (31 - g) / 10;
+    r += sWarmLift[r];
+    g += sWarmLift[g] >> 1;
     b = b * 7 / 8;
     // Use the same screen fade as the source, never flash bright during a warp
     // or Bag/Party transition. Hardware fades already cover all OBJ pixels.
@@ -167,14 +175,16 @@ static void LightActor(u32 objectId, const struct LampPosition *lamps, u32 count
     for (u32 i = 0; i < 128; i++)
     {
         struct OamData *oam = &gMain.oamBuffer[i];
-        s32 dx = (oam->x - sprite->oam.x) & 511;
-        s32 dy = (oam->y - sprite->oam.y) & 255;
+        s32 dx, dy;
+        if (oam->paletteNum != source
+         || oam->tileNum < sprite->oam.tileNum
+         || oam->tileNum >= sprite->oam.tileNum + tileCount)
+            continue;
+        dx = (oam->x - sprite->oam.x) & 511;
+        dy = (oam->y - sprite->oam.y) & 255;
         // Position + tile range also identifies split object-event pieces.
         // Another NPC sharing the native palette keeps its own lighting.
-        if (oam->paletteNum == source
-         && oam->tileNum >= sprite->oam.tileNum
-         && oam->tileNum < sprite->oam.tileNum + tileCount
-         && dx < -sprite->centerToCornerVecX * 2
+        if (dx < -sprite->centerToCornerVecX * 2
          && dy < -sprite->centerToCornerVecY * 2)
             oam->paletteNum = slot;
     }
@@ -189,6 +199,8 @@ void KyotoLight_Prepare(void)
         KyotoLight_Reset();
         return;
     }
+    if (gTimeOfDay == TIME_NIGHT)
+        KyotoLamp_BeginFrame();
     if (gTimeOfDay == TIME_NIGHT)
         for (u32 i = 0; i < MAX_SPRITES && count < MAX_LOCAL_LIGHTS; i++)
         {

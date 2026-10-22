@@ -1,0 +1,15 @@
+callback 0x819cc39 overworld 0x819cc38 pc 0x30002bc time 3
+profile [314146, 178, 87, 314549, 646, 259, 7383, 270, 183, 662, 9011, 49237, 0, 0, 0, 0]
+lamps [(2, 65528, 214), (3, 200, 214), (4, 120, 102), (5, 120, 38), (6, 65528, 150)]
+callback 0x819cc39 overworld 0x819cc38 pc 0x30001c8 time 3
+callback 0x819cc39 overworld 0x819cc38 pc 0x1f8 time 3
+callback 0x819cc39 overworld 0x819cc38 pc 0x3000200 time 3
+callback 0x819cc39 overworld 0x819cc38 pc 0x3000448 time 3
+callback 0x819cc39 overworld 0x819cc38 pc 0x1f8 time 3
+overlap-extra finished
+clouds-extra finished
+fireflies-extra finished
+callback 0x819cc39 overworld 0x819cc38 pc 0x1f8 time 3
+callback 0x819cc39 overworld 0x819cc38 pc 0x1f8 time 3
+daytime masks [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+reference masks, failures 4396 0

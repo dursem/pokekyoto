@@ -1,0 +1,136 @@
+--- a/src/main.c
++++ b/src/main.c
+@@ -1,4 +1,6 @@
+ #include "global.h"
++#include "new_game.h"
++#include "constants/field_weather.h"
+ #include "field_weather.h"
+ #include "kyoto_lighting.h"
+ #include "kyoto_lamp_mask.h"
+@@ -198,15 +200,64 @@
+ 
+ // Actor lighting, cloud shadows and the firefly shade read the frame's final OAM, tilemaps and queued map
+ // tiles, so they run after the callbacks and before the map palette transaction is sealed for VBlank.
++EWRAM_DATA u32 gKyotoProfile[16] = {0};
++u32 ProfileClock(void)
++{
++    u32 hi = REG_TM2CNT_L;
++    u32 lo = REG_TM1CNT_L;
++    if (hi != REG_TM2CNT_L) { hi = REG_TM2CNT_L; lo = REG_TM1CNT_L; }
++    return (hi << 16) | lo;
++}
+ static void PrepareFieldEffects(void)
+ {
++    u32 start, stamp;
++    REG_TM1CNT_H = 0;
++    REG_TM2CNT_H = 0;
++    REG_TM1CNT_L = 0;
++    REG_TM2CNT_L = 0;
++    REG_TM2CNT_H = TIMER_ENABLE | TIMER_COUNTUP;
++    REG_TM1CNT_H = TIMER_ENABLE;
++    start = stamp = ProfileClock();
+     KyotoLight_Prepare();
++    gKyotoProfile[0] = ProfileClock() - stamp; stamp = ProfileClock();
+     KyotoCloud_Prepare();
++    gKyotoProfile[1] = ProfileClock() - stamp; stamp = ProfileClock();
+     FireflyShade_Prepare();
++    gKyotoProfile[2] = ProfileClock() - stamp;
++    gKyotoProfile[3] = ProfileClock() - start;
++    gKyotoProfile[4]++;
+ }
+ 
+ static void CallCallbacks(void)
+ {
++    if (gKyotoProfile[15] == 1)
++    {
++        NewGameInitData();
++        ResetInitialPlayerAvatarState();
++        SetWarpDestination(MAP_GROUP(MAP_LITTLEROOT_TOWN), MAP_NUM(MAP_LITTLEROOT_TOWN), -1, 33, 23);
++        WarpIntoMap();
++        gFieldCallback = NULL;
++        gFieldCallback2 = NULL;
++        SetMainCallback2(CB2_LoadMap);
++        gKyotoProfile[15] = 0;
++    }
++    if (gKyotoProfile[15] == 2 || gKyotoProfile[15] == 3)
++    {
++        SetNextWeather(gKyotoProfile[15] == 2 ? WEATHER_SUNNY_CLOUDS : WEATHER_SHADE);
++        gKyotoProfile[15] = 0;
++    }
++    if (gKyotoProfile[15] >= 4)
++    {
++        if (gKyotoProfile[15] == 4)
++            SetWarpDestination(MAP_GROUP(MAP_LITTLEROOT_TOWN_PROFESSOR_BIRCHS_LAB), MAP_NUM(MAP_LITTLEROOT_TOWN_PROFESSOR_BIRCHS_LAB), -1, 6, 10);
++        else
++            SetWarpDestination(MAP_GROUP(MAP_LITTLEROOT_TOWN), MAP_NUM(MAP_LITTLEROOT_TOWN), -1, 33, 23);
++        WarpIntoMap();
++        gFieldCallback = NULL;
++        gFieldCallback2 = NULL;
++        SetMainCallback2(CB2_LoadMap);
++        gKyotoProfile[15] = 0;
++    }
+     MapPalettesBeginFrame();
+ 
+     if (gMain.callback1)
+@@ -388,24 +439,33 @@
+     if (gTrainerHillVBlankCounter && *gTrainerHillVBlankCounter < 0xFFFFFFFF)
+         (*gTrainerHillVBlankCounter)++;
+ 
++    u32 profileStart = ProfileClock(), profileStamp = profileStart;
+     bool32 blockVideo = MapPalettesBlockTransfer();
++    gKyotoProfile[14] = blockVideo;
+     if (!blockVideo)
+     {
+         MapPalettesCommit();
++        gKyotoProfile[5] = ProfileClock() - profileStamp; profileStamp = ProfileClock();
+         if (gMain.vblankCallback)
+             gMain.vblankCallback();
++        gKyotoProfile[6] = ProfileClock() - profileStamp;
+     }
+ 
+     gMain.vblankCounter2++;
+ 
+     if (!blockVideo)
+     {
++        profileStamp = ProfileClock();
+         CopyBufferedValuesToGpuRegs();
+         ProcessDma3Requests();
++        gKyotoProfile[7] = ProfileClock() - profileStamp; profileStamp = ProfileClock();
+         KyotoCloud_VBlank();
++        gKyotoProfile[8] = ProfileClock() - profileStamp; profileStamp = ProfileClock();
+         KyotoLamp_VBlank();
+-    }
+-
++        gKyotoProfile[9] = ProfileClock() - profileStamp;
++    }
++
++    gKyotoProfile[10] = ProfileClock() - profileStart;
+     gPcmDmaCounter = gSoundInfo.pcmDmaCounter;
+ 
+     m4aSoundMain();
+--- a/src/kyoto_lighting.c
++++ b/src/kyoto_lighting.c
+@@ -190,10 +190,13 @@
+     }
+ }
+ 
++extern u32 ProfileClock(void);
++extern u32 gKyotoProfile[16];
+ void KyotoLight_Prepare(void)
+ {
+     struct LampPosition lamps[MAX_LOCAL_LIGHTS];
+     u32 count = 0;
++    gKyotoProfile[11] = 0;
+     if (gMain.callback2 != CB2_Overworld)
+     {
+         KyotoLight_Reset();
+@@ -208,7 +211,9 @@
+             if (sprite->inUse && !sprite->invisible && sprite->callback == UpdateLightSprite
+              && sprite->data[5] == LIGHT_TYPE_BALL)
+             {
++                u32 stamp = ProfileClock();
+                 KyotoLamp_Prepare(sprite, count);
++                gKyotoProfile[11] += ProfileClock() - stamp;
+                 lamps[count].x = sprite->x + sprite->x2 + gSpriteCoordOffsetX;
+                 lamps[count].y = sprite->y + sprite->y2 + gSpriteCoordOffsetY;
+                 count++;
