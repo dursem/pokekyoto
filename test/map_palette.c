@@ -66,7 +66,7 @@ static void DrawTestCache(const u8 *references)
 {
     for (u32 y = 0; y < 32; y += 2)
         for (u32 x = 0; x < 32; x += 2)
-            MapPalettesSetMetatile(y * 32 + x, 0, sTiles, references);
+            MapPalettesSetMetatile(y * 32 + x, 0, sTiles, NULL, references);
 }
 
 TEST("Map palettes render four extras and reconstruct an evicted palette during a fade")

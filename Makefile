@@ -278,7 +278,7 @@ MAP_PALETTE_OUTPUT := $(DATA_SRC_SUBDIR)/tilesets/map_palettes.generated.h
 AUTO_GEN_TARGETS += $(MAP_PALETTE_OUTPUT)
 
 $(MAP_PALETTE_OUTPUT): $(MAP_PALETTE_TOOL) $(MAP_TILESET_SOURCES) $(MAP_LAYOUT_SOURCES) $(MAP_TILESET_CONFIG) \
-                        src/field_door.c src/map_preview_screen.c include/constants/metatile_labels.h .map_version
+                        src/field_door.c src/map_preview_screen.c include/constants/metatile_labels.h include/map_palette.h .map_version
 	python3 $(MAP_PALETTE_TOOL) --root . --game $(MAP_VERSION) --output $@
 
 check: check-map-tilesets

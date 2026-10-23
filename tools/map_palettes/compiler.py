@@ -269,6 +269,29 @@ def effect_requirements(root, spec, layouts, maps):
     return reserved, pinned, effects
 
 
+def layout_resident_palettes(root, layout, primary, secondary, pinned, resident):
+    """Reserve the runtime glass-palette copy only for its matching tileset pair."""
+    if (layout["primary_tileset"] != "gTileset_General"
+            or layout["secondary_tileset"] != "gTileset_Petalburg"
+            or layout.get("layout_version", "emerald") != "emerald"):
+        return resident
+    header = root / "include/map_palette.h"
+    require(header.exists(), f"{header}: missing MAP_PALETTE_UNLIT_GLASS definition")
+    values = re.findall(r'^[ \t]*#define[ \t]+MAP_PALETTE_UNLIT_GLASS[ \t]+'
+                        r'(0[xX][0-9a-fA-F]+|[0-9]+)[ \t]*(?://[^\n]*)?$',
+                        header.read_text(), re.M)
+    require(len(values) == 1, f"{header}: MAP_PALETTE_UNLIT_GLASS must be one integer literal")
+    logical = int(values[0], 16 if values[0].lower().startswith("0x") else 10)
+    require(0 < logical < 14, f"{header}: unlit glass palette must be in [1, 13]")
+    bit = 1 << logical
+    label = f"{layout['id']}: logical palette {logical} is reserved for unlit glass"
+    require(not (pinned | resident) & bit, f"{label}; an authored palette or effect already pins or retains it")
+    require(not any(value & bit for value in primary), f"{label}; primary metatiles already reference it")
+    require(not any(value & bit for value in secondary), f"{label}; secondary metatiles already reference it")
+    # This is a logical palette, not a fixed bank: physical reserved bank 7 is unrelated.
+    return resident | bit
+
+
 def compile_project(root, manifest, game="emerald"):
     require(isinstance(manifest, dict) and manifest.get("version") == 1, "Unsupported palette manifest version")
     require(set(manifest) <= {"version", "tilesets"}, "Unknown manifest fields")
@@ -338,6 +361,7 @@ def compile_project(root, manifest, game="emerald"):
                     f"{layout['id']}: primary metatiles may not reference UI/extra palettes")
             require(len(primary) <= primary_count and len(secondary) <= fmt["id_mask"] - primary_count,
                     f"{layout['id']}: too many metatiles")
+            layout_resident = layout_resident_palettes(root, layout, primary, secondary, pinned, resident)
             # A layout whose tiles stream (see docs/TILESET_CAPACITY_GUIDE.md) keeps VRAM slots 1008-1023 for doors.
             streamed = any((defs[symbol][0].parent / "metatile_tiles_ext.bin").exists()
                            for symbol in (layout["primary_tileset"], layout["secondary_tileset"]))
@@ -364,9 +388,9 @@ def compile_project(root, manifest, game="emerald"):
                     else:
                         require(bool(spec.get("dynamic_metatiles")), f"{map_data['id']}: declare dynamic_metatiles for computed setmetatile {token}")
                 peak = max(peak, certify(layout, map_data, layouts, maps_by_id, combined, root,
-                                        reserved, pinned, mutations, resident))
+                                        reserved, pinned, mutations, layout_resident))
             code.append(f"extern const struct MapLayout {layout['name']};")
-            profiles.append(f"    {{&{layout['name']}, {reserved}, {pinned}, {resident}, {len(primary)}}},")
+            profiles.append(f"    {{&{layout['name']}, {reserved}, {pinned}, {layout_resident}, {len(primary)}}},")
             report.append({"layout": layout["id"], "peak": peak, "capacity": 14 - reserved.bit_count()})
         rows = []
         nights = []

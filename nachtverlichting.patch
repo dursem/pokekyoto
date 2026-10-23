@@ -1,0 +1,568 @@
+diff --git a/Makefile b/Makefile
+index 0189bf6..1849c89 100644
+--- a/Makefile
++++ b/Makefile
+@@ -278,7 +278,7 @@ MAP_PALETTE_OUTPUT := $(DATA_SRC_SUBDIR)/tilesets/map_palettes.generated.h
+ AUTO_GEN_TARGETS += $(MAP_PALETTE_OUTPUT)
+ 
+ $(MAP_PALETTE_OUTPUT): $(MAP_PALETTE_TOOL) $(MAP_TILESET_SOURCES) $(MAP_LAYOUT_SOURCES) $(MAP_TILESET_CONFIG) \
+-                        src/field_door.c src/map_preview_screen.c include/constants/metatile_labels.h .map_version
++                        src/field_door.c src/map_preview_screen.c include/constants/metatile_labels.h include/map_palette.h .map_version
+ 	python3 $(MAP_PALETTE_TOOL) --root . --game $(MAP_VERSION) --output $@
+ 
+ check: check-map-tilesets
+diff --git a/include/map_palette.h b/include/map_palette.h
+index 164751b..ee2fd29 100644
+--- a/include/map_palette.h
++++ b/include/map_palette.h
+@@ -6,6 +6,9 @@
+ #define MAP_PALETTES_COUNT (NUM_PALS_TOTAL + 4)
+ #define MAP_PALETTE_NONE 0xFF
+ #define MAP_PALETTE_CELLS (32 * 32)
++// General/Petalburg's glass canopy uses this copy of General palette 0.
++// tools/map_palettes/compiler.py checks that authored tiles/effects do not use it.
++#define MAP_PALETTE_UNLIT_GLASS 7
+ 
+ struct TilesetPaletteExtension
+ {
+@@ -45,11 +48,12 @@ u32 MapPalettesTilemapsPrepared(void);
+ u32 MapPalettesTilemapsCommitted(void);
+ bool32 MapPalettesQueueTile(const void *source, u32 tile);
+ const u8 *MapPalettesGetTileGraphics(u32 tile);
+-void MapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, const u8 *references);
++void MapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, const u8 *ext, const u8 *references);
+ const u8 *MapPalettesGetReferences(const struct Tileset *tileset, u32 metatile);
+ u32 MapPalettesWeatherType(u32 bank, u32 fallback);
+ u32 MapPalettesMask(void);
+ void MapPalettesUpdateAlternates(u32 banks);
++void MapPalettesApplyNightLights(u32 banks);
+ void MapPalettesPin(u32 logical);
+ void MapPalettesReserve(u32 banks);
+ u16 MapPalettesResolve(u16 tile, u32 logical);
+diff --git a/src/field_camera.c b/src/field_camera.c
+index fe600c7..cd1fa39 100644
+--- a/src/field_camera.c
++++ b/src/field_camera.c
+@@ -274,7 +274,7 @@ static void DrawMetatileCached(s32 metatileLayerType, const u16 *tiles, const u8
+         SetCachedCell(gOverworldTilemapBuffer_Bg2, cell, tiles, ext, isDoor ? -1 : (s32)(4 + i), isDoor);
+         SetCachedCell(gOverworldTilemapBuffer_Bg1, cell, tiles, ext, (isDoor ? 4 : 8) + i, isDoor);
+     }
+-    MapPalettesSetMetatile(offset, metatileLayerType, tiles, references);
++    MapPalettesSetMetatile(offset, metatileLayerType, tiles, ext, references);
+     ScheduleBgCopyTilemapToVram(1);
+     ScheduleBgCopyTilemapToVram(2);
+     ScheduleBgCopyTilemapToVram(3);
+@@ -327,7 +327,7 @@ static void DrawMetatile(s32 metatileLayerType, const u16 *tiles, const u8 *ext,
+         gOverworldTilemapBuffer_Bg1[offset + 0x20] = tiles[10];
+         gOverworldTilemapBuffer_Bg1[offset + 0x21] = tiles[11];
+     }
+-    MapPalettesSetMetatile(offset, metatileLayerType, tiles, references);
++    MapPalettesSetMetatile(offset, metatileLayerType, tiles, ext, references);
+     ScheduleBgCopyTilemapToVram(1);
+     ScheduleBgCopyTilemapToVram(2);
+     ScheduleBgCopyTilemapToVram(3);
+diff --git a/src/field_weather.c b/src/field_weather.c
+index 41bd902..106bb2b 100644
+--- a/src/field_weather.c
++++ b/src/field_weather.c
+@@ -457,6 +457,8 @@ static void ApplyColorMap(u8 startPalIndex, u8 numPalettes, s8 colorMapIndex)
+     u16 palOffset;
+     const u8 *colorMap;
+     u32 i;
++    u32 lightPalettes = ((1u << min(startPalIndex + numPalettes, NUM_PALS_TOTAL)) - 1)
++                     & ~((1u << min(startPalIndex, NUM_PALS_TOTAL)) - 1);
+ 
+     if (colorMapIndex > 0)
+     {
+@@ -551,6 +553,7 @@ static void ApplyColorMap(u8 startPalIndex, u8 numPalettes, s8 colorMapIndex)
+             CpuFastCopy(&gPlttBufferUnfaded[PLTT_ID(startPalIndex)], &gPlttBufferFaded[PLTT_ID(startPalIndex)], numPalettes * PLTT_SIZE_4BPP);
+         }
+     }
++    MapPalettesApplyNightLights(lightPalettes);
+ }
+ 
+ static void ApplyColorMapWithBlend(u8 startPalIndex, u8 numPalettes, s8 colorMapIndex, u8 blendCoeff, u32 blendColor)
+@@ -558,10 +561,6 @@ static void ApplyColorMapWithBlend(u8 startPalIndex, u8 numPalettes, s8 colorMap
+     u16 palOffset;
+     u16 curPalIndex;
+     u32 i;
+-    struct RGBColor color = *(struct RGBColor *)&blendColor;
+-    u8 rBlend = color.r;
+-    u8 gBlend = color.g;
+-    u8 bBlend = color.b;
+ 
+     palOffset = PLTT_ID(startPalIndex);
+     numPalettes += startPalIndex;
+@@ -575,7 +574,8 @@ static void ApplyColorMapWithBlend(u8 startPalIndex, u8 numPalettes, s8 colorMap
+         UpdatePalettesWithTime(1 << (palOffset >> 4)); // Apply TOD blend
+         if (MapPalettesWeatherType(curPalIndex, sPaletteColorMapTypes[curPalIndex]) == COLOR_MAP_NONE || IsSpritePalTagBlendImmune(curPalIndex))
+         {
+-            // No color map. Simply blend the colors.
++            // No color map. Light the windows before applying the screen fade.
++            MapPalettesApplyNightLights(1u << curPalIndex);
+             BlendPalettesFine(1, gPlttBufferFaded + palOffset, gPlttBufferFaded + palOffset, blendCoeff, blendColor);
+             palOffset += 16;
+         }
+@@ -595,12 +595,10 @@ static void ApplyColorMapWithBlend(u8 startPalIndex, u8 numPalettes, s8 colorMap
+                 u8 g = colorMap[baseColor.g];
+                 u8 b = colorMap[baseColor.b];
+ 
+-                // Apply color map and target blend color to the original color.
+-                r += ((rBlend - r) * blendCoeff) >> 4;
+-                g += ((gBlend - g) * blendCoeff) >> 4;
+-                b += ((bBlend - b) * blendCoeff) >> 4;
+                 gPlttBufferFaded[palOffset++] = RGB2(r, g, b);
+             }
++            MapPalettesApplyNightLights(1u << curPalIndex);
++            BlendPalettesFine(1, gPlttBufferFaded + palOffset - 16, gPlttBufferFaded + palOffset - 16, blendCoeff, blendColor);
+         }
+ 
+         curPalIndex++;
+@@ -609,26 +607,19 @@ static void ApplyColorMapWithBlend(u8 startPalIndex, u8 numPalettes, s8 colorMap
+ 
+ static void ApplyDroughtColorMapWithBlend(s8 colorMapIndex, u8 blendCoeff, u32 blendColor)
+ {
+-    struct RGBColor color;
+-    u8 rBlend;
+-    u8 gBlend;
+-    u8 bBlend;
+     u16 curPalIndex;
+     u16 palOffset;
+     u16 i;
+ 
+     colorMapIndex = -colorMapIndex - 1;
+-    color = *(struct RGBColor *)&blendColor;
+-    rBlend = color.r;
+-    gBlend = color.g;
+-    bBlend = color.b;
+     palOffset = 0;
+     for (curPalIndex = 0; curPalIndex < 32; curPalIndex++)
+     {
+         if (MapPalettesWeatherType(curPalIndex, sPaletteColorMapTypes[curPalIndex]) == COLOR_MAP_NONE|| IsSpritePalTagBlendImmune(curPalIndex))
+         {
+-            // No color map. Simply blend the colors.
+-            BlendPalette(palOffset, 16, blendCoeff, blendColor);
++            // Match BlendPalette's original RGB_ALPHA stripping before fading.
++            for (i = 0; i < 16; i++)
++                gPlttBufferFaded[palOffset + i] = gPlttBufferUnfaded[palOffset + i] & ~RGB_ALPHA;
+             palOffset += 16;
+         }
+         else
+@@ -652,13 +643,11 @@ static void ApplyDroughtColorMapWithBlend(s8 colorMapIndex, u8 blendCoeff, u32 b
+                 g2 = color2.g;
+                 b2 = color2.b;
+ 
+-                r2 += ((rBlend - r2) * blendCoeff) >> 4;
+-                g2 += ((gBlend - g2) * blendCoeff) >> 4;
+-                b2 += ((bBlend - b2) * blendCoeff) >> 4;
+-
+                 gPlttBufferFaded[palOffset++] = RGB2(r2, g2, b2);
+             }
+         }
++        MapPalettesApplyNightLights(1u << curPalIndex);
++        BlendPalettesFine(1, gPlttBufferFaded + palOffset - 16, gPlttBufferFaded + palOffset - 16, blendCoeff, blendColor);
+     }
+ }
+ 
+@@ -673,6 +662,7 @@ static void ApplyFogBlend(u8 blendCoeff, u32 blendColor)
+     UpdateAltBgPalettes(PALETTES_BG);
+     CpuFastCopy(gPlttBufferUnfaded, gPlttBufferFaded, PLTT_BUFFER_SIZE * 2);
+     UpdatePalettesWithTime(PALETTES_ALL);
++    MapPalettesApplyNightLights(PALETTES_BG);
+     // Then blend tile palettes [0, 12] faded->faded with fadeIn color
+     BlendPalettesFine(PALETTES_MAP, gPlttBufferFaded, gPlttBufferFaded, blendCoeff, blendColor);
+ 
+diff --git a/src/map_palette.c b/src/map_palette.c
+index 39b0979..3cb30c4 100644
+--- a/src/map_palette.c
++++ b/src/map_palette.c
+@@ -5,7 +5,10 @@
+ #include "malloc.h"
+ #include "overworld.h"
+ #include "palette.h"
++#include "tile_cache.h"
++#include "tilesets.h"
+ #include "constants/field_weather.h"
++#include "constants/rgb.h"
+ 
+ struct MapPaletteState
+ {
+@@ -33,6 +36,31 @@ static u32 sTilemapsPrepared;
+ static u32 sTilemapsCommitted;
+ static volatile bool8 sInFrame;
+ 
++static bool32 UsesUnlitGlassPalette(const struct MapLayout *layout)
++{
++#if !IS_FRLG
++    return layout && layout->primaryTileset == &gTileset_General
++                  && layout->secondaryTileset == &gTileset_Petalburg;
++#else
++    return FALSE;
++#endif
++}
++
++static u32 GetTilePalette(u16 tile, u32 ext, u32 logical)
++{
++    u32 virtualTile = (tile & TILEMAP_TILE_NUM_MASK)
++                   | (((ext & METATILE_EXT_TILE_HIGH_MASK) >> METATILE_EXT_TILE_HIGH_SHIFT) << 10);
++
++    // General tiles.png: x=0..63, y=448..479 (four rows of eight 8x8 tiles).
++    // Local primary tiles 896..951 occupy virtual IDs 1408..1463. Ignore the
++    // architecture in the right half of those rows, and keep all window tiles
++    // on palette 0. Flip flags do not change the underlying tile identity.
++    if (logical == 0 && UsesUnlitGlassPalette(sState->layout)
++     && virtualTile >= 1408 && virtualTile < 1472 && (virtualTile - 1408) % 16 < 8)
++        return MAP_PALETTE_UNLIT_GLASS;
++    return logical;
++}
++
+ #define REQUIRE_PALETTE(condition, ...) do { \
+     if (!(condition)) { \
+         MapPalettesReset(); \
+@@ -203,7 +231,7 @@ static void SetReference(u32 layer, u32 cell, u32 logical)
+         tilemap[cell] = (tilemap[cell] & 0xFFF) | ((bank == MAP_PALETTE_NONE ? 0 : bank) << 12);
+ }
+ 
+-void MapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, const u8 *references)
++void MapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, const u8 *ext, const u8 *references)
+ {
+     static const u8 offsets[] = {0, 1, 32, 33};
+     if (!sState)
+@@ -224,6 +252,9 @@ void MapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, const u
+                 source = (layer == 0 ? 4 : 0) + tile;
+             }
+             logical = references ? references[source] : tiles[source] >> 12;
++            // Door frames contain physical VRAM slots, not tileset tile IDs.
++            if (layerType != 0xFF)
++                logical = GetTilePalette(tiles[source], ext ? ext[source] : 0, logical);
+             SetReference(layer, offset + offsets[tile], logical);
+         }
+     }
+@@ -232,6 +263,8 @@ void MapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, const u
+ 
+ static const u16 *GetBasePalette(u32 logical)
+ {
++    if (logical == MAP_PALETTE_UNLIT_GLASS && UsesUnlitGlassPalette(sState->layout))
++        return sState->layout->primaryTileset->palettes[0];
+     if (logical >= NUM_PALS_TOTAL)
+         return sState->extension->extraPalettes[logical - NUM_PALS_TOTAL];
+     const struct Tileset *tileset = logical < GetNumPalsInPrimary(sState->layout)
+@@ -249,6 +282,8 @@ void MapPalettesUpdateAlternates(u32 banks)
+         const u16 *night = NULL;
+         if (!(banks & (1u << bank)) || logical == MAP_PALETTE_NONE)
+             continue;
++        if (logical == MAP_PALETTE_UNLIT_GLASS && UsesUnlitGlassPalette(sState->layout))
++            continue;
+         if (logical >= NUM_PALS_TOTAL)
+             night = sState->extension->extraNightPalettes[logical - NUM_PALS_TOTAL];
+         else
+@@ -266,6 +301,67 @@ void MapPalettesUpdateAlternates(u32 banks)
+     }
+ }
+ 
++#if !IS_FRLG
++struct MapPaletteNightLight
++{
++    const struct Tileset *tileset;
++    u8 palette;
++    u8 color;
++    u16 nightColor;
++};
++
++// Logical palette/color numbers are the zero-based numbers shown in OpalMap.
++// Keep the day .pal files intact; only the final displayed colors are changed.
++static const struct MapPaletteNightLight sNightLights[] =
++{
++    {&gTileset_General,   0, 11, RGB2GBA(255, 226, 95)}, // #FFE25F
++    {&gTileset_General,   0, 15, RGB2GBA(255, 197, 74)}, // #FFC54A
++    {&gTileset_Petalburg, 8, 12, RGB2GBA(255, 197, 74)}, // #FFC54A
++    {&gTileset_Petalburg, 8, 13, RGB2GBA(255, 226, 95)}, // #FFE25F
++};
++#endif
++
++// Apply once after time/weather coloring, before any screen fade. Using owners
++// (not banks) also handles a palette being loaded during Prepare(), before the
++// new logical-to-physical bank allocation has been committed.
++void MapPalettesApplyNightLights(u32 banks)
++{
++#if !IS_FRLG
++    const struct MapLayout *layout = sState ? sState->layout : gMapHeader.mapLayout;
++    u32 nightWeight = 256 - min(gTimeBlend.altWeight, 256);
++
++    if (!layout || !nightWeight || !MapHasNaturalLight(gMapHeader.mapType))
++        return;
++
++    banks &= MapPalettesMask();
++    for (u32 bank = 0; bank < NUM_PALS_TOTAL; bank++)
++    {
++        u32 logical = sState ? sState->owners[bank] : bank;
++        const struct Tileset *tileset;
++
++        if (!(banks & (1u << bank)) || logical == MAP_PALETTE_NONE)
++            continue;
++        tileset = logical < GetNumPalsInPrimary(layout) ? layout->primaryTileset : layout->secondaryTileset;
++        for (u32 i = 0; i < ARRAY_COUNT(sNightLights); i++)
++        {
++            const struct MapPaletteNightLight *light = &sNightLights[i];
++            if (tileset == light->tileset && logical == light->palette)
++            {
++                u32 offset = BG_PLTT_ID(bank) + light->color;
++                u16 color = gPlttBufferFaded[offset];
++                s32 r = GET_R(color);
++                s32 g = GET_G(color);
++                s32 b = GET_B(color);
++                r += ((GET_R(light->nightColor) - r) * (s32)nightWeight) >> 8;
++                g += ((GET_G(light->nightColor) - g) * (s32)nightWeight) >> 8;
++                b += ((GET_B(light->nightColor) - b) * (s32)nightWeight) >> 8;
++                gPlttBufferFaded[offset] = RGB2(r, g, b);
++            }
++        }
++    }
++#endif
++}
++
+ u32 MapPalettesMask(void)
+ {
+     return sState ? PALETTES_MAP & ~sState->reserved : PALETTES_MAP;
+diff --git a/src/palette.c b/src/palette.c
+index fcf00b9..d919bcf 100644
+--- a/src/palette.c
++++ b/src/palette.c
+@@ -88,6 +88,7 @@ void ReapplyMapPaletteFade(u32 bank)
+     if (sMapFadeMode == TIME_OF_DAY_FADE)
+     {
+         TimeMixPalettes(1, unfaded, faded, gPaletteFade.bld0, gPaletteFade.bld1, gPaletteFade.weight);
++        MapPalettesApplyNightLights(1u << bank);
+         BlendPalettesFine(1, faded, faded, sMapFadeY, sMapFadeColor);
+     }
+     else if (sMapFadeMode == NORMAL_FADE)
+@@ -340,6 +341,8 @@ static u8 UpdateTimeOfDayPaletteFade(void)
+         }
+     }
+ 
++    MapPalettesApplyNightLights(timePalettes);
++
+     // Then, blend from faded->faded with native BlendPalettes
+     BlendPalettesFine(gPaletteFadeSelectedPalettes, dst, dst, gPaletteFade.y, gPaletteFade.blendColor);
+ 
+diff --git a/src/palette_util.c b/src/palette_util.c
+index 842d4bf..c6c1f3f 100644
+--- a/src/palette_util.c
++++ b/src/palette_util.c
+@@ -1,4 +1,5 @@
+ #include "global.h"
++#include "map_palette.h"
+ #include "palette.h"
+ #include "palette_util.h"
+ #include "util.h"
+@@ -387,6 +388,7 @@ void UpdatePulseBlend(struct PulseBlend *pulseBlend)
+                     pulseBlendPalette->delayCounter = pulseBlendPalette->pulseBlendSettings.delay;
+                     CpuFastCopy(gPlttBufferUnfaded + pulseBlendPalette->pulseBlendSettings.paletteOffset, gPlttBufferFaded + pulseBlendPalette->pulseBlendSettings.paletteOffset, PLTT_SIZE_4BPP);
+                     UpdatePalettesWithTime(1 << (pulseBlendPalette->pulseBlendSettings.paletteOffset >> 4));
++                    MapPalettesApplyNightLights(1u << (pulseBlendPalette->pulseBlendSettings.paletteOffset >> 4));
+                     // pulseBlendSettings has a numColors field, but it is only ever set to 16 (for Mirage Tower)
+                     // So, it's ok to use the fine blending here which blends the entire palette
+                     BlendPalettesFine(1, gPlttBufferFaded + pulseBlendPalette->pulseBlendSettings.paletteOffset, gPlttBufferFaded + pulseBlendPalette->pulseBlendSettings.paletteOffset, pulseBlendPalette->blendCoeff, pulseBlendPalette->pulseBlendSettings.blendColor);
+diff --git a/test/map_palette.c b/test/map_palette.c
+index c3f14d6..b65353e 100644
+--- a/test/map_palette.c
++++ b/test/map_palette.c
+@@ -66,7 +66,7 @@ static void DrawTestCache(const u8 *references)
+ {
+     for (u32 y = 0; y < 32; y += 2)
+         for (u32 x = 0; x < 32; x += 2)
+-            MapPalettesSetMetatile(y * 32 + x, 0, sTiles, references);
++            MapPalettesSetMetatile(y * 32 + x, 0, sTiles, NULL, references);
+ }
+ 
+ TEST("Map palettes render four extras and reconstruct an evicted palette during a fade")
+diff --git a/test/tile_cache.c b/test/tile_cache.c
+index 94794b4..4d16cb8 100644
+--- a/test/tile_cache.c
++++ b/test/tile_cache.c
+@@ -458,7 +458,7 @@ TEST("Tile cache: A released slot waits for the extended palette system to trans
+         WriteVirtualTile(&cells[filled], tile++);
+ 
+     releasedSlot = cells[0] & TILEMAP_TILE_NUM_MASK;
+-    MapPalettesSetMetatile(0, 0, cells, NULL);
++    MapPalettesSetMetatile(0, 0, cells, NULL, NULL);
+     TileCache_WriteCell(&cells[0], 0, 0);
+     MapPalettesEndFrame();
+     gMain.vblankCounter1++;
+diff --git a/tools/map_palettes/compiler.py b/tools/map_palettes/compiler.py
+index f23f517..216c444 100644
+--- a/tools/map_palettes/compiler.py
++++ b/tools/map_palettes/compiler.py
+@@ -269,6 +269,29 @@ def effect_requirements(root, spec, layouts, maps):
+     return reserved, pinned, effects
+ 
+ 
++def layout_resident_palettes(root, layout, primary, secondary, pinned, resident):
++    """Reserve the runtime glass-palette copy only for its matching tileset pair."""
++    if (layout["primary_tileset"] != "gTileset_General"
++            or layout["secondary_tileset"] != "gTileset_Petalburg"
++            or layout.get("layout_version", "emerald") != "emerald"):
++        return resident
++    header = root / "include/map_palette.h"
++    require(header.exists(), f"{header}: missing MAP_PALETTE_UNLIT_GLASS definition")
++    values = re.findall(r'^[ \t]*#define[ \t]+MAP_PALETTE_UNLIT_GLASS[ \t]+'
++                        r'(0[xX][0-9a-fA-F]+|[0-9]+)[ \t]*(?://[^\n]*)?$',
++                        header.read_text(), re.M)
++    require(len(values) == 1, f"{header}: MAP_PALETTE_UNLIT_GLASS must be one integer literal")
++    logical = int(values[0], 16 if values[0].lower().startswith("0x") else 10)
++    require(0 < logical < 14, f"{header}: unlit glass palette must be in [1, 13]")
++    bit = 1 << logical
++    label = f"{layout['id']}: logical palette {logical} is reserved for unlit glass"
++    require(not (pinned | resident) & bit, f"{label}; an authored palette or effect already pins or retains it")
++    require(not any(value & bit for value in primary), f"{label}; primary metatiles already reference it")
++    require(not any(value & bit for value in secondary), f"{label}; secondary metatiles already reference it")
++    # This is a logical palette, not a fixed bank: physical reserved bank 7 is unrelated.
++    return resident | bit
++
++
+ def compile_project(root, manifest, game="emerald"):
+     require(isinstance(manifest, dict) and manifest.get("version") == 1, "Unsupported palette manifest version")
+     require(set(manifest) <= {"version", "tilesets"}, "Unknown manifest fields")
+@@ -338,6 +361,7 @@ def compile_project(root, manifest, game="emerald"):
+                     f"{layout['id']}: primary metatiles may not reference UI/extra palettes")
+             require(len(primary) <= primary_count and len(secondary) <= fmt["id_mask"] - primary_count,
+                     f"{layout['id']}: too many metatiles")
++            layout_resident = layout_resident_palettes(root, layout, primary, secondary, pinned, resident)
+             # A layout whose tiles stream (see docs/TILESET_CAPACITY_GUIDE.md) keeps VRAM slots 1008-1023 for doors.
+             streamed = any((defs[symbol][0].parent / "metatile_tiles_ext.bin").exists()
+                            for symbol in (layout["primary_tileset"], layout["secondary_tileset"]))
+@@ -364,9 +388,9 @@ def compile_project(root, manifest, game="emerald"):
+                     else:
+                         require(bool(spec.get("dynamic_metatiles")), f"{map_data['id']}: declare dynamic_metatiles for computed setmetatile {token}")
+                 peak = max(peak, certify(layout, map_data, layouts, maps_by_id, combined, root,
+-                                        reserved, pinned, mutations, resident))
++                                        reserved, pinned, mutations, layout_resident))
+             code.append(f"extern const struct MapLayout {layout['name']};")
+-            profiles.append(f"    {{&{layout['name']}, {reserved}, {pinned}, {resident}, {len(primary)}}},")
++            profiles.append(f"    {{&{layout['name']}, {reserved}, {pinned}, {layout_resident}, {len(primary)}}},")
+             report.append({"layout": layout["id"], "peak": peak, "capacity": 14 - reserved.bit_count()})
+         rows = []
+         nights = []
+diff --git a/tools/map_palettes/test_compiler.py b/tools/map_palettes/test_compiler.py
+index 1293ea0..93f844d 100644
+--- a/tools/map_palettes/test_compiler.py
++++ b/tools/map_palettes/test_compiler.py
+@@ -68,6 +68,118 @@ const u16 gSecondaryMetatiles[] = INCBIN_U16("data/tilesets/secondary/metatiles.
+             self.json(f"data/maps/{data['name']}/map.json", data)
+         return compile_project(self.root, self.manifest, game)
+ 
++    def glass_pair(self):
++        self.write('src/data/tilesets/headers.h', '''
++const struct Tileset gTileset_General = {.isSecondary = FALSE, .metatiles = gPrimaryMetatiles};
++const struct Tileset gTileset_Petalburg = {.isSecondary = TRUE, .metatiles = gSecondaryMetatiles};
++''')
++        self.write('include/map_palette.h', '#define MAP_PALETTE_UNLIT_GLASS 7\n')
++        self.layout.update(primary_tileset='gTileset_General', secondary_tileset='gTileset_Petalburg')
++        self.spec['tileset'] = 'gTileset_Petalburg'
++        self.refs[7] = [0] * 12
++        self.sidecar(self.refs)
++
++    def test_glass_copy_is_resident_even_without_visible_canopy(self):
++        self.glass_pair()
++        source, report = self.compile()
++        self.assertEqual(report[0]['peak'], 2)
++        self.assertIn('{&Test_Layout, 0, 1, 128, 1}', source)
++
++    def test_glass_copy_residency_does_not_leak_to_another_primary(self):
++        self.glass_pair()
++        header = self.root / 'src/data/tilesets/headers.h'
++        header.write_text(header.read_text() +
++                          '\nconst struct Tileset gOther = {.isSecondary = FALSE, .metatiles = gPrimaryMetatiles};\n')
++        other = dict(self.layout, id='LAYOUT_OTHER', name='Other_Layout', primary_tileset='gOther')
++        self.layouts.append(other)
++        self.maps.append(dict(id='MAP_OTHER', name='Other', layout='LAYOUT_OTHER', connections=[]))
++        source, report = self.compile()
++        self.assertEqual({r['layout']: r['peak'] for r in report}, {'LAYOUT_TEST': 2, 'LAYOUT_OTHER': 1})
++        self.assertIn('{&Other_Layout, 0, 1, 0, 1}', source)
++
++    def test_glass_copy_does_not_apply_to_other_secondary(self):
++        header = self.root / 'src/data/tilesets/headers.h'
++        header.write_text(header.read_text().replace('gPrimary =', 'gTileset_General ='))
++        self.layout['primary_tileset'] = 'gTileset_General'
++        source, report = self.compile()
++        self.assertEqual(report[0]['peak'], 1)
++        self.assertIn('{&Test_Layout, 0, 1, 0, 1}', source)
++
++    def test_glass_copy_does_not_apply_to_frlg(self):
++        self.glass_pair()
++        self.layout['layout_version'] = 'frlg'
++        self.refs[7] = [7] * 12
++        self.sidecar(self.refs)
++        self.bin(self.layout['blockdata_filepath'], [640 + 7] * 96)
++        source, report = self.compile('firered')
++        self.assertEqual(report[0]['peak'], 2)
++        self.assertIn('{&Test_Layout, 0, 1, 0, 1}', source)
++
++    def test_glass_copy_rejects_authored_primary_collision(self):
++        self.glass_pair()
++        self.bin('data/tilesets/primary/metatiles.bin', [0x7000] * 12)
++        with self.assertRaisesRegex(PaletteError, 'palette 7.*primary metatiles'):
++            self.compile()
++
++    def test_glass_copy_rejects_authored_secondary_collision_even_offscreen(self):
++        self.glass_pair()
++        self.refs[7] = [7] * 12
++        self.sidecar(self.refs)
++        with self.assertRaisesRegex(PaletteError, 'palette 7.*secondary metatiles'):
++            self.compile()
++
++    def test_glass_copy_rejects_pinned_or_resident_collision(self):
++        self.glass_pair()
++        for field in ('pinned_palettes', 'resident_palettes'):
++            with self.subTest(field=field):
++                self.spec[field] = [7]
++                with self.assertRaisesRegex(PaletteError, 'palette 7.*already pins or retains'):
++                    self.compile()
++                del self.spec[field]
++
++    def test_glass_copy_rejects_door_palette_collision(self):
++        self.glass_pair()
++        self.write('src/field_door.c', '''
++static const u8 sDoorAnimPalettes_Test[] = {7};
++{ .tileset = &gTileset_General, .palettes = sDoorAnimPalettes_Test, },
++''')
++        with self.assertRaisesRegex(PaletteError, 'palette 7.*already pins or retains'):
++            self.compile()
++
++    def test_glass_copy_may_use_another_bank_if_bank_seven_is_reserved(self):
++        self.glass_pair()
++        self.spec['reserved_banks'] = [7]
++        source, report = self.compile()
++        self.assertEqual(report[0]['capacity'], 13)
++        self.assertEqual(report[0]['peak'], 2)
++        self.assertIn('{&Test_Layout, 128, 1, 128, 1}', source)
++
++    def test_glass_copy_counts_toward_bank_capacity(self):
++        self.glass_pair()
++        logical = [i for i in range(14) if i != 7]
++        self.bin(self.layout['blockdata_filepath'], ([512 + i for i in logical] * 8)[:96])
++        self.assertEqual(self.compile()[1][0]['peak'], 14)
++        logical.append(14)
++        self.bin(self.layout['blockdata_filepath'], ([512 + i for i in logical] * 8)[:96])
++        with self.assertRaisesRegex(PaletteError, '15 palettes exceed 14'):
++            self.compile()
++
++    def test_glass_copy_reads_its_logical_id_from_runtime_header(self):
++        self.glass_pair()
++        self.write('include/map_palette.h', '#define MAP_PALETTE_UNLIT_GLASS 0x09 // runtime copy\n')
++        self.refs[7] = [7] * 12
++        self.refs[9] = [0] * 12
++        self.sidecar(self.refs)
++        source, report = self.compile()
++        self.assertEqual(report[0]['peak'], 2)
++        self.assertIn('{&Test_Layout, 0, 1, 512, 1}', source)
++
++    def test_glass_copy_requires_unambiguous_runtime_constant(self):
++        self.glass_pair()
++        self.write('include/map_palette.h', '#define MAP_PALETTE_UNLIT_GLASS 7 + 1\n')
++        with self.assertRaisesRegex(PaletteError, 'must be one integer literal'):
++            self.compile()
++
+     def test_four_extras_generate_without_changing_metatile_words(self):
+         self.bin(self.layout['blockdata_filepath'], [526, 527, 528, 529] * 24)
+         original = (self.root / 'data/tilesets/secondary/metatiles.bin').read_bytes()

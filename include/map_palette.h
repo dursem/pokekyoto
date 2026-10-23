@@ -6,6 +6,9 @@
 #define MAP_PALETTES_COUNT (NUM_PALS_TOTAL + 4)
 #define MAP_PALETTE_NONE 0xFF
 #define MAP_PALETTE_CELLS (32 * 32)
+// General/Petalburg's glass canopy uses this copy of General palette 0.
+// tools/map_palettes/compiler.py checks that authored tiles/effects do not use it.
+#define MAP_PALETTE_UNLIT_GLASS 7
 
 struct TilesetPaletteExtension
 {
@@ -45,11 +48,12 @@ u32 MapPalettesTilemapsPrepared(void);
 u32 MapPalettesTilemapsCommitted(void);
 bool32 MapPalettesQueueTile(const void *source, u32 tile);
 const u8 *MapPalettesGetTileGraphics(u32 tile);
-void MapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, const u8 *references);
+void MapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, const u8 *ext, const u8 *references);
 const u8 *MapPalettesGetReferences(const struct Tileset *tileset, u32 metatile);
 u32 MapPalettesWeatherType(u32 bank, u32 fallback);
 u32 MapPalettesMask(void);
 void MapPalettesUpdateAlternates(u32 banks);
+void MapPalettesApplyNightLights(u32 banks);
 void MapPalettesPin(u32 logical);
 void MapPalettesReserve(u32 banks);
 u16 MapPalettesResolve(u16 tile, u32 logical);

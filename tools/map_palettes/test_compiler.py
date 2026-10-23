@@ -68,6 +68,118 @@ const u16 gSecondaryMetatiles[] = INCBIN_U16("data/tilesets/secondary/metatiles.
             self.json(f"data/maps/{data['name']}/map.json", data)
         return compile_project(self.root, self.manifest, game)
 
+    def glass_pair(self):
+        self.write('src/data/tilesets/headers.h', '''
+const struct Tileset gTileset_General = {.isSecondary = FALSE, .metatiles = gPrimaryMetatiles};
+const struct Tileset gTileset_Petalburg = {.isSecondary = TRUE, .metatiles = gSecondaryMetatiles};
+''')
+        self.write('include/map_palette.h', '#define MAP_PALETTE_UNLIT_GLASS 7\n')
+        self.layout.update(primary_tileset='gTileset_General', secondary_tileset='gTileset_Petalburg')
+        self.spec['tileset'] = 'gTileset_Petalburg'
+        self.refs[7] = [0] * 12
+        self.sidecar(self.refs)
+
+    def test_glass_copy_is_resident_even_without_visible_canopy(self):
+        self.glass_pair()
+        source, report = self.compile()
+        self.assertEqual(report[0]['peak'], 2)
+        self.assertIn('{&Test_Layout, 0, 1, 128, 1}', source)
+
+    def test_glass_copy_residency_does_not_leak_to_another_primary(self):
+        self.glass_pair()
+        header = self.root / 'src/data/tilesets/headers.h'
+        header.write_text(header.read_text() +
+                          '\nconst struct Tileset gOther = {.isSecondary = FALSE, .metatiles = gPrimaryMetatiles};\n')
+        other = dict(self.layout, id='LAYOUT_OTHER', name='Other_Layout', primary_tileset='gOther')
+        self.layouts.append(other)
+        self.maps.append(dict(id='MAP_OTHER', name='Other', layout='LAYOUT_OTHER', connections=[]))
+        source, report = self.compile()
+        self.assertEqual({r['layout']: r['peak'] for r in report}, {'LAYOUT_TEST': 2, 'LAYOUT_OTHER': 1})
+        self.assertIn('{&Other_Layout, 0, 1, 0, 1}', source)
+
+    def test_glass_copy_does_not_apply_to_other_secondary(self):
+        header = self.root / 'src/data/tilesets/headers.h'
+        header.write_text(header.read_text().replace('gPrimary =', 'gTileset_General ='))
+        self.layout['primary_tileset'] = 'gTileset_General'
+        source, report = self.compile()
+        self.assertEqual(report[0]['peak'], 1)
+        self.assertIn('{&Test_Layout, 0, 1, 0, 1}', source)
+
+    def test_glass_copy_does_not_apply_to_frlg(self):
+        self.glass_pair()
+        self.layout['layout_version'] = 'frlg'
+        self.refs[7] = [7] * 12
+        self.sidecar(self.refs)
+        self.bin(self.layout['blockdata_filepath'], [640 + 7] * 96)
+        source, report = self.compile('firered')
+        self.assertEqual(report[0]['peak'], 2)
+        self.assertIn('{&Test_Layout, 0, 1, 0, 1}', source)
+
+    def test_glass_copy_rejects_authored_primary_collision(self):
+        self.glass_pair()
+        self.bin('data/tilesets/primary/metatiles.bin', [0x7000] * 12)
+        with self.assertRaisesRegex(PaletteError, 'palette 7.*primary metatiles'):
+            self.compile()
+
+    def test_glass_copy_rejects_authored_secondary_collision_even_offscreen(self):
+        self.glass_pair()
+        self.refs[7] = [7] * 12
+        self.sidecar(self.refs)
+        with self.assertRaisesRegex(PaletteError, 'palette 7.*secondary metatiles'):
+            self.compile()
+
+    def test_glass_copy_rejects_pinned_or_resident_collision(self):
+        self.glass_pair()
+        for field in ('pinned_palettes', 'resident_palettes'):
+            with self.subTest(field=field):
+                self.spec[field] = [7]
+                with self.assertRaisesRegex(PaletteError, 'palette 7.*already pins or retains'):
+                    self.compile()
+                del self.spec[field]
+
+    def test_glass_copy_rejects_door_palette_collision(self):
+        self.glass_pair()
+        self.write('src/field_door.c', '''
+static const u8 sDoorAnimPalettes_Test[] = {7};
+{ .tileset = &gTileset_General, .palettes = sDoorAnimPalettes_Test, },
+''')
+        with self.assertRaisesRegex(PaletteError, 'palette 7.*already pins or retains'):
+            self.compile()
+
+    def test_glass_copy_may_use_another_bank_if_bank_seven_is_reserved(self):
+        self.glass_pair()
+        self.spec['reserved_banks'] = [7]
+        source, report = self.compile()
+        self.assertEqual(report[0]['capacity'], 13)
+        self.assertEqual(report[0]['peak'], 2)
+        self.assertIn('{&Test_Layout, 128, 1, 128, 1}', source)
+
+    def test_glass_copy_counts_toward_bank_capacity(self):
+        self.glass_pair()
+        logical = [i for i in range(14) if i != 7]
+        self.bin(self.layout['blockdata_filepath'], ([512 + i for i in logical] * 8)[:96])
+        self.assertEqual(self.compile()[1][0]['peak'], 14)
+        logical.append(14)
+        self.bin(self.layout['blockdata_filepath'], ([512 + i for i in logical] * 8)[:96])
+        with self.assertRaisesRegex(PaletteError, '15 palettes exceed 14'):
+            self.compile()
+
+    def test_glass_copy_reads_its_logical_id_from_runtime_header(self):
+        self.glass_pair()
+        self.write('include/map_palette.h', '#define MAP_PALETTE_UNLIT_GLASS 0x09 // runtime copy\n')
+        self.refs[7] = [7] * 12
+        self.refs[9] = [0] * 12
+        self.sidecar(self.refs)
+        source, report = self.compile()
+        self.assertEqual(report[0]['peak'], 2)
+        self.assertIn('{&Test_Layout, 0, 1, 512, 1}', source)
+
+    def test_glass_copy_requires_unambiguous_runtime_constant(self):
+        self.glass_pair()
+        self.write('include/map_palette.h', '#define MAP_PALETTE_UNLIT_GLASS 7 + 1\n')
+        with self.assertRaisesRegex(PaletteError, 'must be one integer literal'):
+            self.compile()
+
     def test_four_extras_generate_without_changing_metatile_words(self):
         self.bin(self.layout['blockdata_filepath'], [526, 527, 528, 529] * 24)
         original = (self.root / 'data/tilesets/secondary/metatiles.bin').read_bytes()

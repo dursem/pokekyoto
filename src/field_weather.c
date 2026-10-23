@@ -457,6 +457,8 @@ static void ApplyColorMap(u8 startPalIndex, u8 numPalettes, s8 colorMapIndex)
     u16 palOffset;
     const u8 *colorMap;
     u32 i;
+    u32 lightPalettes = ((1u << min(startPalIndex + numPalettes, NUM_PALS_TOTAL)) - 1)
+                     & ~((1u << min(startPalIndex, NUM_PALS_TOTAL)) - 1);
 
     if (colorMapIndex > 0)
     {
@@ -551,6 +553,7 @@ static void ApplyColorMap(u8 startPalIndex, u8 numPalettes, s8 colorMapIndex)
             CpuFastCopy(&gPlttBufferUnfaded[PLTT_ID(startPalIndex)], &gPlttBufferFaded[PLTT_ID(startPalIndex)], numPalettes * PLTT_SIZE_4BPP);
         }
     }
+    MapPalettesApplyNightLights(lightPalettes);
 }
 
 static void ApplyColorMapWithBlend(u8 startPalIndex, u8 numPalettes, s8 colorMapIndex, u8 blendCoeff, u32 blendColor)
@@ -558,10 +561,6 @@ static void ApplyColorMapWithBlend(u8 startPalIndex, u8 numPalettes, s8 colorMap
     u16 palOffset;
     u16 curPalIndex;
     u32 i;
-    struct RGBColor color = *(struct RGBColor *)&blendColor;
-    u8 rBlend = color.r;
-    u8 gBlend = color.g;
-    u8 bBlend = color.b;
 
     palOffset = PLTT_ID(startPalIndex);
     numPalettes += startPalIndex;
@@ -575,7 +574,8 @@ static void ApplyColorMapWithBlend(u8 startPalIndex, u8 numPalettes, s8 colorMap
         UpdatePalettesWithTime(1 << (palOffset >> 4)); // Apply TOD blend
         if (MapPalettesWeatherType(curPalIndex, sPaletteColorMapTypes[curPalIndex]) == COLOR_MAP_NONE || IsSpritePalTagBlendImmune(curPalIndex))
         {
-            // No color map. Simply blend the colors.
+            // No color map. Light the windows before applying the screen fade.
+            MapPalettesApplyNightLights(1u << curPalIndex);
             BlendPalettesFine(1, gPlttBufferFaded + palOffset, gPlttBufferFaded + palOffset, blendCoeff, blendColor);
             palOffset += 16;
         }
@@ -595,12 +595,10 @@ static void ApplyColorMapWithBlend(u8 startPalIndex, u8 numPalettes, s8 colorMap
                 u8 g = colorMap[baseColor.g];
                 u8 b = colorMap[baseColor.b];
 
-                // Apply color map and target blend color to the original color.
-                r += ((rBlend - r) * blendCoeff) >> 4;
-                g += ((gBlend - g) * blendCoeff) >> 4;
-                b += ((bBlend - b) * blendCoeff) >> 4;
                 gPlttBufferFaded[palOffset++] = RGB2(r, g, b);
             }
+            MapPalettesApplyNightLights(1u << curPalIndex);
+            BlendPalettesFine(1, gPlttBufferFaded + palOffset - 16, gPlttBufferFaded + palOffset - 16, blendCoeff, blendColor);
         }
 
         curPalIndex++;
@@ -609,26 +607,19 @@ static void ApplyColorMapWithBlend(u8 startPalIndex, u8 numPalettes, s8 colorMap
 
 static void ApplyDroughtColorMapWithBlend(s8 colorMapIndex, u8 blendCoeff, u32 blendColor)
 {
-    struct RGBColor color;
-    u8 rBlend;
-    u8 gBlend;
-    u8 bBlend;
     u16 curPalIndex;
     u16 palOffset;
     u16 i;
 
     colorMapIndex = -colorMapIndex - 1;
-    color = *(struct RGBColor *)&blendColor;
-    rBlend = color.r;
-    gBlend = color.g;
-    bBlend = color.b;
     palOffset = 0;
     for (curPalIndex = 0; curPalIndex < 32; curPalIndex++)
     {
         if (MapPalettesWeatherType(curPalIndex, sPaletteColorMapTypes[curPalIndex]) == COLOR_MAP_NONE|| IsSpritePalTagBlendImmune(curPalIndex))
         {
-            // No color map. Simply blend the colors.
-            BlendPalette(palOffset, 16, blendCoeff, blendColor);
+            // Match BlendPalette's original RGB_ALPHA stripping before fading.
+            for (i = 0; i < 16; i++)
+                gPlttBufferFaded[palOffset + i] = gPlttBufferUnfaded[palOffset + i] & ~RGB_ALPHA;
             palOffset += 16;
         }
         else
@@ -652,13 +643,11 @@ static void ApplyDroughtColorMapWithBlend(s8 colorMapIndex, u8 blendCoeff, u32 b
                 g2 = color2.g;
                 b2 = color2.b;
 
-                r2 += ((rBlend - r2) * blendCoeff) >> 4;
-                g2 += ((gBlend - g2) * blendCoeff) >> 4;
-                b2 += ((bBlend - b2) * blendCoeff) >> 4;
-
                 gPlttBufferFaded[palOffset++] = RGB2(r2, g2, b2);
             }
         }
+        MapPalettesApplyNightLights(1u << curPalIndex);
+        BlendPalettesFine(1, gPlttBufferFaded + palOffset - 16, gPlttBufferFaded + palOffset - 16, blendCoeff, blendColor);
     }
 }
 
@@ -673,6 +662,7 @@ static void ApplyFogBlend(u8 blendCoeff, u32 blendColor)
     UpdateAltBgPalettes(PALETTES_BG);
     CpuFastCopy(gPlttBufferUnfaded, gPlttBufferFaded, PLTT_BUFFER_SIZE * 2);
     UpdatePalettesWithTime(PALETTES_ALL);
+    MapPalettesApplyNightLights(PALETTES_BG);
     // Then blend tile palettes [0, 12] faded->faded with fadeIn color
     BlendPalettesFine(PALETTES_MAP, gPlttBufferFaded, gPlttBufferFaded, blendCoeff, blendColor);
 

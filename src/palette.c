@@ -88,6 +88,7 @@ void ReapplyMapPaletteFade(u32 bank)
     if (sMapFadeMode == TIME_OF_DAY_FADE)
     {
         TimeMixPalettes(1, unfaded, faded, gPaletteFade.bld0, gPaletteFade.bld1, gPaletteFade.weight);
+        MapPalettesApplyNightLights(1u << bank);
         BlendPalettesFine(1, faded, faded, sMapFadeY, sMapFadeColor);
     }
     else if (sMapFadeMode == NORMAL_FADE)
@@ -339,6 +340,8 @@ static u8 UpdateTimeOfDayPaletteFade(void)
             dst1 += 16;
         }
     }
+
+    MapPalettesApplyNightLights(timePalettes);
 
     // Then, blend from faded->faded with native BlendPalettes
     BlendPalettesFine(gPaletteFadeSelectedPalettes, dst, dst, gPaletteFade.y, gPaletteFade.blendColor);

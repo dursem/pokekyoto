@@ -274,7 +274,7 @@ static void DrawMetatileCached(s32 metatileLayerType, const u16 *tiles, const u8
         SetCachedCell(gOverworldTilemapBuffer_Bg2, cell, tiles, ext, isDoor ? -1 : (s32)(4 + i), isDoor);
         SetCachedCell(gOverworldTilemapBuffer_Bg1, cell, tiles, ext, (isDoor ? 4 : 8) + i, isDoor);
     }
-    MapPalettesSetMetatile(offset, metatileLayerType, tiles, references);
+    MapPalettesSetMetatile(offset, metatileLayerType, tiles, ext, references);
     ScheduleBgCopyTilemapToVram(1);
     ScheduleBgCopyTilemapToVram(2);
     ScheduleBgCopyTilemapToVram(3);
@@ -327,7 +327,7 @@ static void DrawMetatile(s32 metatileLayerType, const u16 *tiles, const u8 *ext,
         gOverworldTilemapBuffer_Bg1[offset + 0x20] = tiles[10];
         gOverworldTilemapBuffer_Bg1[offset + 0x21] = tiles[11];
     }
-    MapPalettesSetMetatile(offset, metatileLayerType, tiles, references);
+    MapPalettesSetMetatile(offset, metatileLayerType, tiles, ext, references);
     ScheduleBgCopyTilemapToVram(1);
     ScheduleBgCopyTilemapToVram(2);
     ScheduleBgCopyTilemapToVram(3);

@@ -458,7 +458,7 @@ TEST("Tile cache: A released slot waits for the extended palette system to trans
         WriteVirtualTile(&cells[filled], tile++);
 
     releasedSlot = cells[0] & TILEMAP_TILE_NUM_MASK;
-    MapPalettesSetMetatile(0, 0, cells, NULL);
+    MapPalettesSetMetatile(0, 0, cells, NULL, NULL);
     TileCache_WriteCell(&cells[0], 0, 0);
     MapPalettesEndFrame();
     gMain.vblankCounter1++;

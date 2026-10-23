@@ -5,7 +5,10 @@
 #include "malloc.h"
 #include "overworld.h"
 #include "palette.h"
+#include "tile_cache.h"
+#include "tilesets.h"
 #include "constants/field_weather.h"
+#include "constants/rgb.h"
 
 struct MapPaletteState
 {
@@ -32,6 +35,31 @@ static EWRAM_DATA struct MapPaletteState *sState = NULL;
 static u32 sTilemapsPrepared;
 static u32 sTilemapsCommitted;
 static volatile bool8 sInFrame;
+
+static bool32 UsesUnlitGlassPalette(const struct MapLayout *layout)
+{
+#if !IS_FRLG
+    return layout && layout->primaryTileset == &gTileset_General
+                  && layout->secondaryTileset == &gTileset_Petalburg;
+#else
+    return FALSE;
+#endif
+}
+
+static u32 GetTilePalette(u16 tile, u32 ext, u32 logical)
+{
+    u32 virtualTile = (tile & TILEMAP_TILE_NUM_MASK)
+                   | (((ext & METATILE_EXT_TILE_HIGH_MASK) >> METATILE_EXT_TILE_HIGH_SHIFT) << 10);
+
+    // General tiles.png: x=0..63, y=448..479 (four rows of eight 8x8 tiles).
+    // Local primary tiles 896..951 occupy virtual IDs 1408..1463. Ignore the
+    // architecture in the right half of those rows, and keep all window tiles
+    // on palette 0. Flip flags do not change the underlying tile identity.
+    if (logical == 0 && UsesUnlitGlassPalette(sState->layout)
+     && virtualTile >= 1408 && virtualTile < 1472 && (virtualTile - 1408) % 16 < 8)
+        return MAP_PALETTE_UNLIT_GLASS;
+    return logical;
+}
 
 #define REQUIRE_PALETTE(condition, ...) do { \
     if (!(condition)) { \
@@ -203,7 +231,7 @@ static void SetReference(u32 layer, u32 cell, u32 logical)
         tilemap[cell] = (tilemap[cell] & 0xFFF) | ((bank == MAP_PALETTE_NONE ? 0 : bank) << 12);
 }
 
-void MapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, const u8 *references)
+void MapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, const u8 *ext, const u8 *references)
 {
     static const u8 offsets[] = {0, 1, 32, 33};
     if (!sState)
@@ -224,6 +252,9 @@ void MapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, const u
                 source = (layer == 0 ? 4 : 0) + tile;
             }
             logical = references ? references[source] : tiles[source] >> 12;
+            // Door frames contain physical VRAM slots, not tileset tile IDs.
+            if (layerType != 0xFF)
+                logical = GetTilePalette(tiles[source], ext ? ext[source] : 0, logical);
             SetReference(layer, offset + offsets[tile], logical);
         }
     }
@@ -232,6 +263,8 @@ void MapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, const u
 
 static const u16 *GetBasePalette(u32 logical)
 {
+    if (logical == MAP_PALETTE_UNLIT_GLASS && UsesUnlitGlassPalette(sState->layout))
+        return sState->layout->primaryTileset->palettes[0];
     if (logical >= NUM_PALS_TOTAL)
         return sState->extension->extraPalettes[logical - NUM_PALS_TOTAL];
     const struct Tileset *tileset = logical < GetNumPalsInPrimary(sState->layout)
@@ -249,6 +282,8 @@ void MapPalettesUpdateAlternates(u32 banks)
         const u16 *night = NULL;
         if (!(banks & (1u << bank)) || logical == MAP_PALETTE_NONE)
             continue;
+        if (logical == MAP_PALETTE_UNLIT_GLASS && UsesUnlitGlassPalette(sState->layout))
+            continue;
         if (logical >= NUM_PALS_TOTAL)
             night = sState->extension->extraNightPalettes[logical - NUM_PALS_TOTAL];
         else
@@ -264,6 +299,67 @@ void MapPalettesUpdateAlternates(u32 banks)
             AvgPaletteWeighted((u16 *)GetBasePalette(logical), (u16 *)night,
                                &gPlttBufferUnfaded[BG_PLTT_ID(bank)], gTimeBlend.altWeight);
     }
+}
+
+#if !IS_FRLG
+struct MapPaletteNightLight
+{
+    const struct Tileset *tileset;
+    u8 palette;
+    u8 color;
+    u16 nightColor;
+};
+
+// Logical palette/color numbers are the zero-based numbers shown in OpalMap.
+// Keep the day .pal files intact; only the final displayed colors are changed.
+static const struct MapPaletteNightLight sNightLights[] =
+{
+    {&gTileset_General,   0, 11, RGB2GBA(255, 226, 95)}, // #FFE25F
+    {&gTileset_General,   0, 15, RGB2GBA(255, 197, 74)}, // #FFC54A
+    {&gTileset_Petalburg, 8, 12, RGB2GBA(255, 197, 74)}, // #FFC54A
+    {&gTileset_Petalburg, 8, 13, RGB2GBA(255, 226, 95)}, // #FFE25F
+};
+#endif
+
+// Apply once after time/weather coloring, before any screen fade. Using owners
+// (not banks) also handles a palette being loaded during Prepare(), before the
+// new logical-to-physical bank allocation has been committed.
+void MapPalettesApplyNightLights(u32 banks)
+{
+#if !IS_FRLG
+    const struct MapLayout *layout = sState ? sState->layout : gMapHeader.mapLayout;
+    u32 nightWeight = 256 - min(gTimeBlend.altWeight, 256);
+
+    if (!layout || !nightWeight || !MapHasNaturalLight(gMapHeader.mapType))
+        return;
+
+    banks &= MapPalettesMask();
+    for (u32 bank = 0; bank < NUM_PALS_TOTAL; bank++)
+    {
+        u32 logical = sState ? sState->owners[bank] : bank;
+        const struct Tileset *tileset;
+
+        if (!(banks & (1u << bank)) || logical == MAP_PALETTE_NONE)
+            continue;
+        tileset = logical < GetNumPalsInPrimary(layout) ? layout->primaryTileset : layout->secondaryTileset;
+        for (u32 i = 0; i < ARRAY_COUNT(sNightLights); i++)
+        {
+            const struct MapPaletteNightLight *light = &sNightLights[i];
+            if (tileset == light->tileset && logical == light->palette)
+            {
+                u32 offset = BG_PLTT_ID(bank) + light->color;
+                u16 color = gPlttBufferFaded[offset];
+                s32 r = GET_R(color);
+                s32 g = GET_G(color);
+                s32 b = GET_B(color);
+                r += ((GET_R(light->nightColor) - r) * (s32)nightWeight) >> 8;
+                g += ((GET_G(light->nightColor) - g) * (s32)nightWeight) >> 8;
+                b += ((GET_B(light->nightColor) - b) * (s32)nightWeight) >> 8;
+                gPlttBufferFaded[offset] = RGB2(r, g, b);
+            }
+        }
+    }
+#endif
 }
 
 u32 MapPalettesMask(void)
