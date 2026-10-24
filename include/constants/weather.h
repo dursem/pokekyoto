@@ -16,15 +16,19 @@ enum OverworldWeather
     WEATHER_UNDERWATER, // Unused
     WEATHER_SHADE, // Original name was closer to WEATHER_CLOUDY/OVERCAST
     WEATHER_DROUGHT,
-    WEATHER_DOWNPOUR,
+    WEATHER_DOWNPOUR, // Kyoto: small sakura petals; keep map/save ID 13.
     WEATHER_UNDERWATER_BUBBLES,
     WEATHER_ABNORMAL, // The alternating weather during Groudon/Kyogre conflict
     WEATHER_ROUTE119_CYCLE,
     WEATHER_ROUTE123_CYCLE,
     WEATHER_FOG, // Aggregate of WEATHER_FOG_HORIZONTAL and WEATHER_FOG_DIAGONAL
     WEATHER_DYNAMIC,
+    WEATHER_AUTUMN_WIND, // Append new weather without renumbering existing maps.
     WEATHER_COUNT,
 };
+
+// Descriptive script alias; existing Downpour map headers continue to work.
+#define WEATHER_SAKURA_PETALS WEATHER_DOWNPOUR
 
 // These are used in maps' coord_weather_event entries.
 // They are not a one-to-one mapping with the engine's
@@ -42,6 +46,8 @@ enum OverworldWeather
 #define COORD_EVENT_WEATHER_DROUGHT             11
 #define COORD_EVENT_WEATHER_ROUTE119_CYCLE      20
 #define COORD_EVENT_WEATHER_ROUTE123_CYCLE      21
+#define COORD_EVENT_WEATHER_SAKURA_PETALS       22
+#define COORD_EVENT_WEATHER_AUTUMN_WIND         23
 
 // These are the "abnormal weather events" that are used
 // to find Kyogre and Groudon.

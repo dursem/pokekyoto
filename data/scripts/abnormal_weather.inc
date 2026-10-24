@@ -163,7 +163,7 @@ AbnormalWeather_EventScript_HideMapNamePopup::
 	return
 
 AbnormalWeather_StartKyogreWeather::
-	setweather WEATHER_DOWNPOUR
+	setweather WEATHER_RAIN_THUNDERSTORM
 	return
 
 AbnormalWeather_StartGroudonWeather::

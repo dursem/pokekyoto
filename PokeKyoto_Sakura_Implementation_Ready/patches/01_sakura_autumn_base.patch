@@ -1,0 +1,2050 @@
+diff --git a/data/maps/SootopolisCity/scripts.inc b/data/maps/SootopolisCity/scripts.inc
+index 3a13433a..32c80b89 100644
+--- a/data/maps/SootopolisCity/scripts.inc
++++ b/data/maps/SootopolisCity/scripts.inc
+@@ -93,7 +93,7 @@ SootopolisCity_EventScript_SetNormalWeather::
+ 	return
+ 
+ SootopolisCity_EventScript_SetDownpour::
+-	setweather WEATHER_DOWNPOUR
++	setweather WEATHER_RAIN_THUNDERSTORM
+ 	return
+ 
+ SootopolisCity_EventScript_CheckSetEnterCaveOfOriginObjPos::
+diff --git a/data/scripts/abnormal_weather.inc b/data/scripts/abnormal_weather.inc
+index c5b03a97..669917e4 100644
+--- a/data/scripts/abnormal_weather.inc
++++ b/data/scripts/abnormal_weather.inc
+@@ -163,7 +163,7 @@ AbnormalWeather_EventScript_HideMapNamePopup::
+ 	return
+ 
+ AbnormalWeather_StartKyogreWeather::
+-	setweather WEATHER_DOWNPOUR
++	setweather WEATHER_RAIN_THUNDERSTORM
+ 	return
+ 
+ AbnormalWeather_StartGroudonWeather::
+diff --git a/docs/kyoto_sakura_autumn_weather.md b/docs/kyoto_sakura_autumn_weather.md
+new file mode 100644
+index 00000000..d609318f
+--- /dev/null
++++ b/docs/kyoto_sakura_autumn_weather.md
+@@ -0,0 +1,207 @@
++# Pok√©Kyoto: Sakura petals and Autumn Wind
++
++This update targets `dursem/pokekyoto` Emerald source at commit
++`4dcb7048ecaa400f11927f07c5528b726ddb5b1e` (23 October 2026).
++
++## Weather selection
++
++| Effect | Map/script constant | ID | Debug-menu label |
++| --- | --- | --- | --- |
++| Small pink Sakura petals | `WEATHER_DOWNPOUR` or `WEATHER_SAKURA_PETALS` | 13 | SAKURA PETALS |
++| Red/gold Autumn Wind | `WEATHER_AUTUMN_WIND` | 20 | AUTUMN WIND |
++
++Downpour's existing ID is retained. Maps already configured with Downpour now
++show the small Sakura petals. Autumn Wind is appended after the existing
++weather IDs, so existing map headers and saved weather numbers are not shifted.
++
++The existing debug menu is opened by holding **B** and pressing **START**.
++Choose **Utilities ‚Üí Set weather‚Ä¶**, then select ID **13** or **20**.
++The debug selector includes the new weather.
++
++Both effects fade in and out over 90 game frames (about 1.5 seconds). The
++particles keep moving during the fade. When both connected maps use the same
++weather, the existing particles and animation continue at their current
++opacity. If the player walks back before a fade-out finishes, the existing
++effect fades back in from its current opacity, without resetting its sprites.
++
++An outgoing effect finishes fading before the destination's new weather starts.
++Sakura and Autumn Wind each fade in when selected as the destination. A weather
++picked in the debug menu is temporary: a connected route applies its own map
++header weather. Assign the desired weather to both maps for continuous weather.
++
++To set a permanent map weather in OpalMap/Porymap, set the map header's weather
++to `WEATHER_DOWNPOUR` for Sakura or `WEATHER_AUTUMN_WIND` for Autumn Wind.
++Reload the editor project after applying the source update so it reads the new
++weather constant. No map layout or tileset needs to be replaced.
++
++Script examples:
++
++```asm
++    setweather WEATHER_SAKURA_PETALS
++    doweather
++```
++
++```asm
++    setweather WEATHER_AUTUMN_WIND
++    doweather
++```
++
++Optional coordinate weather events have their own independent numbering:
++`COORD_EVENT_WEATHER_SAKURA_PETALS` is 22 and
++`COORD_EVENT_WEATHER_AUTUMN_WIND` is 23. These are coordinate-event IDs, not
++map-header weather IDs.
++
++## Sakura appearance and exact tree-color matching
++
++The renderer reuses the previously approved small petal artwork: three visible
++colors, transparency, and nine tilt poses in fixed 16√ó16 sprite cells. The art
++inside those cells remains small. Up to 24 petals drift downward slowly with
++individual side-to-side motion. There is no affine scaling or constant diagonal
++rain motion.
++
++The color source is the pink tree in the current General primary tileset:
++
++| Petal color | General logical palette | Tree color index | Authored RGB |
++| --- | --- | --- | --- |
++| Light pink | 3 | 9 | 255, 189, 181 |
++| Middle pink | 3 | 10 | 239, 156, 173 |
++| Dark pink | 3 | 11 | 214, 123, 148 |
++
++These RGB values describe the source `.pal` file. The game stores its normal
++15-bit GBA representation. Petal colors are read from the actual compiled tree
++palette, not duplicated as unrelated hard-coded pink RGB values.
++
++The current map engine can move a logical palette to a different physical BG
++bank while scrolling. `MapPalettesGetPhysicalBank()` exposes the current bank
++without allocating or pinning another map palette. Immediately before palette
++DMA, `Petals_BeforePaletteTransfer()` copies the tree's three final displayed
++colors into the dedicated petal OBJ palette. Day/night interpolation, weather
++coloring, palette-bank changes and software screen fades have already been
++applied at that point. The colors are not tinted a second time.
++
++If the tree palette is not currently resident, the ordinary weather/day/night
++OBJ pipeline uses the same original tree colors as its baseline. This avoids
++reserving an extra background palette. The current General tileset has no
++alternate night palette for these pink entries; its emissive window-color
++overrides affect other entries.
++
++`include/kyoto_petals_config.h` contains the palette/index references. Editing
++the tree's three colors in `data/tilesets/primary/general/palettes/03.pal`
++automatically changes the petals when rebuilding. If the tree is moved to a
++different logical palette or different color indices, update the references
++in that config header too.
++
++## Autumn Wind
++
++Autumn Wind reuses the original red and gold leaf graphics from the previous
++Autumn Wind source package. Eight leaves travel from right to left, with a
++gentle vertical wave, rotating poses and a slow variation in gust strength.
++Each leaf type has eight fixed 16√ó16 poses.
++
++The autumn palette goes through the game's normal day/night and screen-fade
++processing. The exact pink-tree matching hook applies only to Sakura.
++
++## Menus, transitions and rendering
++
++Both effects use ordinary 4bpp OBJ sprites at priority 1. BG0 text boxes and
++menus draw in front. The particles do not alter shared hardware alpha settings
++to control their opacity, and they do not consume the gameplay RNG stream.
++
++The fade uses 64 levels of fixed spatial transparency in the sprite artwork.
++An 8√ó8 ordered coverage mask progressively reveals or removes pixels while
++retaining their original palette indices. It does not blink entire sprites on
++alternate frames, tint the petals towards black/white, or change the shared
++alpha coefficients used by shadows and lighting. At full opacity, the graphics
++are byte-identical to the original source sheets.
++
++`KYOTO_PETALS_FADE_FRAMES` in `include/kyoto_petals_config.h` controls the fade
++duration. A single aligned 2,048-byte working sheet is rebuilt only when the
++coverage level changes. The existing pre-palette VBlank hook commits that sheet
++only while the overworld callback and the effect's tile ownership are valid.
++Releasing the effect clears the pending upload before any menu can reuse its
++tiles. Fully visible steady weather does not re-upload its sprite sheet.
++
++When leaving the overworld or resetting the sprite pool, the effect snapshots
++its motion, opacity and pending destination weather, then releases only its own
++sprites, graphics and palette.
++Returning at the same map/player position restores the particle positions and
++poses with the current camera origin and the saved opacity. If a Bag/Party visit
++interrupts an outgoing fade, `ResumePausedWeather()` restores that unfinished
++transition before starting the destination weather. Changing to another weather
++releases the effect's resources after it has become invisible. Allocation
++failure does not hang the weather initializer.
++
++The resource tag is `0x1210` in the separate graphics and palette namespaces.
++Sakura uses 36 8√ó8 tiles (1,152 bytes); Autumn Wind uses 64 8√ó8 tiles (2,048
++bytes). Only the currently active effect's sheet is loaded. Each uses one OBJ
++palette, with no additional permanently reserved BG palette.
++
++## Rain behavior
++
++Weather 13 is now decorative Sakura. It no longer starts rain sprites, thunder,
++rain sounds, a rain battle condition, rain-based evolution, Water-type Weather
++Ball previews or Rainy Castform follower forms. Autumn Wind is also decorative.
++Ordinary Rain and Rain Thunderstorm retain their weather behavior.
++
++The existing Groudon/Kyogre storm scripts and alternating abnormal-weather
++sequence use the existing Rain Thunderstorm slot instead of the repurposed
++Downpour slot, so those rain sequences remain storms.
++
++## Build and install
++
++Use the existing Pok√©Kyoto source folder. The update does not require a second
++project, a base-ROM replacement, or reimporting map/tileset files.
++
++Choose one patch according to what is already installed. For a first
++installation of Sakura and Autumn Wind, enter the existing repository and run:
++
++```sh
++git apply --check /path/to/pokekyoto-sakura-autumn.patch
++git apply /path/to/pokekyoto-sakura-autumn.patch
++make -j8
++```
++
++If the previous Sakura/Autumn update from this conversation is already
++installed, use the smaller fade-only update instead:
++
++```sh
++git apply --check /path/to/pokekyoto-smooth-fades-only.patch
++git apply /path/to/pokekyoto-smooth-fades-only.patch
++make -j8
++```
++
++The fade-only patch contains six changed files and upgrades the previous
++weather renderer, menu-resume hook, configuration, tests and documentation.
++Apply one of these two patches, not both.
++
++Use the actual extracted patch path. If the check reports a conflict, stop and
++merge the indicated source changes with the newer local work. Do not force an
++old whole-project ZIP over a newer project. The patch includes the new source,
++headers and packed graphics.
++
++The packed `.4bpp` files are deliberate source assets: their frames are stored
++as four contiguous tiles per 16√ó16 pose. The included `*_reference.png` sheets
++are visual references; they are named separately to prevent a generic
++row-major PNG conversion from silently repacking the frames incorrectly.
++
++## Focused verification
++
++`test/field_weather_petals.c` contains integration checks for exact tree-color
++matching under time blending, partial fades and physical-bank relocation;
++offscreen-tree/menu guards; resource cleanup/recreation; and unchanged weather
++IDs and normal-rain battle behavior.
++
++It also checks progressive sprite coverage and exact fade endpoints, unchanged
++source colors and hardware blend coefficients, smooth reversal, and restoration
++of a partially faded effect through a menu transition.
++
++With the project's test tools installed, the focused suite can be run using:
++
++```sh
++make -j8 check \
++  TEST_SRCS='test/test_runner.c test/test_runner_args.c test/test_runner_battle.c test/test_test_runner.c test/field_weather_petals.c' \
++  TESTS='Petal weather'
++```
++
++See the package's validation report for the exact compiler, emulator version,
++build result and runtime checks recorded for the delivered build.
+diff --git a/graphics/weather/autumn_wind/gold_leaf.png b/graphics/weather/autumn_wind/gold_leaf.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..6fc58dcf6a218e239b67ad8b2b807ba260637aa2
+GIT binary patch
+literal 1116
+zcmeAS@N?(olHy`uVBq!ia0vp^4L~fw!3-o{wzcnKU|?nl@CkAK&+z~M`)mK7pZk9A
+z*z<E+&uyJ^ZjRTSDLu!EHCw8Sj~NO$d1WIbp!QKP8Un*61RUknjsrczSQ6wH%;50s
+zMjDXK<>}%WQZeUk$i_TYLyprTib7}p|Igj|y1;Cu->WNp{kkm428ziwZ|WnSt<U@X
+zA>ni8W82f7>=U>pXU-A0R=oC@fMVa4vi-(2wjv$V49>jy*n0iq4yEX5#+SF6kEP49
+zG8jLf^<bT9f|$C-J=J8bKi10Dm(-5muSnv^?rU1TqIJfUk3ub)8~qwY1diIX+DlF-
+zcRtvcsq`>(BFm1Q-rm<3^;lzC)-2e#=(>x_Ut6PzU#@jXhBd~xTv_-w?!ZS5kBhta
+znmKJ>*{8K&@0lo8z8l^u9gCG`3hqdi`D1F_ZufXq!k(xXdCS`td)f%SE{yoHRl0GT
+vyK>zAMHlV+|4n`3=qRZEpI_4MTlhED20cEP%ZrlqK=JMA>gTe~DWM4f;Jd1S
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/weather/autumn_wind/leaves.4bpp b/graphics/weather/autumn_wind/leaves.4bpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..abd631f6e67457c69f7e74f7c7d763282ab87f36
+GIT binary patch
+literal 2048
+zcma)+(N5G*5QgWH7}3|{#@8TCmE|o=Qz`obhU}$5$o7&D$@Y?9V$P*O4SwHQS9&Pf
+zWs<+`>G@~=nK{!&6gIHxA{KR|>o)qj9q;b55ZB<#w}|SVhko8f-@;qX*IVf=_y5-1
+zM6@{E=(yW{qYb-nBQ43HZN@G}u0ivfnCQ3aM~C+E1ciuFI=i;$LVuyHE|4Z_hi)Qn
+zUymIvjO3zK-#mN~aS3{`028zJYpU8`vGr%N{oD&<QIF>k<nU;TS~}3YiTLT}T3?QQ
+z8-QBbgex{EDArUSwi+Q~PIbrUpdxHhzpls!oAC;q<e;3@T7SVkfx_&Od|Hru_fYIk
+z7W#Lwc&MX4Zz9#j`IA`I^$f1)XYE5A!*l++Pb@A#k%Ri4L3_E*-Tb#&;*gRaOSET&
+z{@Bl4?(>WOgj)wZw}~0Rd08^Av7>kxWV<jd^`sB^J7DqDY`Y|q#L{~%>KAppqsiIe
+z2FG$bGG%-*!yo8Y5yM9?sb6hps$vEY0UWsUW99-BR?%?3*_yk-c76iG>VeOWc(Xd<
+z$hd{scW1vcX4X&e;#WZ$En3JG4e(fZo8?=^>??Cc+_Q=PCWg{`d13u=1ctnPaxqu?
+z|CxL*aoXPhL;~qM^f}0haGw~V;`Sf7$zxXX{5b=~9Nh6jcxJDFzFTZy&z}G_r2|49
+zj=A>Ux;Onla1p&c`1<5r3Vr9qvvSiM7=tagfSqpF|DJsQ2hWks!&t^dvcbp487Q>f
+z-OQ<Tcm}rjUk`s(1M!ZC>kN#H)9IKr=gxQn=?c2IB`e<8zDF}p=r1(08;CKq>l{3T
+csVTb$JO``-r{EpvL182n2Du~hDR^4{Uy$_&Bme*a
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/weather/autumn_wind/leaves.gbapal b/graphics/weather/autumn_wind/leaves.gbapal
+new file mode 100644
+index 00000000..94f51ea7
+--- /dev/null
++++ b/graphics/weather/autumn_wind/leaves.gbapal
+@@ -0,0 +1 @@
++|øküg~c<[ŸNy&SFÿ9ÿ(5(5(5(5(5
+\ No newline at end of file
+diff --git a/graphics/weather/autumn_wind/leaves_reference.png b/graphics/weather/autumn_wind/leaves_reference.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..9bdfd02b2ca3f87b369f7e5a5baeb080786c4504
+GIT binary patch
+literal 1363
+zcmeAS@N?(olHy`uVBq!ia0vp^4M42G!3-qd{%H_rU|?nl@CkAK&+z~M`)mK7pZk9A
+z*z<E+&uyJ^ZjRTSDLu!EHCw8Sj~NO$d1WIbp!QKP8Un*61RUknjsrczSQ6wH%;50s
+zMj8VH6Qie#V@SoEw_%<|M+`W=oODf`_W!@x3BN^oPiDp}*LtS5jje^{_O}b|0T!~l
+z+t1t&-W6HaJxA<a?2e^-Tch{voWvg-eo`~UH%!APVacs)M^;H>9XCFEPJl_HI<R?h
+z2+uX1B&8`v9lDeMq)Kj=(sT{DDZ1chf6%iJ>yPQ3VBt1l5(pHTwc^K~#U=|s_`5A~
+zJa{r?={(8iuEjr2F&s5}H2=BGt%zoc^uGC7j}|8_eXsF+)lS33fAquIe6<(Nd8DBk
+z_F#eb{tpZaXSb9VewDFfdE9fXQYz(px#I%&=YLlDYX9GUewCEc#l-xas^#mBA5cGH
+zqI}}oG@0|Cy!O}bF^RY6DSJLGxPtNLq`WWE+SeKWefxO9`TwkY`#W7{ajU<0zU4;P
+zA=c!^ZicWc=RLSxJ-(Nku#_h)G1-~=w@+B<m;OUj|A*@9GSw{docqkAHsy+}u|H-k
+z*;CkI=o&AOq<@B?R<-}+v+3?BOWv%gzxDXZgku`TdRdWg9u$hOC_awh)nL&7Gxtro
+z$q8dc_hWh?hXe&R=V*IP+9RpKYQV6usYz7U-09tU?ZuPknL4#3zYz&JV)nL*!CTnD
+z_57DxqO0DV5r`|?w(oSCtc~yVo)>*g!F{az-}yA(w#Z1`rTBdN+%<A*k3=6cl-!hO
+yAy;c0U-sSaPvw{ODRciXDBPTA`}@H23*vLT<PNDX{qP5r%spNGT-G@yGywq4`X^NY
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/weather/autumn_wind/red_leaf.png b/graphics/weather/autumn_wind/red_leaf.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..181c6c07b9f5a9b265ee0ad7c318c8b5f2b81c26
+GIT binary patch
+literal 1119
+zcmeAS@N?(olHy`uVBq!ia0vp^4L~fw!3-o{wzcnKU|?nl@CkAK&+z~M`)mK7pZk9A
+z*z<E+&uyJ^ZjRTSDLu!EHCw8Sj~NO$d1WIbp!QKP8Un*61RUknjsrczSQ6wH%;50s
+zMjDXK>*?YcQZeUku=O-%LyqE;%1I^vZ?mPBCAS!R?u>5fo3COZ_c;6ikv;)&nJ1T%
+z8Q#do$O_t8c5E+^j@prM;Bc?@OFvzYb3zM}w`{4Ndh6$dH;lqfZ_M2bbxjwT%5*Ds
+zdrK{OU^x4BUyR6;5>JjlViSe$FBG^GByPewqtf@#ous{jiAw(k6LLMQq7{E7KME2u
+zt@R7IJmc5&^O3RT1wQd#Px~e1>AYV2tTdaESLNTgl&2YIW8CLxua(|$a`OC|)`o`d
+z+UI7kmS?oO_$8d#`krT?p!4(7#%F)tuUl=y5q6;N#wY*7`IF-%I5|?Sy{~Tmdr7|M
+x^f%o_IqMTjTeweoR|npAy2Dy??8mM7H)Lfu3e^92y_pFV<({s7F6*2UngDy!tgZk6
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/weather/sakura_petals.4bpp b/graphics/weather/sakura_petals.4bpp
+new file mode 100644
+index 0000000000000000000000000000000000000000..cc983fa4c79ef9ad1e690b21fd38248353340ab7
+GIT binary patch
+literal 1152
+zcmb`G0S<#85CpgN1Mmaj1&#gx-@1G82#BHB^x}#h$Z&fR7$Ptefgt7cER)CuDAKOk
+zz$dtr=%Q@EPVrg|A?EyN%dc#mA)O&DfAI`c{)2$*e2xrpTUpX?E#GrrMz3At;6KE6
+zSwYqR#C@$J?f&v!$v3rLzxDo-pSaJ2|KfBP_xY9mcfLGW2)0;fi1gmP?LJXMtl8>;
+w8JhSiVW?dnn)h5M_9CAvogcMt7ZZNB&R>4u^Z$>B_amR?+^b);AG$K=1L;Z>*8l(j
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/weather/sakura_petals_reference.png b/graphics/weather/sakura_petals_reference.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..a25838b38bc42c4d17fb9185da5e6e6d2d6325fb
+GIT binary patch
+literal 571
+zcmV-B0>u4^P)<h;3K|Lk000e1NJLTq0058x000mO1^@s6`S$i;0005-Nkl<ZcmeE}
+z!A%4)3`J*Xfm$d7i3Ye*0!2^)R~kT~3_9S>5yXw-FfSSpR+LQQWOo9)LHal(ezxOS
+zV)tU`KfMDL9q0p8(Y%fhLm!|%1yvpB160+%4sQ<7^!hT1tgRAGYz=Q^@%Qsi&rcKk
+zxzc<oOAPW^dB@DX7hA%^B5Ek*9lO*)tdODu1iS+8Ujs#;b<eU`cnhL^$&2*f)>_vN
+zhqnCvGoR<&8UqFiCzidGB)_wB?^6E$Ih<%P^1@+V+?n61JvcxsOoTZA#-bR%RfvvX
+z%j;PGZC!i!T7JB`9@n0!w~xJDaDYMq*!z6@#yDmDQU%~&%a1p=zn3FmN-DoOH?bS=
+z>jSFXlwz*GkY5KdlaCKjAi(AQUDgA-CLDpMk=auD&CMrCOJ3!s6zc!0y$=qM8vrU_
+z#08dRk=dK~>!;}42f(*APYojJ-N(bD=}W+&d5P!S-~eeSE<p2<-p^gP;^p5R`EzU4
+zel2-&BVD_t|F9ytQwgv0OB~-u2S^IAB-X*<_1~rI()@hrlLnN=I26D4-AnWN9DPIV
+zi)F199U$#gx@L%CiBmCQQOYlN4ohwn^GWT)qLg3k999(bN$t1hsgD}4AsuyqLJ9lc
+zX?0-#0XnVzo&9b40G<5^)HUD-00960H^IzV00006Nkl<Z0|0JOpfHF#Bb)#L002ov
+JPDHLkV1lfk3MK#m
+
+literal 0
+HcmV?d00001
+
+diff --git a/include/constants/weather.h b/include/constants/weather.h
+index 5d824b45..5c1817f2 100644
+--- a/include/constants/weather.h
++++ b/include/constants/weather.h
+@@ -16,16 +16,20 @@ enum OverworldWeather
+     WEATHER_UNDERWATER, // Unused
+     WEATHER_SHADE, // Original name was closer to WEATHER_CLOUDY/OVERCAST
+     WEATHER_DROUGHT,
+-    WEATHER_DOWNPOUR,
++    WEATHER_DOWNPOUR, // Kyoto: small sakura petals; keep map/save ID 13.
+     WEATHER_UNDERWATER_BUBBLES,
+     WEATHER_ABNORMAL, // The alternating weather during Groudon/Kyogre conflict
+     WEATHER_ROUTE119_CYCLE,
+     WEATHER_ROUTE123_CYCLE,
+     WEATHER_FOG, // Aggregate of WEATHER_FOG_HORIZONTAL and WEATHER_FOG_DIAGONAL
+     WEATHER_DYNAMIC,
++    WEATHER_AUTUMN_WIND, // Append new weather without renumbering existing maps.
+     WEATHER_COUNT,
+ };
+ 
++// Descriptive script alias; existing Downpour map headers continue to work.
++#define WEATHER_SAKURA_PETALS WEATHER_DOWNPOUR
++
+ // These are used in maps' coord_weather_event entries.
+ // They are not a one-to-one mapping with the engine's
+ // internal weather constants above.
+@@ -42,6 +46,8 @@ enum OverworldWeather
+ #define COORD_EVENT_WEATHER_DROUGHT             11
+ #define COORD_EVENT_WEATHER_ROUTE119_CYCLE      20
+ #define COORD_EVENT_WEATHER_ROUTE123_CYCLE      21
++#define COORD_EVENT_WEATHER_SAKURA_PETALS       22
++#define COORD_EVENT_WEATHER_AUTUMN_WIND         23
+ 
+ // These are the "abnormal weather events" that are used
+ // to find Kyogre and Groudon.
+diff --git a/include/field_weather_petals.h b/include/field_weather_petals.h
+new file mode 100644
+index 00000000..9aeab17c
+--- /dev/null
++++ b/include/field_weather_petals.h
+@@ -0,0 +1,28 @@
++#ifndef GUARD_FIELD_WEATHER_PETALS_H
++#define GUARD_FIELD_WEATHER_PETALS_H
++
++#include "global.h"
++
++// Ordinary (not blend-immune) OBJ palette: native time and screen fades apply.
++#define KYOTO_PETALS_PALETTE_TAG 0x1210
++#define KYOTO_SAKURA_PETAL_COUNT 24
++#define KYOTO_AUTUMN_LEAF_COUNT 8
++
++void Sakura_InitVars(void);
++void Sakura_Main(void);
++void Sakura_InitAll(void);
++bool8 Sakura_Finish(void);
++void AutumnWind_InitVars(void);
++void AutumnWind_Main(void);
++void AutumnWind_InitAll(void);
++bool8 AutumnWind_Finish(void);
++
++// Call before ResetSpriteData, or when leaving the overworld callback.
++// Snapshots motion and destroys only sprites/resources owned by this effect.
++void Petals_Reset(void);
++// Resume an interrupted outgoing fade after menus, before initializing weather.
++u8 Petals_GetResumeWeather(u8 targetWeather);
++// Commit owned fade graphics and palette before KyotoCloud's VBlank hook.
++void Petals_BeforePaletteTransfer(void);
++
++#endif
+diff --git a/include/kyoto_petals_config.h b/include/kyoto_petals_config.h
+new file mode 100644
+index 00000000..07ea773e
+--- /dev/null
++++ b/include/kyoto_petals_config.h
+@@ -0,0 +1,16 @@
++#ifndef GUARD_KYOTO_PETALS_CONFIG_H
++#define GUARD_KYOTO_PETALS_CONFIG_H
++
++// The three pink canopy shades in the current General primary tileset.
++// These are logical map-palette coordinates, not fixed physical BG banks.
++#define KYOTO_SAKURA_TREE_PALETTE 3
++#define KYOTO_SAKURA_TREE_LIGHT 9
++#define KYOTO_SAKURA_TREE_MIDDLE 10
++#define KYOTO_SAKURA_TREE_DARK 11
++
++// About 1.5 seconds at the GBA frame rate. The 8x8 coverage mask only changes
++// the particle pixels; tree colors, shadows and lamp blending stay untouched.
++#define KYOTO_PETALS_FADE_FRAMES 90
++#define KYOTO_PETALS_FADE_STEPS 64
++
++#endif
+diff --git a/include/map_palette.h b/include/map_palette.h
+index ee2fd291..bed47056 100644
+--- a/include/map_palette.h
++++ b/include/map_palette.h
+@@ -33,6 +33,9 @@ extern const struct TilesetPaletteExtension gTilesetPaletteExtensions[];
+ extern const struct MapPaletteProfile gMapPaletteProfiles[];
+ 
+ bool32 MapPalettesActive(void);
++// Read the current bank without allocating a palette or changing tilemaps.
++// Returns MAP_PALETTE_NONE when the logical palette is not resident.
++u32 MapPalettesGetPhysicalBank(u32 logical);
+ bool32 MapPalettesCanContinue(const struct MapLayout *layout);
+ u32 MapPalettesMetatileCount(const struct Tileset *tileset, u32 fallback);
+ void MapPalettesReset(void);
+diff --git a/src/battle_main.c b/src/battle_main.c
+index 0e19cc77..1f3aca6c 100644
+--- a/src/battle_main.c
++++ b/src/battle_main.c
+@@ -5599,7 +5599,6 @@ enum Type GetDynamicMoveType(struct Pokemon *mon, enum Move move, enum BattlerId
+                 break;
+             case WEATHER_RAIN:
+             case WEATHER_RAIN_THUNDERSTORM:
+-            case WEATHER_DOWNPOUR:
+                 if (holdEffect != HOLD_EFFECT_UTILITY_UMBRELLA)
+                     return TYPE_WATER;
+                 break;
+diff --git a/src/battle_message.c b/src/battle_message.c
+index e3f9f55c..9fc63bc4 100644
+--- a/src/battle_message.c
++++ b/src/battle_message.c
+@@ -1335,9 +1335,10 @@ const u16 gWeatherStartsStringIds[] =
+     [WEATHER_UNDERWATER]         = STRINGID_ITISRAINING,
+     [WEATHER_SHADE]              = STRINGID_ITISRAINING,
+     [WEATHER_DROUGHT]            = STRINGID_SUNLIGHTISHARSH,
+-    [WEATHER_DOWNPOUR]           = STRINGID_ITISRAINING,
++    [WEATHER_DOWNPOUR]           = STRINGID_EMPTYSTRING4,
+     [WEATHER_UNDERWATER_BUBBLES] = STRINGID_ITISRAINING,
+-    [WEATHER_ABNORMAL]           = STRINGID_ITISRAINING
++    [WEATHER_ABNORMAL]           = STRINGID_ITISRAINING,
++    [WEATHER_AUTUMN_WIND]        = STRINGID_EMPTYSTRING4,
+ };
+ 
+ const u16 gTerrainStartsStringIds[] =
+diff --git a/src/battle_util.c b/src/battle_util.c
+index e424a4ff..ddef23df 100644
+--- a/src/battle_util.c
++++ b/src/battle_util.c
+@@ -2917,7 +2917,6 @@ bool32 TryFieldEffects(enum FieldEffectCases caseId)
+             {
+             case WEATHER_RAIN:
+             case WEATHER_RAIN_THUNDERSTORM:
+-            case WEATHER_DOWNPOUR:
+                 if (!(gBattleWeather & B_WEATHER_RAIN))
+                 {
+                     gBattleWeather = B_WEATHER_RAIN_NORMAL;
+@@ -11450,7 +11449,8 @@ u32 GetWeatherFromOverworldWeather(u32 owWeather)
+     case WEATHER_UNDERWATER:            return B_WEATHER_NONE;
+     case WEATHER_SHADE:                 return B_WEATHER_NONE;
+     case WEATHER_DROUGHT:               return B_WEATHER_SUN_NORMAL;
+-    case WEATHER_DOWNPOUR:              return B_WEATHER_RAIN_NORMAL;
++    case WEATHER_DOWNPOUR:              return B_WEATHER_NONE;
++    case WEATHER_AUTUMN_WIND:           return B_WEATHER_NONE;
+     case WEATHER_UNDERWATER_BUBBLES:    return B_WEATHER_NONE;
+     case WEATHER_ABNORMAL:              return B_WEATHER_NONE;
+     case WEATHER_ROUTE119_CYCLE:        return B_WEATHER_NONE;
+@@ -11478,6 +11478,7 @@ enum BattleTerrain GetBattleTerrainFromOverworldWeather(u32 owWeather)
+     case WEATHER_SHADE:                 return B_TERRAIN_NONE;
+     case WEATHER_DROUGHT:               return B_TERRAIN_NONE;
+     case WEATHER_DOWNPOUR:              return B_TERRAIN_NONE;
++    case WEATHER_AUTUMN_WIND:           return B_TERRAIN_NONE;
+     case WEATHER_UNDERWATER_BUBBLES:    return B_TERRAIN_NONE;
+     case WEATHER_ABNORMAL:              return B_TERRAIN_NONE;
+     case WEATHER_ROUTE119_CYCLE:        return B_TERRAIN_NONE;
+diff --git a/src/coord_event_weather.c b/src/coord_event_weather.c
+index 85f22a8b..52186792 100644
+--- a/src/coord_event_weather.c
++++ b/src/coord_event_weather.c
+@@ -22,6 +22,8 @@ static void CoordEventWeather_Shade(void);
+ static void CoordEventWeather_Drought(void);
+ static void CoordEventWeather_Route119Cycle(void);
+ static void CoordEventWeather_Route123Cycle(void);
++static void CoordEventWeather_SakuraPetals(void);
++static void CoordEventWeather_AutumnWind(void);
+ 
+ static const struct CoordEventWeather sCoordEventWeatherFuncs[] =
+ {
+@@ -38,6 +40,8 @@ static const struct CoordEventWeather sCoordEventWeatherFuncs[] =
+     { COORD_EVENT_WEATHER_DROUGHT,           CoordEventWeather_Drought },
+     { COORD_EVENT_WEATHER_ROUTE119_CYCLE,    CoordEventWeather_Route119Cycle },
+     { COORD_EVENT_WEATHER_ROUTE123_CYCLE,    CoordEventWeather_Route123Cycle },
++    { COORD_EVENT_WEATHER_SAKURA_PETALS,     CoordEventWeather_SakuraPetals },
++    { COORD_EVENT_WEATHER_AUTUMN_WIND,       CoordEventWeather_AutumnWind },
+ };
+ 
+ static void CoordEventWeather_Clouds(void)
+@@ -105,6 +109,16 @@ static void CoordEventWeather_Route123Cycle(void)
+     SetWeather(WEATHER_ROUTE123_CYCLE);
+ }
+ 
++static void CoordEventWeather_SakuraPetals(void)
++{
++    SetWeather(WEATHER_SAKURA_PETALS);
++}
++
++static void CoordEventWeather_AutumnWind(void)
++{
++    SetWeather(WEATHER_AUTUMN_WIND);
++}
++
+ void DoCoordEventWeather(u8 coordEventWeather)
+ {
+     u8 i;
+diff --git a/src/data/pokemon/form_change_tables.h b/src/data/pokemon/form_change_tables.h
+index 74abcc5c..a5d48d3e 100644
+--- a/src/data/pokemon/form_change_tables.h
++++ b/src/data/pokemon/form_change_tables.h
+@@ -834,7 +834,8 @@ static const struct FormChange sCastformFormChangeTable[] =
+     {FORM_CHANGE_OVERWORLD_WEATHER, SPECIES_CASTFORM_SUNNY,  WEATHER_DROUGHT},
+     {FORM_CHANGE_OVERWORLD_WEATHER, SPECIES_CASTFORM_RAINY,  WEATHER_RAIN},
+     {FORM_CHANGE_OVERWORLD_WEATHER, SPECIES_CASTFORM_RAINY,  WEATHER_RAIN_THUNDERSTORM},
+-    {FORM_CHANGE_OVERWORLD_WEATHER, SPECIES_CASTFORM_RAINY,  WEATHER_DOWNPOUR},
++    {FORM_CHANGE_OVERWORLD_WEATHER, SPECIES_CASTFORM_NORMAL, WEATHER_DOWNPOUR},
++    {FORM_CHANGE_OVERWORLD_WEATHER, SPECIES_CASTFORM_NORMAL, WEATHER_AUTUMN_WIND},
+     {FORM_CHANGE_OVERWORLD_WEATHER, SPECIES_CASTFORM_SNOWY,  WEATHER_SNOW},
+     {FORM_CHANGE_OVERWORLD_WEATHER, SPECIES_CASTFORM_NORMAL, WEATHER_NONE},
+     {FORM_CHANGE_BEGIN_BATTLE,      SPECIES_CASTFORM_NORMAL}, // To prevent Battles from being affected.
+diff --git a/src/debug.c b/src/debug.c
+index 62003251..194456d4 100644
+--- a/src/debug.c
++++ b/src/debug.c
+@@ -1954,7 +1954,7 @@ static const struct DebugSelectionStep sWeatherSelectionStep = {
+     .stepUpdate = DebugSelectionStep_UpdateWeather,
+     .stepConfirm = DebugSelectionStep_GenericInputConfirm,
+     .minValue = WEATHER_NONE,
+-    .maxValue = WEATHER_DYNAMIC - 1,
++    .maxValue = WEATHER_COUNT - 1,
+     .digits = 2
+ };
+ 
+diff --git a/src/field_weather.c b/src/field_weather.c
+index 106bb2b9..ceddda8f 100644
+--- a/src/field_weather.c
++++ b/src/field_weather.c
+@@ -7,6 +7,7 @@
+ #include "decompress.h"
+ #include "event_object_movement.h"
+ #include "field_weather.h"
++#include "field_weather_petals.h"
+ #include "fieldmap.h"
+ #include "main.h"
+ #include "menu.h"
+@@ -141,8 +142,9 @@ static const struct WeatherCallbacks sWeatherFuncs[] =
+     [WEATHER_UNDERWATER]         = {FogHorizontal_InitVars, FogHorizontal_Main, FogHorizontal_InitAll, FogHorizontal_Finish},
+     [WEATHER_SHADE]              = {FireflyShade_InitVars,   FireflyShade_Main,   FireflyShade_InitAll,   FireflyShade_Finish},
+     [WEATHER_DROUGHT]            = {Drought_InitVars,       Drought_Main,       Drought_InitAll,       Drought_Finish},
+-    [WEATHER_DOWNPOUR]           = {Downpour_InitVars,      Thunderstorm_Main,  Downpour_InitAll,      Thunderstorm_Finish},
++    [WEATHER_DOWNPOUR]           = {Sakura_InitVars,        Sakura_Main,        Sakura_InitAll,        Sakura_Finish},
+     [WEATHER_UNDERWATER_BUBBLES] = {Bubbles_InitVars,       Bubbles_Main,       Bubbles_InitAll,       Bubbles_Finish},
++    [WEATHER_AUTUMN_WIND]        = {AutumnWind_InitVars,    AutumnWind_Main,    AutumnWind_InitAll,    AutumnWind_Finish},
+ };
+ 
+ void (*const gWeatherPalStateFuncs[])(void) =
+@@ -228,7 +230,7 @@ void StartWeather(void)
+ 
+ void SetNextWeather(u8 weather)
+ {
+-    if (weather != WEATHER_RAIN && weather != WEATHER_RAIN_THUNDERSTORM && weather != WEATHER_DOWNPOUR)
++    if (weather != WEATHER_RAIN && weather != WEATHER_RAIN_THUNDERSTORM)
+     {
+         PlayRainStoppingSoundEffect();
+     }
+@@ -365,7 +367,6 @@ static void FadeInScreenWithWeather(void)
+     {
+     case WEATHER_RAIN:
+     case WEATHER_RAIN_THUNDERSTORM:
+-    case WEATHER_DOWNPOUR:
+         if (FadeInScreen_RainShowShade() == FALSE)
+         {
+             gWeatherPtr->colorMapIndex = 3;
+@@ -760,7 +761,6 @@ void FadeSelectedPals(u8 mode, s8 delay, u32 selectedPalettes)
+     {
+     case WEATHER_RAIN:
+     case WEATHER_RAIN_THUNDERSTORM:
+-    case WEATHER_DOWNPOUR:
+     case WEATHER_FOG_HORIZONTAL:
+     case WEATHER_DROUGHT:
+         useWeatherPal = TRUE;
+@@ -907,7 +907,6 @@ void ApplyWeatherToNewMapPalette(u32 bank)
+         {
+         case WEATHER_RAIN:
+         case WEATHER_RAIN_THUNDERSTORM:
+-        case WEATHER_DOWNPOUR:
+             ApplyColorMapWithBlend(bank, 1, 3, coeff, gWeatherPtr->fadeDestColor);
+             return;
+         case WEATHER_DROUGHT:
+@@ -1235,18 +1234,20 @@ static const u8 sWeatherNames[WEATHER_COUNT][24] = {
+     [WEATHER_UNDERWATER]         = _("UNDERWATER"),
+     [WEATHER_SHADE]              = _("FIREFLIES"),
+     [WEATHER_DROUGHT]            = _("DROUGHT"),
+-    [WEATHER_DOWNPOUR]           = _("DOWNPOUR"),
++    [WEATHER_DOWNPOUR]           = _("SAKURA PETALS"),
+     [WEATHER_UNDERWATER_BUBBLES] = _("UNDERWATER BUBBLES"),
+     [WEATHER_ABNORMAL]           = _("ABNORMAL(NOT WORKING)"),
+     [WEATHER_ROUTE119_CYCLE]     = _("ROUTE119 CYCLE"),
+     [WEATHER_ROUTE123_CYCLE]     = _("ROUTE123 CYCLE"),
+     [WEATHER_FOG]                = _("FOG"),
++    [WEATHER_DYNAMIC]            = _("DYNAMIC"),
++    [WEATHER_AUTUMN_WIND]        = _("AUTUMN WIND"),
+ };
+ 
+ static const u8 sDebugText_WeatherNotDefined[] = _("NOT DEFINED!!!");
+ const u8 *GetWeatherName(u32 weatherId)
+ {
+-    if (sWeatherNames[weatherId][0] != 0)
++    if (weatherId < ARRAY_COUNT(sWeatherNames) && sWeatherNames[weatherId][0] != 0)
+         return sWeatherNames[weatherId];
+     return sDebugText_WeatherNotDefined;
+ }
+diff --git a/src/field_weather_effect.c b/src/field_weather_effect.c
+index 91cc795d..0ce73935 100644
+--- a/src/field_weather_effect.c
++++ b/src/field_weather_effect.c
+@@ -4,6 +4,7 @@
+ #include "event_object_movement.h"
+ #include "fieldmap.h"
+ #include "field_weather.h"
++#include "field_weather_petals.h"
+ #include "overworld.h"
+ #include "random.h"
+ #include "script.h"
+@@ -413,8 +414,7 @@ bool8 Rain_Finish(void)
+     {
+     case 0:
+         if (gWeatherPtr->nextWeather == WEATHER_RAIN
+-         || gWeatherPtr->nextWeather == WEATHER_RAIN_THUNDERSTORM
+-         || gWeatherPtr->nextWeather == WEATHER_DOWNPOUR)
++         || gWeatherPtr->nextWeather == WEATHER_RAIN_THUNDERSTORM)
+         {
+             gWeatherPtr->finishStep = 0xFF;
+             return FALSE;
+@@ -1089,8 +1089,7 @@ bool8 Thunderstorm_Finish(void)
+         if (gWeatherPtr->thunderAllowEnd)
+         {
+             if (gWeatherPtr->nextWeather == WEATHER_RAIN
+-             || gWeatherPtr->nextWeather == WEATHER_RAIN_THUNDERSTORM
+-             || gWeatherPtr->nextWeather == WEATHER_DOWNPOUR)
++             || gWeatherPtr->nextWeather == WEATHER_RAIN_THUNDERSTORM)
+                 return FALSE;
+ 
+             gWeatherPtr->targetRainSpriteCount = 0;
+@@ -2373,24 +2372,24 @@ static void CreateAbnormalWeatherTask(void)
+     s16 *data = gTasks[taskId].data;
+ 
+     tDelay = 600;
+-    if (sCurrentAbnormalWeather == WEATHER_DOWNPOUR)
++    if (sCurrentAbnormalWeather == WEATHER_RAIN_THUNDERSTORM)
+     {
+-        // Currently Downpour, next will be Drought
++        // Currently Thunderstorm, next will be Drought
+         tWeatherA = WEATHER_DROUGHT;
+-        tWeatherB = WEATHER_DOWNPOUR;
++        tWeatherB = WEATHER_RAIN_THUNDERSTORM;
+     }
+     else if (sCurrentAbnormalWeather == WEATHER_DROUGHT)
+     {
+-        // Currently Drought, next will be Downpour
+-        tWeatherA = WEATHER_DOWNPOUR;
++        // Currently Drought, next will be Thunderstorm
++        tWeatherA = WEATHER_RAIN_THUNDERSTORM;
+         tWeatherB = WEATHER_DROUGHT;
+     }
+     else
+     {
+-        // Default to starting with Downpour
+-        sCurrentAbnormalWeather = WEATHER_DOWNPOUR;
++        // Default to starting with Thunderstorm
++        sCurrentAbnormalWeather = WEATHER_RAIN_THUNDERSTORM;
+         tWeatherA = WEATHER_DROUGHT;
+-        tWeatherB = WEATHER_DOWNPOUR;
++        tWeatherB = WEATHER_RAIN_THUNDERSTORM;
+     }
+ }
+ 
+@@ -2442,7 +2441,7 @@ void DoCurrentWeather(void)
+     {
+         if (FuncIsActiveTask(Task_DoAbnormalWeather))
+             DestroyTask(FindTaskIdByFunc(Task_DoAbnormalWeather));
+-        sCurrentAbnormalWeather = WEATHER_DOWNPOUR;
++        sCurrentAbnormalWeather = WEATHER_RAIN_THUNDERSTORM;
+     }
+     SetNextWeather(weather);
+ }
+@@ -2450,6 +2449,7 @@ void DoCurrentWeather(void)
+ void ResumePausedWeather(void)
+ {
+     u8 weather = GetSavedWeather();
++    u8 resumeWeather;
+ 
+     if (weather == WEATHER_ABNORMAL)
+     {
+@@ -2461,9 +2461,12 @@ void ResumePausedWeather(void)
+     {
+         if (FuncIsActiveTask(Task_DoAbnormalWeather))
+             DestroyTask(FindTaskIdByFunc(Task_DoAbnormalWeather));
+-        sCurrentAbnormalWeather = WEATHER_DOWNPOUR;
++        sCurrentAbnormalWeather = WEATHER_RAIN_THUNDERSTORM;
+     }
+-    SetCurrentAndNextWeather(weather);
++    resumeWeather = Petals_GetResumeWeather(weather);
++    SetCurrentAndNextWeather(resumeWeather);
++    if (resumeWeather != weather)
++        SetNextWeather(weather);
+ }
+ 
+ #define WEATHER_CYCLE_LENGTH  4
+@@ -2578,6 +2581,7 @@ static enum OverworldWeather TranslateWeatherNum(enum OverworldWeather weather)
+     case WEATHER_ROUTE119_CYCLE:     return sWeatherCycleRoute119[gSaveBlock1Ptr->weatherCycleStage];
+     case WEATHER_ROUTE123_CYCLE:     return sWeatherCycleRoute123[gSaveBlock1Ptr->weatherCycleStage];
+     case WEATHER_DYNAMIC:            return GetDynamicWeather();
++    case WEATHER_AUTUMN_WIND:        return WEATHER_AUTUMN_WIND;
+     }
+ 
+     return WEATHER_NONE;
+diff --git a/src/field_weather_petals.c b/src/field_weather_petals.c
+new file mode 100644
+index 00000000..62d733ba
+--- /dev/null
++++ b/src/field_weather_petals.c
+@@ -0,0 +1,573 @@
++#include "global.h"
++#include "field_weather.h"
++#include "field_weather_petals.h"
++#include "kyoto_petals_config.h"
++#include "main.h"
++#include "map_palette.h"
++#include "overworld.h"
++#include "palette.h"
++#include "sprite.h"
++#include "tilesets.h"
++#include "trig.h"
++
++// Both effects use fixed 16x16 cells, with four contiguous 8x8 tiles per pose.
++// Sakura retains the approved small three-color artwork and nine tilt poses.
++// Autumn Wind retains the original gold/red leaf artwork and eight poses each.
++#define PETALS_TILE_TAG 0x1210
++#define PETALS_FRAME_TILES 4
++#define PETALS_MAX_COUNT KYOTO_SAKURA_PETAL_COUNT
++#define PETALS_MAX_SHEET_SIZE (16 * 128)
++#define AUTUMN_Q 64
++#define AUTUMN_LEFT (-24)
++#define AUTUMN_RIGHT 264
++#define AUTUMN_TOP (-24)
++#define AUTUMN_BOTTOM 184
++
++enum PetalMode
++{
++    PETAL_MODE_NONE,
++    PETAL_MODE_SAKURA,
++    PETAL_MODE_AUTUMN,
++};
++
++struct PetalSnapshot
++{
++    s16 data[PETALS_MAX_COUNT][8];
++    s16 playerX;
++    s16 playerY;
++    s8 mapGroup;
++    s8 mapNum;
++    u8 mode;
++    u8 count;
++    u8 fadeFrame;
++    u8 nextWeather;
++    bool8 valid;
++};
++
++static EWRAM_DATA struct PetalSnapshot sSnapshot = {0};
++static EWRAM_DATA u8 sSpriteIds[PETALS_MAX_COUNT] = {0};
++static EWRAM_DATA u8 sLiveCount = 0;
++static EWRAM_DATA u8 sMode = PETAL_MODE_NONE;
++static EWRAM_DATA u8 sPaletteIndex = 0;
++static EWRAM_DATA u16 sTileStart = 0;
++static EWRAM_DATA u16 sGustPhase = 0;
++static EWRAM_DATA bool8 sPaletteOwned = FALSE;
++static EWRAM_DATA bool8 sTilesOwned = FALSE;
++static EWRAM_DATA bool8 sCopiedTreeColors = FALSE;
++static EWRAM_DATA u8 sFadeFrame = 0;
++static EWRAM_DATA u8 sFadeLevel = 0;
++static EWRAM_DATA bool8 sFadeTilesDirty = FALSE;
++static EWRAM_DATA u32 sFadeTiles[PETALS_MAX_SHEET_SIZE / sizeof(u32)] = {0};
++
++static void Sakura_Update(struct Sprite *sprite);
++static void AutumnWind_Update(struct Sprite *sprite);
++static void Sakura_Draw(struct Sprite *sprite);
++static void AutumnWind_Draw(struct Sprite *sprite);
++
++static const u8 ALIGNED(4) sSakuraTiles[] = INCBIN_U8("graphics/weather/sakura_petals.4bpp");
++static const u8 ALIGNED(4) sAutumnTiles[] = INCBIN_U8("graphics/weather/autumn_wind/leaves.4bpp");
++static const u16 sAutumnPalette[] = INCBIN_U16("graphics/weather/autumn_wind/leaves.gbapal");
++
++STATIC_ASSERT(sizeof(sSakuraTiles) == 9 * 128, SakuraNeedsNinePacked16x16Frames);
++STATIC_ASSERT(sizeof(sAutumnTiles) == 16 * 128, AutumnNeedsSixteenPacked16x16Frames);
++STATIC_ASSERT(sizeof(sAutumnPalette) == 16 * sizeof(u16), AutumnNeedsOne4bppPalette);
++STATIC_ASSERT(KYOTO_AUTUMN_LEAF_COUNT <= PETALS_MAX_COUNT, AutumnSnapshotCapacity);
++STATIC_ASSERT(KYOTO_PETALS_FADE_FRAMES > 0 && KYOTO_PETALS_FADE_FRAMES <= 255, PetalFadeFrameRange);
++STATIC_ASSERT(KYOTO_PETALS_FADE_STEPS == 64, PetalFadeNeeds8x8Coverage);
++STATIC_ASSERT(sizeof(sAutumnTiles) <= sizeof(sFadeTiles), PetalFadeSheetCapacity);
++
++// Fixed spatial coverage, not alternating-frame visibility. Every retained
++// pixel keeps its original palette index, including the exact tree pinks.
++static const u8 sFadeThreshold[8][8] =
++{
++    { 0, 48, 12, 60,  3, 51, 15, 63},
++    {32, 16, 44, 28, 35, 19, 47, 31},
++    { 8, 56,  4, 52, 11, 59,  7, 55},
++    {40, 24, 36, 20, 43, 27, 39, 23},
++    { 2, 50, 14, 62,  1, 49, 13, 61},
++    {34, 18, 46, 30, 33, 17, 45, 29},
++    {10, 58,  6, 54,  9, 57,  5, 53},
++    {42, 26, 38, 22, 41, 25, 37, 21},
++};
++
++static const struct SpriteSheet sSheets[] =
++{
++    [PETAL_MODE_SAKURA] = {sSakuraTiles, sizeof(sSakuraTiles), PETALS_TILE_TAG},
++    [PETAL_MODE_AUTUMN] = {sAutumnTiles, sizeof(sAutumnTiles), PETALS_TILE_TAG},
++};
++
++static const struct OamData sPetalOam =
++{
++    .affineMode = ST_OAM_AFFINE_OFF,
++    .objMode = ST_OAM_OBJ_NORMAL,
++    .bpp = ST_OAM_4BPP,
++    .shape = SPRITE_SHAPE(16x16),
++    .size = SPRITE_SIZE(16x16),
++    .priority = 1, // BG0 dialogue, map names and the Start menu stay in front.
++};
++
++static const struct SpriteTemplate sSakuraTemplate =
++{
++    .tileTag = PETALS_TILE_TAG,
++    .paletteTag = KYOTO_PETALS_PALETTE_TAG,
++    .oam = &sPetalOam,
++    .anims = gDummySpriteAnimTable,
++    .images = NULL,
++    .affineAnims = gDummySpriteAffineAnimTable,
++    .callback = Sakura_Update,
++};
++
++static const struct SpriteTemplate sAutumnTemplate =
++{
++    .tileTag = PETALS_TILE_TAG,
++    .paletteTag = KYOTO_PETALS_PALETTE_TAG,
++    .oam = &sPetalOam,
++    .anims = gDummySpriteAnimTable,
++    .images = NULL,
++    .affineAnims = gDummySpriteAffineAnimTable,
++    .callback = AutumnWind_Update,
++};
++
++static bool8 OwnsSprite(u8 id)
++{
++    return id < MAX_SPRITES && gSprites[id].inUse
++        && ((sMode == PETAL_MODE_SAKURA && gSprites[id].callback == Sakura_Update)
++         || (sMode == PETAL_MODE_AUTUMN && gSprites[id].callback == AutumnWind_Update));
++}
++
++static u16 PetalRandom(u16 *seed)
++{
++    // Cosmetic effects must not advance the battle/encounter random seed.
++    *seed = (u16)(*seed * 109 + 89);
++    return *seed;
++}
++
++static void RememberLocation(void)
++{
++    if (gSaveBlock1Ptr == NULL)
++        return;
++    sSnapshot.mapGroup = gSaveBlock1Ptr->location.mapGroup;
++    sSnapshot.mapNum = gSaveBlock1Ptr->location.mapNum;
++    sSnapshot.playerX = gSaveBlock1Ptr->pos.x;
++    sSnapshot.playerY = gSaveBlock1Ptr->pos.y;
++}
++
++static bool8 CanResume(void)
++{
++    return sSnapshot.valid && sSnapshot.mode == sMode
++        && sSnapshot.count <= PETALS_MAX_COUNT && gSaveBlock1Ptr != NULL
++        && sSnapshot.mapGroup == gSaveBlock1Ptr->location.mapGroup
++        && sSnapshot.mapNum == gSaveBlock1Ptr->location.mapNum
++        && sSnapshot.playerX == gSaveBlock1Ptr->pos.x
++        && sSnapshot.playerY == gSaveBlock1Ptr->pos.y;
++}
++
++u8 Petals_GetResumeWeather(u8 targetWeather)
++{
++    // Saved weather already names the destination while the old particles
++    // are fading out. Preserve that pending transition across a Bag/Party
++    // visit instead of treating it as a fresh destination-weather load.
++    if (CanResume() && sSnapshot.fadeFrame > 0
++     && sSnapshot.nextWeather == targetWeather)
++    {
++        if (sSnapshot.mode == PETAL_MODE_SAKURA)
++            return WEATHER_SAKURA_PETALS;
++        if (sSnapshot.mode == PETAL_MODE_AUTUMN)
++            return WEATHER_AUTUMN_WIND;
++    }
++    return targetWeather;
++}
++
++static void PrepareFadeTiles(void)
++{
++    u32 row, x, word;
++    u32 rowMasks[8];
++    u8 level = (u32)sFadeFrame * KYOTO_PETALS_FADE_STEPS / KYOTO_PETALS_FADE_FRAMES;
++    const u32 *source = (const u32 *)sSheets[sMode].data;
++
++    if (sFadeLevel == level)
++        return;
++
++    // An interrupt must never copy a half-written sheet. The old complete
++    // level remains in VRAM until the next ownership-checked VBlank commit.
++    sFadeTilesDirty = FALSE;
++    for (row = 0; row < 8; row++)
++    {
++        rowMasks[row] = 0;
++        for (x = 0; x < 8; x++)
++            if (sFadeThreshold[row][x] < level)
++                rowMasks[row] |= (u32)0xF << (x * 4);
++    }
++    for (word = 0; word < sSheets[sMode].size / sizeof(u32); word++)
++        sFadeTiles[word] = source[word] & rowMasks[word & 7];
++    sFadeLevel = level;
++    sFadeTilesDirty = TRUE;
++}
++
++static void ReleaseGraphics(void)
++{
++    // Do not leave a queued upload pointing at tiles a menu may immediately
++    // reuse. Fade sheets are committed only by our guarded VBlank hook.
++    sFadeTilesDirty = FALSE;
++    if (sPaletteOwned)
++    {
++        if (IndexOfSpritePaletteTag(KYOTO_PETALS_PALETTE_TAG) == sPaletteIndex)
++            FreeSpritePaletteByTag(KYOTO_PETALS_PALETTE_TAG);
++        sPaletteOwned = FALSE;
++    }
++    if (sTilesOwned)
++    {
++        if (GetSpriteTileStartByTag(PETALS_TILE_TAG) == sTileStart)
++            FreeSpriteTilesByTag(PETALS_TILE_TAG);
++        sTilesOwned = FALSE;
++    }
++}
++
++static void DestroyParticles(void)
++{
++    u32 i;
++    for (i = 0; i < sLiveCount; i++)
++        if (OwnsSprite(sSpriteIds[i]))
++            DestroySprite(&gSprites[sSpriteIds[i]]);
++    sLiveCount = 0;
++    ReleaseGraphics();
++}
++
++void Petals_Reset(void)
++{
++    u32 i, j;
++    if (!sLiveCount)
++    {
++        ReleaseGraphics();
++        return;
++    }
++
++    sSnapshot.valid = TRUE;
++    sSnapshot.mode = sMode;
++    sSnapshot.count = sLiveCount;
++    sSnapshot.fadeFrame = sFadeFrame;
++    sSnapshot.nextWeather = gWeatherPtr->nextWeather;
++    RememberLocation();
++    for (i = 0; i < sLiveCount; i++)
++    {
++        if (!OwnsSprite(sSpriteIds[i]))
++        {
++            sSnapshot.valid = FALSE;
++            continue;
++        }
++        for (j = 0; j < 8; j++)
++            sSnapshot.data[i][j] = gSprites[sSpriteIds[i]].data[j];
++    }
++    // This also runs on callback changes, which need not reset the whole
++    // sprite pool immediately. Remove our old callbacks before freeing their
++    // graphics; other sprites and the saved particle motion remain untouched.
++    DestroyParticles();
++}
++
++static bool8 LoadGraphics(void)
++{
++    u16 palette[16] = {0};
++    struct SpritePalette spritePalette = {palette, KYOTO_PETALS_PALETTE_TAG};
++    struct SpriteSheet sheet = sSheets[sMode];
++    u32 i;
++
++    sFadeLevel = 0xFF;
++    PrepareFadeTiles();
++    sheet.data = sFadeTiles;
++    sTileStart = LoadSpriteSheet(&sheet);
++    // LoadSpriteSheet returns zero both for tile zero and allocation failure.
++    if (GetSpriteTileStartByTag(PETALS_TILE_TAG) != sTileStart)
++    {
++        sFadeTilesDirty = FALSE;
++        return FALSE;
++    }
++    sTilesOwned = TRUE;
++    sFadeTilesDirty = FALSE; // LoadSpriteSheet copied this complete level.
++    if (sMode == PETAL_MODE_SAKURA)
++    {
++        // A true untinted source is required for the ordinary OBJ time/fade
++        // pipeline. Never copy a night-tinted BG color into the unfaded buffer.
++        palette[1] = gTileset_General.palettes[KYOTO_SAKURA_TREE_PALETTE][KYOTO_SAKURA_TREE_LIGHT];
++        palette[2] = gTileset_General.palettes[KYOTO_SAKURA_TREE_PALETTE][KYOTO_SAKURA_TREE_MIDDLE];
++        palette[3] = gTileset_General.palettes[KYOTO_SAKURA_TREE_PALETTE][KYOTO_SAKURA_TREE_DARK];
++    }
++    else
++    {
++        for (i = 0; i < 16; i++)
++            palette[i] = sAutumnPalette[i];
++    }
++
++    sPaletteIndex = LoadSpritePalette(&spritePalette);
++    if (sPaletteIndex >= 16)
++    {
++        ReleaseGraphics();
++        return FALSE;
++    }
++    sPaletteOwned = TRUE;
++    sCopiedTreeColors = FALSE;
++    UpdateSpritePaletteWithWeather(sPaletteIndex, FALSE);
++    return TRUE;
++}
++
++void Petals_BeforePaletteTransfer(void)
++{
++    u32 bank, offset;
++    if (!sLiveCount || gMain.callback2 != CB2_Overworld)
++        return;
++
++    if (sFadeTilesDirty && sTilesOwned
++     && GetSpriteTileStartByTag(PETALS_TILE_TAG) == sTileStart)
++    {
++        CpuCopy16(sFadeTiles, (u8 *)OBJ_VRAM0 + sTileStart * TILE_SIZE_4BPP, sSheets[sMode].size);
++        sFadeTilesDirty = FALSE;
++    }
++
++    if (!sPaletteOwned || sMode != PETAL_MODE_SAKURA
++     || gMapHeader.mapLayout == NULL
++     || gMapHeader.mapLayout->primaryTileset != &gTileset_General
++     || sPaletteIndex >= 16
++     || IndexOfSpritePaletteTag(KYOTO_PETALS_PALETTE_TAG) != sPaletteIndex)
++        return;
++
++    bank = MapPalettesGetPhysicalBank(KYOTO_SAKURA_TREE_PALETTE);
++    if (bank == MAP_PALETTE_NONE)
++    {
++        // Once the tree bank leaves the screen, return to the normal OBJ
++        // result. Only refresh when idle: reloading/re-tinting mid-fade could
++        // defeat the engine's deliberately skipped fade-update frames.
++        if (sCopiedTreeColors && !gPaletteFade.active
++         && gWeatherPtr->palProcessingState != WEATHER_PAL_STATE_SCREEN_FADING_IN
++         && gWeatherPtr->palProcessingState != WEATHER_PAL_STATE_SCREEN_FADING_OUT)
++        {
++            UpdateSpritePaletteWithWeather(sPaletteIndex, FALSE);
++            sCopiedTreeColors = FALSE;
++        }
++        return;
++    }
++
++    // Read the logical tree palette's CURRENT bank after every palette effect.
++    // This follows remapping, morning/evening interpolation and screen fades
++    // exactly, without reserving an additional BG bank or double-tinting.
++    offset = OBJ_PLTT_ID(sPaletteIndex);
++    gPlttBufferFaded[offset + 1] = gPlttBufferFaded[BG_PLTT_ID(bank) + KYOTO_SAKURA_TREE_LIGHT];
++    gPlttBufferFaded[offset + 2] = gPlttBufferFaded[BG_PLTT_ID(bank) + KYOTO_SAKURA_TREE_MIDDLE];
++    gPlttBufferFaded[offset + 3] = gPlttBufferFaded[BG_PLTT_ID(bank) + KYOTO_SAKURA_TREE_DARK];
++    sCopiedTreeColors = TRUE;
++}
++
++static void LockPose(struct Sprite *sprite, u32 pose)
++{
++    sprite->oam.tileNum = sprite->sheetTileStart + pose * PETALS_FRAME_TILES;
++    // Cancel the default frame-zero request before the first OAM build; this
++    // prevents the old one-frame pose flash when returning from the Bag.
++    sprite->animBeginning = FALSE;
++    sprite->animEnded = TRUE;
++    sprite->animPaused = TRUE;
++    sprite->coordOffsetEnabled = FALSE;
++}
++
++static void Sakura_Draw(struct Sprite *sprite)
++{
++    u32 phase = (u16)sprite->data[2] >> 8;
++    u32 pose = ((gSineTable[(phase + 64) & 255] + 256) * 8 + 255) >> 9;
++    sprite->x = sprite->data[0];
++    sprite->y = sprite->data[1] >> 7;
++    sprite->x2 = (gSineTable[phase] * (sprite->data[5] & 15)) >> 8;
++    sprite->y2 = 0;
++    LockPose(sprite, pose);
++}
++
++static void Sakura_Update(struct Sprite *sprite)
++{
++    s16 cameraX = gSpriteCoordOffsetX;
++    s16 cameraY = gSpriteCoordOffsetY;
++    s32 x = sprite->data[0] + (s16)(cameraX - sprite->data[6]);
++    s32 y = sprite->data[1] + (s16)(cameraY - sprite->data[7]) * 128 + sprite->data[3];
++    u16 seed = (u16)sprite->data[5] >> 4;
++
++    if (y > 176 * 128)
++    {
++        y -= 192 * 128;
++        x = ((u32)PetalRandom(&seed) * 240) >> 16;
++        sprite->data[5] = (s16)(((seed & 0xFFF) << 4) | (sprite->data[5] & 15));
++    }
++    if (y < -16 * 128)
++        y += 192 * 128;
++    if (x < -24)
++        x += 288;
++    if (x > 264)
++        x -= 288;
++
++    sprite->data[0] = x;
++    sprite->data[1] = y;
++    sprite->data[2] = (u16)(sprite->data[2] + sprite->data[4]);
++    sprite->data[6] = cameraX;
++    sprite->data[7] = cameraY;
++    Sakura_Draw(sprite);
++}
++
++static s16 WrapAutumn(s32 position, s16 low, s16 high)
++{
++    // Preserve overshoot to avoid a small pause at the wrapping boundary.
++    if (position > high * AUTUMN_Q)
++        position -= (high - low) * AUTUMN_Q;
++    if (position < low * AUTUMN_Q)
++        position += (high - low) * AUTUMN_Q;
++    return position;
++}
++
++static void AutumnWind_Draw(struct Sprite *sprite)
++{
++    u16 frame = ((sprite->data[3] >> 3) & 7) + (sprite->data[2] & 1) * 8;
++    sprite->x = sprite->data[0] >> 6;
++    sprite->y = sprite->data[1] >> 6;
++    sprite->x2 = 0;
++    sprite->y2 = gSineTable[sprite->data[3] & 255] >> 4;
++    LockPose(sprite, frame);
++}
++
++static void AutumnWind_Update(struct Sprite *sprite)
++{
++    s16 dx = (s16)(gSpriteCoordOffsetX - sprite->data[6]);
++    s16 dy = (s16)(gSpriteCoordOffsetY - sprite->data[7]);
++    s16 wave;
++    s16 gust = (gSineTable[(sGustPhase >> 8) & 255] + 256) >> 5;
++
++    sprite->data[6] = gSpriteCoordOffsetX;
++    sprite->data[7] = gSpriteCoordOffsetY;
++    sprite->data[3] = (sprite->data[3] + 1) & 511;
++    wave = gSineTable[sprite->data[3] & 255];
++    sprite->data[0] = WrapAutumn(sprite->data[0] + (s32)dx * AUTUMN_Q
++                              - 47 - gust + (wave >> 4), AUTUMN_LEFT, AUTUMN_RIGHT);
++    sprite->data[1] = WrapAutumn(sprite->data[1] + (s32)dy * AUTUMN_Q
++                              - 5, AUTUMN_TOP, AUTUMN_BOTTOM);
++    AutumnWind_Draw(sprite);
++}
++
++static void CreateParticles(void)
++{
++    u32 i, j;
++    u16 seed = 0x517B;
++    u32 count = sMode == PETAL_MODE_SAKURA ? KYOTO_SAKURA_PETAL_COUNT : KYOTO_AUTUMN_LEAF_COUNT;
++    const struct SpriteTemplate *template = sMode == PETAL_MODE_SAKURA ? &sSakuraTemplate : &sAutumnTemplate;
++    bool8 resume = CanResume();
++
++    if (sLiveCount)
++        return;
++    sFadeFrame = resume ? sSnapshot.fadeFrame : 0;
++    if (!LoadGraphics())
++        return;
++    for (i = 0; i < count; i++)
++    {
++        u8 id = CreateSpriteAtEnd(template, 0, 0, 78);
++        struct Sprite *sprite;
++        if (id >= MAX_SPRITES)
++            break;
++        sprite = &gSprites[id];
++        sSpriteIds[sLiveCount++] = id;
++        if (resume && i < sSnapshot.count)
++        {
++            for (j = 0; j < 8; j++)
++                sprite->data[j] = sSnapshot.data[i][j];
++        }
++        else if (sMode == PETAL_MODE_SAKURA)
++        {
++            sprite->data[0] = ((u32)PetalRandom(&seed) * 240) >> 16;
++            sprite->data[1] = (s16)((((u32)PetalRandom(&seed) * 192) >> 16) - 16) * 128;
++            sprite->data[2] = PetalRandom(&seed);
++            sprite->data[3] = 18 + (PetalRandom(&seed) & 7);
++            sprite->data[4] = 256 + (PetalRandom(&seed) & 127);
++            sprite->data[5] = (s16)(((PetalRandom(&seed) & 0xFFF) << 4) | (9 + (i & 3)));
++        }
++        else
++        {
++            sprite->data[0] = (((i * 47) & 255) - 8) * AUTUMN_Q;
++            sprite->data[1] = (((i * 29) & 127) + 16) * AUTUMN_Q;
++            sprite->data[2] = i & 1;
++            sprite->data[3] = i * 37;
++        }
++        // Menu reconstruction resets the camera origin. Preserve the position
++        // and pose, but rebase the camera delta before the first update.
++        sprite->data[6] = gSpriteCoordOffsetX;
++        sprite->data[7] = gSpriteCoordOffsetY;
++        if (sMode == PETAL_MODE_SAKURA)
++            Sakura_Draw(sprite);
++        else
++            AutumnWind_Draw(sprite);
++    }
++    if (!sLiveCount)
++        ReleaseGraphics();
++    sSnapshot.valid = FALSE;
++    RememberLocation();
++}
++
++static void InitParticles(u8 mode)
++{
++    if (sLiveCount && sMode != mode)
++        DestroyParticles();
++    sMode = mode;
++    gWeatherPtr->initStep = 0;
++    gWeatherPtr->weatherGfxLoaded = FALSE;
++    gWeatherPtr->targetColorMapIndex = 0;
++    gWeatherPtr->colorMapStepDelay = 20;
++    Weather_SetBlendCoeffs(8, BASE_SHADOW_INTENSITY);
++    gWeatherPtr->noShadows = FALSE;
++}
++
++static void RunParticles(void)
++{
++    bool8 hadParticles = sLiveCount != 0;
++
++    if (!gWeatherPtr->initStep || (!sLiveCount && sSnapshot.valid))
++    {
++        CreateParticles();
++        // Allocation failure must never trap the weather initialization loop.
++        gWeatherPtr->initStep = 1;
++        gWeatherPtr->weatherGfxLoaded = TRUE;
++    }
++    // The creation frame shows the exact saved opacity after a menu. Native
++    // SetNextWeather reversals retain the live sprites and ramp up from here.
++    if (hadParticles && sLiveCount && sFadeFrame < KYOTO_PETALS_FADE_FRAMES)
++    {
++        sFadeFrame++;
++        PrepareFadeTiles();
++    }
++    sGustPhase += 64;
++    RememberLocation();
++}
++
++static bool8 FinishParticles(void)
++{
++    if (!sLiveCount && CanResume())
++    {
++        CreateParticles();
++        if (sLiveCount)
++            return TRUE;
++    }
++    if (sLiveCount && sFadeFrame > 0)
++    {
++        sFadeFrame--;
++        PrepareFadeTiles();
++        sGustPhase += 64;
++        RememberLocation();
++        if (sFadeFrame > 0)
++            return TRUE;
++    }
++    DestroyParticles();
++    sSnapshot.valid = FALSE;
++    sSnapshot.count = 0;
++    sMode = PETAL_MODE_NONE;
++    sFadeFrame = 0;
++    sFadeLevel = 0xFF;
++    gWeatherPtr->weatherGfxLoaded = FALSE;
++    return FALSE;
++}
++
++void Sakura_InitVars(void) { InitParticles(PETAL_MODE_SAKURA); }
++void Sakura_Main(void) { RunParticles(); }
++void Sakura_InitAll(void) { Sakura_InitVars(); Sakura_Main(); }
++bool8 Sakura_Finish(void) { return FinishParticles(); }
++void AutumnWind_InitVars(void) { InitParticles(PETAL_MODE_AUTUMN); }
++void AutumnWind_Main(void) { RunParticles(); }
++void AutumnWind_InitAll(void) { AutumnWind_InitVars(); AutumnWind_Main(); }
++bool8 AutumnWind_Finish(void) { return FinishParticles(); }
+diff --git a/src/main.c b/src/main.c
+index 11e2f648..05986f6e 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -1,4 +1,5 @@
+ #include "global.h"
++#include "field_weather_petals.h"
+ #include "field_weather.h"
+ #include "kyoto_lighting.h"
+ #include "kyoto_lamp_mask.h"
+@@ -222,7 +223,10 @@ static void CallCallbacks(void)
+ void SetMainCallback2(MainCallback callback)
+ {
+     if (gMain.callback2 == CB2_Overworld && callback != CB2_Overworld)
++    {
+         FireflyShade_Reset();
++        Petals_Reset();
++    }
+     if (callback != CB2_Overworld)
+         Glide_Reset();
+     if (callback != CB2_Overworld)
+diff --git a/src/map_palette.c b/src/map_palette.c
+index 3cb30c4b..6b4b30fc 100644
+--- a/src/map_palette.c
++++ b/src/map_palette.c
+@@ -114,6 +114,27 @@ bool32 MapPalettesActive(void)
+     return sState != NULL;
+ }
+ 
++u32 MapPalettesGetPhysicalBank(u32 logical)
++{
++    if (logical >= MAP_PALETTES_COUNT)
++        return MAP_PALETTE_NONE;
++
++    if (sState)
++    {
++        u32 bank = sState->banks[logical];
++        if (bank >= NUM_PALS_TOTAL || sState->owners[bank] != logical
++         || (sState->reserved & (1u << bank)))
++            return MAP_PALETTE_NONE;
++        return bank;
++    }
++
++    // Maps without an extended palette profile use the original identity map.
++    // Never return the banks reserved for interface palettes.
++    if (logical >= NUM_PALS_TOTAL || !(PALETTES_MAP & (1u << logical)))
++        return MAP_PALETTE_NONE;
++    return logical;
++}
++
+ // Whether a connected map's palettes can take over the current allocation as it is: the same library on
+ // the same primary tileset. The cells of the previous map then keep valid references.
+ bool32 MapPalettesCanContinue(const struct MapLayout *layout)
+diff --git a/src/palette.c b/src/palette.c
+index d919bcf1..dcc62ae5 100644
+--- a/src/palette.c
++++ b/src/palette.c
+@@ -5,6 +5,7 @@
+ #include "util.h"
+ #include "decompress.h"
+ #include "field_weather.h"
++#include "field_weather_petals.h"
+ #include "malloc.h"
+ #include "menu.h"
+ #include "gpu_regs.h"
+@@ -132,6 +133,7 @@ void FillPalette(u32 value, u32 offset, u32 size)
+ 
+ void TransferPlttBuffer(void)
+ {
++    Petals_BeforePaletteTransfer();
+     KyotoCloud_BeforePaletteTransfer();
+     if (!gPaletteFade.bufferTransferDisabled)
+     {
+diff --git a/src/pokemon.c b/src/pokemon.c
+index b58aee0c..f1c77b90 100644
+--- a/src/pokemon.c
++++ b/src/pokemon.c
+@@ -4251,7 +4251,7 @@ bool32 DoesMonMeetAdditionalConditions(struct Pokemon *mon, const struct Evoluti
+         case IF_WEATHER:
+             if (params[i].arg1 == WEATHER_RAIN)
+             {
+-                if (weather == WEATHER_RAIN || weather == WEATHER_RAIN_THUNDERSTORM || weather == WEATHER_DOWNPOUR)
++                if (weather == WEATHER_RAIN || weather == WEATHER_RAIN_THUNDERSTORM)
+                     currentCondition = TRUE;
+             }
+             else if (params[i].arg1 == WEATHER_FOG)
+diff --git a/src/sprite.c b/src/sprite.c
+index d5fdd9db..c2af149b 100644
+--- a/src/sprite.c
++++ b/src/sprite.c
+@@ -1,4 +1,5 @@
+ #include "global.h"
++#include "field_weather_petals.h"
+ #include "field_weather.h"
+ #include "kyoto_lighting.h"
+ #include "kyoto_icons.h"
+@@ -278,6 +279,7 @@ EWRAM_DATA bool8 gAffineAnimsDisabled = FALSE;
+ 
+ void ResetSpriteData(void)
+ {
++    Petals_Reset();
+     FireflyShade_Reset();
+     KyotoLight_Reset();
+     KyotoIconReset(TRUE);
+diff --git a/test/field_weather_petals.c b/test/field_weather_petals.c
+new file mode 100644
+index 00000000..a549efa4
+--- /dev/null
++++ b/test/field_weather_petals.c
+@@ -0,0 +1,588 @@
++#include "global.h"
++#include "test/test.h"
++#include "battle_util.h"
++#include "field_weather.h"
++#include "field_weather_petals.h"
++#include "gpu_regs.h"
++#include "kyoto_petals_config.h"
++#include "main.h"
++#include "malloc.h"
++#include "map_palette.h"
++#include "overworld.h"
++#include "palette.h"
++#include "sprite.h"
++#include "task.h"
++#include "tilesets.h"
++#include "constants/battle.h"
++#include "constants/map_groups.h"
++#include "constants/rgb.h"
++#include "constants/rtc.h"
++
++// Use the actual General tree palette and engine allocator. Only the cells in
++// the visible test cache are synthetic, so residency and bank moves are real.
++struct PetalFixture
++{
++    MainCallback callback;
++    struct MapHeader mapHeader;
++    struct TimeBlendSettings timeBlend;
++    struct WarpData location;
++    struct Coords16 pos;
++    struct TilesetPaletteExtension extension;
++    struct MapPaletteProfile profile;
++    u16 *tilemaps[3];
++    u8 timeOfDay;
++    u8 savedWeather;
++};
++
++static const u16 sCells[12] = {0};
++static const u8 sTreeColors[] = {9, 10, 11};
++
++static void DrawPaletteCell(u32 offset, u32 logical)
++{
++    u8 references[12];
++    memset(references, logical, sizeof(references));
++    MapPalettesBeginFrame();
++    MapPalettesSetMetatile(offset, 0, sCells, NULL, references);
++    MapPalettesEndFrame();
++}
++
++static void SetTestTime(u32 start, u32 end, u32 weight)
++{
++    gTimeBlend.startBlend = gTimeOfDayBlend[start];
++    gTimeBlend.endBlend = gTimeOfDayBlend[end];
++    gTimeBlend.weight = weight;
++    gTimeBlend.altWeight = 256;
++    gTimeOfDay = end;
++}
++
++static void RunPetalsForTest(u32 weather)
++{
++    if (weather == WEATHER_AUTUMN_WIND)
++        AutumnWind_Main();
++    else
++        Sakura_Main();
++}
++
++static bool8 FinishPetalsForTest(u32 weather)
++{
++    return weather == WEATHER_AUTUMN_WIND ? AutumnWind_Finish() : Sakura_Finish();
++}
++
++static void DrainPetalsForTest(void)
++{
++    // Finish now owns a visible ramp. Teardown must let it release resources
++    // and invalidate its snapshot instead of leaving a partly faded effect.
++    for (u32 frame = 0; frame <= KYOTO_PETALS_FADE_FRAMES; frame++)
++        if (!Sakura_Finish())
++            break;
++}
++
++static const volatile u8 *GetPetalTilePixels(void)
++{
++    u32 tile = GetSpriteTileStartByTag(KYOTO_PETALS_PALETTE_TAG);
++    if (tile == 0xFFFF)
++        return NULL;
++    return (const volatile u8 *)(OBJ_VRAM0 + tile * TILE_SIZE_4BPP);
++}
++
++static u32 PetalCoverage(u32 bytes)
++{
++    const volatile u8 *pixels = GetPetalTilePixels();
++    u32 count = 0;
++    if (pixels == NULL)
++        return 0;
++    for (u32 i = 0; i < bytes; i++)
++    {
++        u32 pixelPair = pixels[i];
++        count += (pixelPair & 15) != 0;
++        count += (pixelPair >> 4) != 0;
++    }
++    return count;
++}
++
++static bool32 RetainedPixelsKeepTheirColor(const u8 *original, u32 bytes)
++{
++    const volatile u8 *pixels = GetPetalTilePixels();
++    if (pixels == NULL)
++        return TRUE;
++    for (u32 i = 0; i < bytes; i++)
++    {
++        u32 pixelPair = pixels[i];
++        if (((pixelPair & 15) && (pixelPair & 15) != (original[i] & 15))
++         || ((pixelPair >> 4) && (pixelPair >> 4) != (original[i] >> 4)))
++            return FALSE;
++    }
++    return TRUE;
++}
++
++static void ReachFullCoverage(u32 weather)
++{
++    for (u32 frame = 0; frame < KYOTO_PETALS_FADE_FRAMES; frame++)
++    {
++        RunPetalsForTest(weather);
++        Petals_BeforePaletteTransfer();
++    }
++}
++
++static void BeginPetalFixture(struct PetalFixture *fixture, bool32 treeVisible)
++{
++    memset(fixture, 0, sizeof(*fixture));
++    fixture->callback = gMain.callback2;
++    fixture->mapHeader = gMapHeader;
++    fixture->timeBlend = gTimeBlend;
++    fixture->timeOfDay = gTimeOfDay;
++    fixture->savedWeather = gSaveBlock1Ptr->weather;
++    fixture->location = gSaveBlock1Ptr->location;
++    fixture->pos = gSaveBlock1Ptr->pos;
++    fixture->tilemaps[0] = gOverworldTilemapBuffer_Bg1;
++    fixture->tilemaps[1] = gOverworldTilemapBuffer_Bg2;
++    fixture->tilemaps[2] = gOverworldTilemapBuffer_Bg3;
++
++    ResetSpriteData();
++    FreeAllSpritePalettes();
++    ResetPaletteFadeControl();
++    StartWeather();
++    gMapHeader = *Overworld_GetMapHeaderByGroupAndId(MAP_GROUP(MAP_LITTLEROOT_TOWN), MAP_NUM(MAP_LITTLEROOT_TOWN));
++    gSaveBlock1Ptr->location.mapGroup = MAP_GROUP(MAP_LITTLEROOT_TOWN);
++    gSaveBlock1Ptr->location.mapNum = MAP_NUM(MAP_LITTLEROOT_TOWN);
++    gSaveBlock1Ptr->pos.x = 10;
++    gSaveBlock1Ptr->pos.y = 10;
++    gOverworldTilemapBuffer_Bg1 = AllocZeroed(BG_SCREEN_SIZE);
++    gOverworldTilemapBuffer_Bg2 = AllocZeroed(BG_SCREEN_SIZE);
++    gOverworldTilemapBuffer_Bg3 = AllocZeroed(BG_SCREEN_SIZE);
++    fixture->extension.tileset = gMapHeader.mapLayout->secondaryTileset;
++    fixture->profile.layout = gMapHeader.mapLayout;
++    fixture->profile.pinnedPalettes = 1;
++    MapPalettesLoadProfile(gMapHeader.mapLayout, &fixture->extension, &fixture->profile);
++    SetTestTime(TIME_DAY, TIME_DAY, 256);
++    gWeatherPtr->currWeather = WEATHER_SAKURA_PETALS;
++    gWeatherPtr->nextWeather = WEATHER_SAKURA_PETALS;
++    gSaveBlock1Ptr->weather = WEATHER_SAKURA_PETALS;
++    gWeatherPtr->colorMapIndex = 0;
++    gWeatherPtr->palProcessingState = WEATHER_PAL_STATE_IDLE;
++    DrawPaletteCell(0, treeVisible ? 3 : 1);
++    // Do not execute the overworld callback; only expose its rendering context.
++    gMain.callback2 = CB2_Overworld;
++    Sakura_InitAll();
++}
++
++static void EndPetalFixture(struct PetalFixture *fixture)
++{
++    DrainPetalsForTest();
++    MapPalettesReset();
++    FREE_AND_SET_NULL(gOverworldTilemapBuffer_Bg1);
++    FREE_AND_SET_NULL(gOverworldTilemapBuffer_Bg2);
++    FREE_AND_SET_NULL(gOverworldTilemapBuffer_Bg3);
++    gOverworldTilemapBuffer_Bg1 = fixture->tilemaps[0];
++    gOverworldTilemapBuffer_Bg2 = fixture->tilemaps[1];
++    gOverworldTilemapBuffer_Bg3 = fixture->tilemaps[2];
++    DestroyTask(gWeatherPtr->taskId);
++    ResetPaletteFadeControl();
++    FreeAllSpritePalettes();
++    gWeatherPtr->currWeather = gWeatherPtr->nextWeather = WEATHER_NONE;
++    gWeatherPtr->palProcessingState = WEATHER_PAL_STATE_IDLE;
++    gMapHeader = fixture->mapHeader;
++    gTimeBlend = fixture->timeBlend;
++    gTimeOfDay = fixture->timeOfDay;
++    gSaveBlock1Ptr->location = fixture->location;
++    gSaveBlock1Ptr->pos = fixture->pos;
++    gSaveBlock1Ptr->weather = fixture->savedWeather;
++    gMain.callback2 = fixture->callback;
++}
++
++static bool32 PetalsMatchTree(u32 treeBank, u32 petalBank)
++{
++    if (treeBank >= 16 || petalBank >= 16)
++        return FALSE;
++    for (u32 i = 0; i < ARRAY_COUNT(sTreeColors); i++)
++        if (gPlttBufferFaded[OBJ_PLTT_ID(petalBank) + i + 1]
++         != gPlttBufferFaded[BG_PLTT_ID(treeBank) + sTreeColors[i]])
++            return FALSE;
++    return TRUE;
++}
++
++TEST("Petal weather: Sakura matches the tree through time, fades and bank relocation")
++{
++    struct PetalFixture fixture;
++    bool32 exact = TRUE;
++    u16 dayColor, nightColor;
++    u32 bank, firstBank, petalBank;
++
++    BeginPetalFixture(&fixture, TRUE);
++    firstBank = bank = MapPalettesGetPhysicalBank(3);
++    petalBank = IndexOfSpritePaletteTag(KYOTO_PETALS_PALETTE_TAG);
++    // The allocator deliberately maps logical palette 3 somewhere other than 3.
++    bool32 remapped = bank < 16 && bank != 3;
++    dayColor = gPlttBufferFaded[BG_PLTT_ID(bank) + 10];
++    Petals_BeforePaletteTransfer();
++    exact &= PetalsMatchTree(bank, petalBank);
++
++    // The map refresh can happen without an OBJ refresh. Compare what would
++    // actually be transferred, including an interpolated dusk and full night.
++    SetTestTime(TIME_DAY, TIME_NIGHT, 128);
++    ApplyWeatherToNewMapPalette(bank);
++    Petals_BeforePaletteTransfer();
++    exact &= PetalsMatchTree(bank, petalBank);
++    SetTestTime(TIME_NIGHT, TIME_NIGHT, 256);
++    ApplyWeatherToNewMapPalette(bank);
++    nightColor = gPlttBufferFaded[BG_PLTT_ID(bank) + 10];
++    Petals_BeforePaletteTransfer();
++    exact &= PetalsMatchTree(bank, petalBank);
++
++    BeginTimeOfDayPaletteFade(PALETTES_ALL, 0, 8, 16,
++                             &gTimeBlend.startBlend, &gTimeBlend.endBlend,
++                             gTimeBlend.weight, RGB_BLACK);
++    Petals_BeforePaletteTransfer();
++    exact &= PetalsMatchTree(bank, petalBank);
++
++    // Evict the tree, let another logical palette occupy its former bank, then
++    // bring the tree back while the screen fade is still in progress.
++    DrawPaletteCell(0, 1);
++    bool32 absent = MapPalettesGetPhysicalBank(3) == MAP_PALETTE_NONE;
++    DrawPaletteCell(2, 3);
++    bank = MapPalettesGetPhysicalBank(3);
++    bool32 moved = bank < 16 && bank != firstBank;
++    Petals_BeforePaletteTransfer();
++    exact &= PetalsMatchTree(bank, petalBank);
++    EndPetalFixture(&fixture);
++
++    EXPECT(remapped);
++    EXPECT(absent);
++    EXPECT(moved);
++    EXPECT_NE(dayColor, nightColor);
++    EXPECT(exact);
++}
++
++static void MenuCallbackForPetalTest(void) { }
++
++TEST("Petal weather: absent tree and non-field callbacks cannot contaminate palettes")
++{
++    struct PetalFixture fixture;
++    u16 before[PLTT_BUFFER_SIZE];
++    bool32 absent, untouchedOffscreen, untouchedMenu;
++
++    BeginPetalFixture(&fixture, FALSE);
++    absent = MapPalettesGetPhysicalBank(3) == MAP_PALETTE_NONE;
++    // A physical bank numbered 3 must not be mistaken for logical palette 3.
++    gPlttBufferFaded[BG_PLTT_ID(3) + 9] = RGB(31, 0, 31);
++    memcpy(before, gPlttBufferFaded, sizeof(before));
++    Petals_BeforePaletteTransfer();
++    untouchedOffscreen = !memcmp(before, gPlttBufferFaded, sizeof(before));
++
++    DrawPaletteCell(2, 3);
++    // Retain the allocated effect to exercise the callback guard independently
++    // of the callback-transition cleanup hook.
++    gMain.callback2 = MenuCallbackForPetalTest;
++    memcpy(before, gPlttBufferFaded, sizeof(before));
++    Petals_BeforePaletteTransfer();
++    untouchedMenu = !memcmp(before, gPlttBufferFaded, sizeof(before));
++    EndPetalFixture(&fixture);
++
++    EXPECT(absent);
++    EXPECT(untouchedOffscreen);
++    EXPECT(untouchedMenu);
++}
++
++struct PetalAppearance
++{
++    s16 x, y, x2, y2;
++    u16 tile;
++    u8 spriteId;
++};
++
++static u32 CapturePetalAppearance(struct PetalAppearance *appearance)
++{
++    u32 count = 0;
++    u32 palette = IndexOfSpritePaletteTag(KYOTO_PETALS_PALETTE_TAG);
++    for (u32 i = 0; i < MAX_SPRITES; i++)
++    {
++        const struct Sprite *sprite = &gSprites[i];
++        if (!sprite->inUse || palette >= 16 || sprite->oam.paletteNum != palette)
++            continue;
++        if (count < KYOTO_SAKURA_PETAL_COUNT)
++        {
++            appearance[count].x = sprite->x;
++            appearance[count].y = sprite->y;
++            appearance[count].x2 = sprite->x2;
++            appearance[count].y2 = sprite->y2;
++            appearance[count].tile = sprite->oam.tileNum - sprite->sheetTileStart;
++            appearance[count].spriteId = i;
++        }
++        count++;
++    }
++    return count;
++}
++
++TEST("Petal weather: menu recreation and weather cleanup preserve unrelated sprites")
++{
++    struct PetalFixture fixture;
++    struct PetalAppearance before[KYOTO_SAKURA_PETAL_COUNT] = {0};
++    struct PetalAppearance after[KYOTO_SAKURA_PETAL_COUNT] = {0};
++    const u16 otherColors[16] = {[0 ... 15] = RGB(5, 10, 20)};
++    const u16 otherTag = 0x7011;
++    u32 beforeCount, afterCount, autumnCount, liveAfterReset = 0;
++    u32 fullCoverage, beforeCoverage, afterCoverage;
++    bool32 released, unrelatedSurvived, sameAppearance, finishReleased;
++    bool32 resumedOutgoingWeather, keptDestinationWeather, continuedFade;
++
++    BeginPetalFixture(&fixture, TRUE);
++    u32 otherPalette = AllocSpritePalette(otherTag);
++    u32 otherSprite = CreateSprite(&gDummySpriteTemplate, 100, 80, 0);
++    gSprites[otherSprite].oam.paletteNum = otherPalette;
++    LoadPalette(otherColors, OBJ_PLTT_ID(otherPalette), sizeof(otherColors));
++    ReachFullCoverage(WEATHER_SAKURA_PETALS);
++    fullCoverage = PetalCoverage(9 * 128);
++    gSaveBlock1Ptr->weather = WEATHER_SUNNY;
++    SetNextWeather(WEATHER_SUNNY);
++    for (u32 frame = 0; frame < KYOTO_PETALS_FADE_FRAMES / 2; frame++)
++    {
++        Sakura_Finish();
++        AnimateSprites();
++        Petals_BeforePaletteTransfer();
++    }
++    beforeCount = CapturePetalAppearance(before);
++    beforeCoverage = PetalCoverage(9 * 128);
++
++    // Use the real callback switch: it must clean up the weather without a
++    // global sprite reset, because the next screen may reuse its resources.
++    SetMainCallback2(MenuCallbackForPetalTest);
++    released = IndexOfSpritePaletteTag(KYOTO_PETALS_PALETTE_TAG) >= 16;
++    for (u32 i = 0; i < MAX_SPRITES; i++)
++        liveAfterReset += gSprites[i].inUse;
++    unrelatedSurvived = gSprites[otherSprite].inUse
++                    && gSprites[otherSprite].x == 100
++                    && gSprites[otherSprite].y == 80
++                    && IndexOfSpritePaletteTag(otherTag) == otherPalette
++                    && !memcmp(otherColors, &gPlttBufferFaded[OBJ_PLTT_ID(otherPalette)], sizeof(otherColors));
++
++    // Match the return-from-Bag path: weather tasks are reconstructed from
++    // saved destination weather while the outgoing Sakura is still fading.
++    DestroyTask(gWeatherPtr->taskId);
++    StartWeather();
++    ResumePausedWeather();
++    resumedOutgoingWeather = gWeatherPtr->currWeather == WEATHER_SAKURA_PETALS;
++    keptDestinationWeather = gWeatherPtr->nextWeather == WEATHER_SUNNY;
++    SetMainCallback2(CB2_Overworld);
++    Sakura_InitAll();
++    Petals_BeforePaletteTransfer();
++    afterCount = CapturePetalAppearance(after);
++    afterCoverage = PetalCoverage(9 * 128);
++    sameAppearance = !memcmp(before, after, sizeof(before));
++    continuedFade = Sakura_Finish();
++    Petals_BeforePaletteTransfer();
++    continuedFade &= PetalCoverage(9 * 128) <= afterCoverage;
++
++    DrainPetalsForTest();
++    gWeatherPtr->currWeather = gWeatherPtr->nextWeather = WEATHER_AUTUMN_WIND;
++    AutumnWind_InitAll();
++    autumnCount = CapturePetalAppearance(after);
++    DrainPetalsForTest();
++    finishReleased = IndexOfSpritePaletteTag(KYOTO_PETALS_PALETTE_TAG) >= 16
++                  && gSprites[otherSprite].inUse
++                  && IndexOfSpritePaletteTag(otherTag) == otherPalette
++                  && !memcmp(otherColors, &gPlttBufferFaded[OBJ_PLTT_ID(otherPalette)], sizeof(otherColors));
++    DestroySprite(&gSprites[otherSprite]);
++    FreeSpritePaletteByTag(otherTag);
++    EndPetalFixture(&fixture);
++
++    EXPECT_EQ(beforeCount, KYOTO_SAKURA_PETAL_COUNT);
++    EXPECT_EQ(liveAfterReset, 1);
++    EXPECT(released);
++    EXPECT(unrelatedSurvived);
++    EXPECT_EQ(afterCount, beforeCount);
++    EXPECT(sameAppearance);
++    EXPECT_GT(beforeCoverage, 0);
++    EXPECT_LT(beforeCoverage, fullCoverage);
++    EXPECT_EQ(afterCoverage, beforeCoverage);
++    EXPECT(resumedOutgoingWeather);
++    EXPECT(keptDestinationWeather);
++    EXPECT(continuedFade);
++    EXPECT_EQ(autumnCount, KYOTO_AUTUMN_LEAF_COUNT);
++    EXPECT(finishReleased);
++}
++
++TEST("Petal weather: gradual fades preserve source colors and shared blending")
++{
++    static const u8 weathers[] = {WEATHER_SAKURA_PETALS, WEATHER_AUTUMN_WIND};
++
++    for (u32 effect = 0; effect < ARRAY_COUNT(weathers); effect++)
++    {
++        struct PetalFixture fixture;
++        u32 weather = weathers[effect];
++        u32 bytes = weather == WEATHER_SAKURA_PETALS ? 9 * 128 : 16 * 128;
++        u32 expectedCount = weather == WEATHER_SAKURA_PETALS ? KYOTO_SAKURA_PETAL_COUNT : KYOTO_AUTUMN_LEAF_COUNT;
++        struct PetalAppearance appearance[KYOTO_SAKURA_PETAL_COUNT] = {0};
++        u16 fullPalette[16];
++        u8 *fullSheet = Alloc(bytes);
++        u32 previous, full, outChanges = 0, inChanges = 0;
++        u32 endFrame = 0, palette, bank;
++        u16 blend;
++        u8 eva, evb;
++        bool32 monotonicOut = TRUE, monotonicIn = TRUE, colorsStable = TRUE;
++        bool32 paletteStable = TRUE, blendStable = TRUE, populationStable = TRUE;
++
++        EXPECT(fullSheet != NULL);
++        BeginPetalFixture(&fixture, TRUE);
++        if (weather == WEATHER_AUTUMN_WIND)
++        {
++            DrainPetalsForTest();
++            gWeatherPtr->currWeather = gWeatherPtr->nextWeather = weather;
++            AutumnWind_InitAll();
++        }
++        SetTestTime(TIME_NIGHT, TIME_NIGHT, 256);
++        bank = MapPalettesGetPhysicalBank(3);
++        ApplyWeatherToNewMapPalette(bank);
++        palette = IndexOfSpritePaletteTag(KYOTO_PETALS_PALETTE_TAG);
++        UpdateSpritePaletteWithWeather(palette, FALSE);
++        ReachFullCoverage(weather);
++        full = previous = PetalCoverage(bytes);
++        const volatile u8 *pixels = GetPetalTilePixels();
++        for (u32 i = 0; i < bytes; i++)
++            fullSheet[i] = pixels[i];
++        memcpy(fullPalette, &gPlttBufferFaded[OBJ_PLTT_ID(palette)], sizeof(fullPalette));
++        blend = GetGpuReg(REG_OFFSET_BLDALPHA);
++        eva = gWeatherPtr->currBlendEVA;
++        evb = gWeatherPtr->currBlendEVB;
++
++        SetNextWeather(WEATHER_SUNNY);
++        for (u32 frame = 1; frame <= KYOTO_PETALS_FADE_FRAMES; frame++)
++        {
++            bool8 continuing = FinishPetalsForTest(weather);
++            Petals_BeforePaletteTransfer();
++            u32 coverage = PetalCoverage(bytes);
++            monotonicOut &= coverage <= previous;
++            outChanges += coverage < previous;
++            colorsStable &= RetainedPixelsKeepTheirColor(fullSheet, bytes);
++            if (continuing)
++            {
++                populationStable &= CapturePetalAppearance(appearance) == expectedCount;
++                paletteStable &= !memcmp(fullPalette, &gPlttBufferFaded[OBJ_PLTT_ID(palette)], sizeof(fullPalette));
++                if (weather == WEATHER_SAKURA_PETALS)
++                    paletteStable &= PetalsMatchTree(bank, palette);
++            }
++            else if (!endFrame)
++            {
++                endFrame = frame;
++            }
++            blendStable &= GetGpuReg(REG_OFFSET_BLDALPHA) == blend
++                        && gWeatherPtr->currBlendEVA == eva && gWeatherPtr->currBlendEVB == evb
++                        && gWeatherPtr->targetBlendEVA == eva && gWeatherPtr->targetBlendEVB == evb;
++            previous = coverage;
++        }
++        bool32 released = IndexOfSpritePaletteTag(KYOTO_PETALS_PALETTE_TAG) >= 16
++                       && GetSpriteTileStartByTag(KYOTO_PETALS_PALETTE_TAG) == 0xFFFF;
++        gWeatherPtr->currWeather = gWeatherPtr->nextWeather = weather;
++        if (weather == WEATHER_AUTUMN_WIND)
++            AutumnWind_InitAll();
++        else
++            Sakura_InitAll();
++        Petals_BeforePaletteTransfer();
++        u32 initialCoverage = previous = PetalCoverage(bytes);
++        for (u32 frame = 0; frame < KYOTO_PETALS_FADE_FRAMES; frame++)
++        {
++            RunPetalsForTest(weather);
++            Petals_BeforePaletteTransfer();
++            u32 coverage = PetalCoverage(bytes);
++            monotonicIn &= coverage >= previous;
++            inChanges += coverage > previous;
++            colorsStable &= RetainedPixelsKeepTheirColor(fullSheet, bytes);
++            populationStable &= CapturePetalAppearance(appearance) == expectedCount;
++            blendStable &= GetGpuReg(REG_OFFSET_BLDALPHA) == blend;
++            previous = coverage;
++        }
++        u32 finalCoverage = previous;
++        FREE_AND_SET_NULL(fullSheet);
++        EndPetalFixture(&fixture);
++
++        EXPECT_GT(full, 8);
++        EXPECT(monotonicOut);
++        EXPECT(monotonicIn);
++        EXPECT_GT(outChanges, 8);
++        EXPECT_GT(inChanges, 8);
++        EXPECT_EQ(endFrame, KYOTO_PETALS_FADE_FRAMES);
++        EXPECT(released);
++        EXPECT_EQ(initialCoverage, 0);
++        EXPECT_EQ(finalCoverage, full);
++        EXPECT(colorsStable);
++        EXPECT(paletteStable);
++        EXPECT(blendStable);
++        EXPECT(populationStable);
++    }
++}
++
++TEST("Petal weather: returning during fade reverses it without recreating petals")
++{
++    struct PetalFixture fixture;
++    struct PetalAppearance before[KYOTO_SAKURA_PETAL_COUNT] = {0};
++    struct PetalAppearance after[KYOTO_SAKURA_PETAL_COUNT] = {0};
++    u32 full, partial, atReversal, afterFirstTick, previous;
++    bool32 sameAppearance, monotonic = TRUE;
++
++    BeginPetalFixture(&fixture, TRUE);
++    ReachFullCoverage(WEATHER_SAKURA_PETALS);
++    full = PetalCoverage(9 * 128);
++    SetNextWeather(WEATHER_SUNNY);
++    for (u32 frame = 0; frame < KYOTO_PETALS_FADE_FRAMES / 2; frame++)
++    {
++        Sakura_Finish();
++        AnimateSprites();
++        Petals_BeforePaletteTransfer();
++    }
++    partial = PetalCoverage(9 * 128);
++    u32 beforeCount = CapturePetalAppearance(before);
++
++    // This is the native route-back cancellation path, including its InitVars
++    // call for the still-current outgoing weather.
++    SetNextWeather(WEATHER_SAKURA_PETALS);
++    Petals_BeforePaletteTransfer();
++    u32 afterCount = CapturePetalAppearance(after);
++    atReversal = PetalCoverage(9 * 128);
++    sameAppearance = !memcmp(before, after, sizeof(before));
++    Sakura_Main();
++    Petals_BeforePaletteTransfer();
++    afterFirstTick = previous = PetalCoverage(9 * 128);
++    for (u32 frame = 0; frame < KYOTO_PETALS_FADE_FRAMES; frame++)
++    {
++        Sakura_Main();
++        Petals_BeforePaletteTransfer();
++        u32 coverage = PetalCoverage(9 * 128);
++        monotonic &= coverage >= previous;
++        previous = coverage;
++    }
++    u32 finalCount = CapturePetalAppearance(after);
++    EndPetalFixture(&fixture);
++
++    EXPECT_GT(partial, 0);
++    EXPECT_LT(partial, full);
++    EXPECT_EQ(beforeCount, KYOTO_SAKURA_PETAL_COUNT);
++    EXPECT_EQ(afterCount, beforeCount);
++    EXPECT(sameAppearance);
++    EXPECT_EQ(atReversal, partial);
++    EXPECT_GE(afterFirstTick, partial);
++    EXPECT_LT(afterFirstTick, full);
++    EXPECT(monotonic);
++    EXPECT_EQ(previous, full);
++    EXPECT_EQ(finalCount, beforeCount);
++}
++
++TEST("Petal weather: saved map IDs stay stable and leaves do not cause battle rain")
++{
++    static const enum OverworldWeather oldIds[] =
++    {
++        WEATHER_NONE, WEATHER_SUNNY_CLOUDS, WEATHER_SUNNY, WEATHER_RAIN,
++        WEATHER_SNOW, WEATHER_RAIN_THUNDERSTORM, WEATHER_FOG_HORIZONTAL,
++        WEATHER_VOLCANIC_ASH, WEATHER_SANDSTORM, WEATHER_FOG_DIAGONAL,
++        WEATHER_UNDERWATER, WEATHER_SHADE, WEATHER_DROUGHT, WEATHER_DOWNPOUR,
++        WEATHER_UNDERWATER_BUBBLES, WEATHER_ABNORMAL, WEATHER_ROUTE119_CYCLE,
++        WEATHER_ROUTE123_CYCLE, WEATHER_FOG, WEATHER_DYNAMIC,
++    };
++    for (u32 i = 0; i < ARRAY_COUNT(oldIds); i++)
++        EXPECT_EQ(oldIds[i], i);
++    EXPECT_EQ(WEATHER_SAKURA_PETALS, 13);
++    EXPECT_EQ(WEATHER_AUTUMN_WIND, 20);
++    EXPECT_GE(WEATHER_COUNT, 21);
++    EXPECT_EQ(GetWeatherFromOverworldWeather(WEATHER_SAKURA_PETALS), B_WEATHER_NONE);
++    EXPECT_EQ(GetWeatherFromOverworldWeather(WEATHER_AUTUMN_WIND), B_WEATHER_NONE);
++    EXPECT_EQ(GetWeatherFromOverworldWeather(WEATHER_RAIN), B_WEATHER_RAIN_NORMAL);
++    EXPECT_EQ(GetWeatherFromOverworldWeather(WEATHER_RAIN_THUNDERSTORM), B_WEATHER_RAIN_NORMAL);
++}

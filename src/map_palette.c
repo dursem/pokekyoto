@@ -114,6 +114,27 @@ bool32 MapPalettesActive(void)
     return sState != NULL;
 }
 
+u32 MapPalettesGetPhysicalBank(u32 logical)
+{
+    if (logical >= MAP_PALETTES_COUNT)
+        return MAP_PALETTE_NONE;
+
+    if (sState)
+    {
+        u32 bank = sState->banks[logical];
+        if (bank >= NUM_PALS_TOTAL || sState->owners[bank] != logical
+         || (sState->reserved & (1u << bank)))
+            return MAP_PALETTE_NONE;
+        return bank;
+    }
+
+    // Maps without an extended palette profile use the original identity map.
+    // Never return the banks reserved for interface palettes.
+    if (logical >= NUM_PALS_TOTAL || !(PALETTES_MAP & (1u << logical)))
+        return MAP_PALETTE_NONE;
+    return logical;
+}
+
 // Whether a connected map's palettes can take over the current allocation as it is: the same library on
 // the same primary tileset. The cells of the previous map then keep valid references.
 bool32 MapPalettesCanContinue(const struct MapLayout *layout)

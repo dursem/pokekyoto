@@ -2917,7 +2917,6 @@ bool32 TryFieldEffects(enum FieldEffectCases caseId)
             {
             case WEATHER_RAIN:
             case WEATHER_RAIN_THUNDERSTORM:
-            case WEATHER_DOWNPOUR:
                 if (!(gBattleWeather & B_WEATHER_RAIN))
                 {
                     gBattleWeather = B_WEATHER_RAIN_NORMAL;
@@ -11450,7 +11449,8 @@ u32 GetWeatherFromOverworldWeather(u32 owWeather)
     case WEATHER_UNDERWATER:            return B_WEATHER_NONE;
     case WEATHER_SHADE:                 return B_WEATHER_NONE;
     case WEATHER_DROUGHT:               return B_WEATHER_SUN_NORMAL;
-    case WEATHER_DOWNPOUR:              return B_WEATHER_RAIN_NORMAL;
+    case WEATHER_DOWNPOUR:              return B_WEATHER_NONE;
+    case WEATHER_AUTUMN_WIND:           return B_WEATHER_NONE;
     case WEATHER_UNDERWATER_BUBBLES:    return B_WEATHER_NONE;
     case WEATHER_ABNORMAL:              return B_WEATHER_NONE;
     case WEATHER_ROUTE119_CYCLE:        return B_WEATHER_NONE;
@@ -11478,6 +11478,7 @@ enum BattleTerrain GetBattleTerrainFromOverworldWeather(u32 owWeather)
     case WEATHER_SHADE:                 return B_TERRAIN_NONE;
     case WEATHER_DROUGHT:               return B_TERRAIN_NONE;
     case WEATHER_DOWNPOUR:              return B_TERRAIN_NONE;
+    case WEATHER_AUTUMN_WIND:           return B_TERRAIN_NONE;
     case WEATHER_UNDERWATER_BUBBLES:    return B_TERRAIN_NONE;
     case WEATHER_ABNORMAL:              return B_TERRAIN_NONE;
     case WEATHER_ROUTE119_CYCLE:        return B_TERRAIN_NONE;

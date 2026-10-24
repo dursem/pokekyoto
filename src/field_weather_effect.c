@@ -4,6 +4,7 @@
 #include "event_object_movement.h"
 #include "fieldmap.h"
 #include "field_weather.h"
+#include "field_weather_petals.h"
 #include "overworld.h"
 #include "random.h"
 #include "script.h"
@@ -413,8 +414,7 @@ bool8 Rain_Finish(void)
     {
     case 0:
         if (gWeatherPtr->nextWeather == WEATHER_RAIN
-         || gWeatherPtr->nextWeather == WEATHER_RAIN_THUNDERSTORM
-         || gWeatherPtr->nextWeather == WEATHER_DOWNPOUR)
+         || gWeatherPtr->nextWeather == WEATHER_RAIN_THUNDERSTORM)
         {
             gWeatherPtr->finishStep = 0xFF;
             return FALSE;
@@ -1089,8 +1089,7 @@ bool8 Thunderstorm_Finish(void)
         if (gWeatherPtr->thunderAllowEnd)
         {
             if (gWeatherPtr->nextWeather == WEATHER_RAIN
-             || gWeatherPtr->nextWeather == WEATHER_RAIN_THUNDERSTORM
-             || gWeatherPtr->nextWeather == WEATHER_DOWNPOUR)
+             || gWeatherPtr->nextWeather == WEATHER_RAIN_THUNDERSTORM)
                 return FALSE;
 
             gWeatherPtr->targetRainSpriteCount = 0;
@@ -2373,24 +2372,24 @@ static void CreateAbnormalWeatherTask(void)
     s16 *data = gTasks[taskId].data;
 
     tDelay = 600;
-    if (sCurrentAbnormalWeather == WEATHER_DOWNPOUR)
+    if (sCurrentAbnormalWeather == WEATHER_RAIN_THUNDERSTORM)
     {
-        // Currently Downpour, next will be Drought
+        // Currently Thunderstorm, next will be Drought
         tWeatherA = WEATHER_DROUGHT;
-        tWeatherB = WEATHER_DOWNPOUR;
+        tWeatherB = WEATHER_RAIN_THUNDERSTORM;
     }
     else if (sCurrentAbnormalWeather == WEATHER_DROUGHT)
     {
-        // Currently Drought, next will be Downpour
-        tWeatherA = WEATHER_DOWNPOUR;
+        // Currently Drought, next will be Thunderstorm
+        tWeatherA = WEATHER_RAIN_THUNDERSTORM;
         tWeatherB = WEATHER_DROUGHT;
     }
     else
     {
-        // Default to starting with Downpour
-        sCurrentAbnormalWeather = WEATHER_DOWNPOUR;
+        // Default to starting with Thunderstorm
+        sCurrentAbnormalWeather = WEATHER_RAIN_THUNDERSTORM;
         tWeatherA = WEATHER_DROUGHT;
-        tWeatherB = WEATHER_DOWNPOUR;
+        tWeatherB = WEATHER_RAIN_THUNDERSTORM;
     }
 }
 
@@ -2442,7 +2441,7 @@ void DoCurrentWeather(void)
     {
         if (FuncIsActiveTask(Task_DoAbnormalWeather))
             DestroyTask(FindTaskIdByFunc(Task_DoAbnormalWeather));
-        sCurrentAbnormalWeather = WEATHER_DOWNPOUR;
+        sCurrentAbnormalWeather = WEATHER_RAIN_THUNDERSTORM;
     }
     SetNextWeather(weather);
 }
@@ -2450,6 +2449,7 @@ void DoCurrentWeather(void)
 void ResumePausedWeather(void)
 {
     u8 weather = GetSavedWeather();
+    u8 resumeWeather;
 
     if (weather == WEATHER_ABNORMAL)
     {
@@ -2461,9 +2461,12 @@ void ResumePausedWeather(void)
     {
         if (FuncIsActiveTask(Task_DoAbnormalWeather))
             DestroyTask(FindTaskIdByFunc(Task_DoAbnormalWeather));
-        sCurrentAbnormalWeather = WEATHER_DOWNPOUR;
+        sCurrentAbnormalWeather = WEATHER_RAIN_THUNDERSTORM;
     }
-    SetCurrentAndNextWeather(weather);
+    resumeWeather = Petals_GetResumeWeather(weather);
+    SetCurrentAndNextWeather(resumeWeather);
+    if (resumeWeather != weather)
+        SetNextWeather(weather);
 }
 
 #define WEATHER_CYCLE_LENGTH  4
@@ -2578,6 +2581,7 @@ static enum OverworldWeather TranslateWeatherNum(enum OverworldWeather weather)
     case WEATHER_ROUTE119_CYCLE:     return sWeatherCycleRoute119[gSaveBlock1Ptr->weatherCycleStage];
     case WEATHER_ROUTE123_CYCLE:     return sWeatherCycleRoute123[gSaveBlock1Ptr->weatherCycleStage];
     case WEATHER_DYNAMIC:            return GetDynamicWeather();
+    case WEATHER_AUTUMN_WIND:        return WEATHER_AUTUMN_WIND;
     }
 
     return WEATHER_NONE;

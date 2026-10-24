@@ -7,6 +7,7 @@
 #include "decompress.h"
 #include "event_object_movement.h"
 #include "field_weather.h"
+#include "field_weather_petals.h"
 #include "fieldmap.h"
 #include "main.h"
 #include "menu.h"
@@ -141,8 +142,9 @@ static const struct WeatherCallbacks sWeatherFuncs[] =
     [WEATHER_UNDERWATER]         = {FogHorizontal_InitVars, FogHorizontal_Main, FogHorizontal_InitAll, FogHorizontal_Finish},
     [WEATHER_SHADE]              = {FireflyShade_InitVars,   FireflyShade_Main,   FireflyShade_InitAll,   FireflyShade_Finish},
     [WEATHER_DROUGHT]            = {Drought_InitVars,       Drought_Main,       Drought_InitAll,       Drought_Finish},
-    [WEATHER_DOWNPOUR]           = {Downpour_InitVars,      Thunderstorm_Main,  Downpour_InitAll,      Thunderstorm_Finish},
+    [WEATHER_DOWNPOUR]           = {Sakura_InitVars,        Sakura_Main,        Sakura_InitAll,        Sakura_Finish},
     [WEATHER_UNDERWATER_BUBBLES] = {Bubbles_InitVars,       Bubbles_Main,       Bubbles_InitAll,       Bubbles_Finish},
+    [WEATHER_AUTUMN_WIND]        = {AutumnWind_InitVars,    AutumnWind_Main,    AutumnWind_InitAll,    AutumnWind_Finish},
 };
 
 void (*const gWeatherPalStateFuncs[])(void) =
@@ -228,7 +230,7 @@ void StartWeather(void)
 
 void SetNextWeather(u8 weather)
 {
-    if (weather != WEATHER_RAIN && weather != WEATHER_RAIN_THUNDERSTORM && weather != WEATHER_DOWNPOUR)
+    if (weather != WEATHER_RAIN && weather != WEATHER_RAIN_THUNDERSTORM)
     {
         PlayRainStoppingSoundEffect();
     }
@@ -365,7 +367,6 @@ static void FadeInScreenWithWeather(void)
     {
     case WEATHER_RAIN:
     case WEATHER_RAIN_THUNDERSTORM:
-    case WEATHER_DOWNPOUR:
         if (FadeInScreen_RainShowShade() == FALSE)
         {
             gWeatherPtr->colorMapIndex = 3;
@@ -760,7 +761,6 @@ void FadeSelectedPals(u8 mode, s8 delay, u32 selectedPalettes)
     {
     case WEATHER_RAIN:
     case WEATHER_RAIN_THUNDERSTORM:
-    case WEATHER_DOWNPOUR:
     case WEATHER_FOG_HORIZONTAL:
     case WEATHER_DROUGHT:
         useWeatherPal = TRUE;
@@ -907,7 +907,6 @@ void ApplyWeatherToNewMapPalette(u32 bank)
         {
         case WEATHER_RAIN:
         case WEATHER_RAIN_THUNDERSTORM:
-        case WEATHER_DOWNPOUR:
             ApplyColorMapWithBlend(bank, 1, 3, coeff, gWeatherPtr->fadeDestColor);
             return;
         case WEATHER_DROUGHT:
@@ -1235,18 +1234,20 @@ static const u8 sWeatherNames[WEATHER_COUNT][24] = {
     [WEATHER_UNDERWATER]         = _("UNDERWATER"),
     [WEATHER_SHADE]              = _("FIREFLIES"),
     [WEATHER_DROUGHT]            = _("DROUGHT"),
-    [WEATHER_DOWNPOUR]           = _("DOWNPOUR"),
+    [WEATHER_DOWNPOUR]           = _("SAKURA PETALS"),
     [WEATHER_UNDERWATER_BUBBLES] = _("UNDERWATER BUBBLES"),
     [WEATHER_ABNORMAL]           = _("ABNORMAL(NOT WORKING)"),
     [WEATHER_ROUTE119_CYCLE]     = _("ROUTE119 CYCLE"),
     [WEATHER_ROUTE123_CYCLE]     = _("ROUTE123 CYCLE"),
     [WEATHER_FOG]                = _("FOG"),
+    [WEATHER_DYNAMIC]            = _("DYNAMIC"),
+    [WEATHER_AUTUMN_WIND]        = _("AUTUMN WIND"),
 };
 
 static const u8 sDebugText_WeatherNotDefined[] = _("NOT DEFINED!!!");
 const u8 *GetWeatherName(u32 weatherId)
 {
-    if (sWeatherNames[weatherId][0] != 0)
+    if (weatherId < ARRAY_COUNT(sWeatherNames) && sWeatherNames[weatherId][0] != 0)
         return sWeatherNames[weatherId];
     return sDebugText_WeatherNotDefined;
 }
