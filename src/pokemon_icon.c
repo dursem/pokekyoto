@@ -330,6 +330,7 @@ void SpriteCB_MonIcon(struct Sprite *sprite)
     UpdateMonIconFrame(sprite);
 }
 
+
 const u8 *GetMonIconTiles(enum Species species, u32 personality)
 {
     return GetMonIconTilesIsEgg(species, personality, FALSE);
