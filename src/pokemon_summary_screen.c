@@ -4676,15 +4676,17 @@ static u8 CreateMonSprite(struct Pokemon *unused)
 
 static void SpriteCB_Pokemon(struct Sprite *sprite)
 {
-    struct PokeSummary *summary = &sMonSummaryScreen->summary;
-
-    if (!gPaletteFade.active && sprite->data[2] != 1)
+    // PokeKyoto: keep the large Pokemon portrait on the Summary/Info screen static.
+    // The cry still plays once, but PokemonSummaryDoMonAnimation is deliberately skipped.
+    if (!gPaletteFade.active)
     {
-        sprite->data[1] = IsMonSpriteNotFlipped(sprite->data[0]);
         PlayMonCry();
-        PokemonSummaryDoMonAnimation(sprite, sprite->data[0], summary->isEgg);
+        sprite->animPaused = TRUE;
+        sprite->data[2] = 1;
+        sprite->callback = SpriteCallbackDummy;
     }
 }
+
 
 // Track and then destroy Task_PokemonSummaryAnimateAfterDelay
 // Normally destroys itself but it can be interrupted before the animation starts
