@@ -33,6 +33,9 @@ extern const struct TilesetPaletteExtension gTilesetPaletteExtensions[];
 extern const struct MapPaletteProfile gMapPaletteProfiles[];
 
 bool32 MapPalettesActive(void);
+// Read the current bank without allocating a palette or changing tilemaps.
+// Returns MAP_PALETTE_NONE when the logical palette is not resident.
+u32 MapPalettesGetPhysicalBank(u32 logical);
 bool32 MapPalettesCanContinue(const struct MapLayout *layout);
 u32 MapPalettesMetatileCount(const struct Tileset *tileset, u32 fallback);
 void MapPalettesReset(void);

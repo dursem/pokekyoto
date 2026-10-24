@@ -1954,7 +1954,7 @@ static const struct DebugSelectionStep sWeatherSelectionStep = {
     .stepUpdate = DebugSelectionStep_UpdateWeather,
     .stepConfirm = DebugSelectionStep_GenericInputConfirm,
     .minValue = WEATHER_NONE,
-    .maxValue = WEATHER_DYNAMIC - 1,
+    .maxValue = WEATHER_COUNT - 1,
     .digits = 2
 };
 

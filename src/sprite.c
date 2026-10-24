@@ -1,4 +1,5 @@
 #include "global.h"
+#include "field_weather_petals.h"
 #include "field_weather.h"
 #include "kyoto_lighting.h"
 #include "kyoto_icons.h"
@@ -278,6 +279,7 @@ EWRAM_DATA bool8 gAffineAnimsDisabled = FALSE;
 
 void ResetSpriteData(void)
 {
+    Petals_Reset();
     FireflyShade_Reset();
     KyotoLight_Reset();
     KyotoIconReset(TRUE);

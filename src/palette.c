@@ -5,6 +5,7 @@
 #include "util.h"
 #include "decompress.h"
 #include "field_weather.h"
+#include "field_weather_petals.h"
 #include "malloc.h"
 #include "menu.h"
 #include "gpu_regs.h"
@@ -132,6 +133,7 @@ void FillPalette(u32 value, u32 offset, u32 size)
 
 void TransferPlttBuffer(void)
 {
+    Petals_BeforePaletteTransfer();
     KyotoCloud_BeforePaletteTransfer();
     if (!gPaletteFade.bufferTransferDisabled)
     {
