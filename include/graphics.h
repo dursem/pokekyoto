@@ -214,6 +214,9 @@ extern const u32 gKyotoBattleActionNameBg[];
 extern const u32 gKyotoBattleMessageTiles[];
 extern const u16 gKyotoBattleMessageTilemap[];
 extern const u16 gKyotoBattleUiPalette[];
+extern const u32 gKyotoBattleMoveTiles[];
+extern const u16 gKyotoBattleMoveTilemap[];
+extern const u16 gKyotoBattleMoveCursorTilemap[];
 extern const u32 gVsLettersGfx[];
 extern const u32 gBattleVSFrame_Gfx[];
 extern const u16 gBattleVSFrame_Pal[];
@@ -222,6 +225,11 @@ extern const u32 gMultiBattleIntroBg_Opponent_Tilemap[];
 extern const u32 gMultiBattleIntroBg_Player_Tilemap[];
 
 // battle environments
+// PokéKyoto V6.4 Land battle background
+extern const u32 gBattleEnvironmentTiles_KyotoLand[];
+extern const u32 gBattleEnvironmentTilemap_KyotoLand[];
+extern const u16 gBattleEnvironmentPalette_KyotoLand[];
+
 extern const u32 gBattleEnvironmentTiles_TallGrass[];
 extern const u32 gBattleEnvironmentTilemap_TallGrass[];
 extern const u32 gBattleEnvironmentAnimTiles_TallGrass[];

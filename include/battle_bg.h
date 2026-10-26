@@ -24,5 +24,7 @@ bool8 LoadChosenBattleElement(u8 caseId);
 void DrawTerrainTypeBattleBackground(void);
 void LoadKyotoBattleActionUi(void);
 void LoadKyotoBattleMessageUi(void);
+void LoadKyotoBattleMoveUi(void);
+void LoadKyotoBattleMoveTiles(void);
 
 #endif // GUARD_BATTLE_BG_H

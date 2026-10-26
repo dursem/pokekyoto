@@ -186,7 +186,7 @@ static const struct WindowTemplate sStandardBattleWindowTemplates[] =
         .tilemapTop = 55,
         .width = 16,    //for z move names
         .height = 2,
-        .paletteNum = 5,
+        .paletteNum = 12,
         .baseBlock = 0x0300,
     },
     [B_WIN_MOVE_NAME_2] = {
@@ -195,7 +195,7 @@ static const struct WindowTemplate sStandardBattleWindowTemplates[] =
         .tilemapTop = 55,
         .width = 8,
         .height = 2,
-        .paletteNum = 5,
+        .paletteNum = 12,
         .baseBlock = 0x0318,
     },
     [B_WIN_MOVE_NAME_3] = {
@@ -204,7 +204,7 @@ static const struct WindowTemplate sStandardBattleWindowTemplates[] =
         .tilemapTop = 57,
         .width = 16,    //for z effect descriptions
         .height = 2,
-        .paletteNum = 5,
+        .paletteNum = 12,
         .baseBlock = 0x0328,
     },
     [B_WIN_MOVE_NAME_4] = {
@@ -213,7 +213,7 @@ static const struct WindowTemplate sStandardBattleWindowTemplates[] =
         .tilemapTop = 57,
         .width = 8,
         .height = 2,
-        .paletteNum = 5,
+        .paletteNum = 12,
         .baseBlock = 0x0340,
     },
     [B_WIN_PP] = {
@@ -222,7 +222,7 @@ static const struct WindowTemplate sStandardBattleWindowTemplates[] =
         .tilemapTop = 55,
         .width = 4,
         .height = 2,
-        .paletteNum = 5,
+        .paletteNum = 12,
         .baseBlock = 0x0290,
     },
     [B_WIN_DUMMY] = {
@@ -240,7 +240,7 @@ static const struct WindowTemplate sStandardBattleWindowTemplates[] =
         .tilemapTop = 55,
         .width = 4,
         .height = 2,
-        .paletteNum = 5,
+        .paletteNum = 12,
         .baseBlock = 0x0298,
     },
     [B_WIN_MOVE_TYPE] = {
@@ -249,7 +249,7 @@ static const struct WindowTemplate sStandardBattleWindowTemplates[] =
         .tilemapTop = 57,
         .width = 8,
         .height = 2,
-        .paletteNum = 5,
+        .paletteNum = 12,
         .baseBlock = 0x02a0,
     },
     [B_WIN_SWITCH_PROMPT] = {
@@ -1009,6 +1009,27 @@ void LoadKyotoBattleActionUi(void)
                                            0, KYOTO_ACTION_MAP_TOP,
                                            KYOTO_UI_MAP_WIDTH, KYOTO_UI_MAP_HEIGHT, 12);
     CopyBgTilemapBufferToVram(0);
+}
+
+// POKEKYOTO_MOVE_UI_V62
+#define KYOTO_MOVE_MAP_TOP 54
+void LoadKyotoBattleMoveUi(void)
+{
+    // POKEKYOTO_MOVE_UI_V62: draw the 240x48 border BEFORE native move text.
+    // Keep action graphics untouched until the BG0 scroll switches to the move page.
+    LoadPalette(gKyotoBattleUiPalette, BG_PLTT_ID(12), PLTT_SIZE_4BPP);
+    CopyToBgTilemapBufferRect_ChangePalette(0, gKyotoBattleMoveTilemap,
+                                           0, KYOTO_MOVE_MAP_TOP,
+                                           KYOTO_UI_MAP_WIDTH, KYOTO_UI_MAP_HEIGHT, 12);
+    CopyBgTilemapBufferToVram(0);
+}
+
+void LoadKyotoBattleMoveTiles(void)
+{
+    // Reuse action BG0 tile slots only when changing to the offscreen move page;
+    // no additional tiles or palettes are allocated over the battle sprite gfx.
+    DecompressDataWithHeaderVram(gKyotoBattleMoveTiles,
+                                 (void *)(BG_CHAR_ADDR(0) + KYOTO_BATTLE_UI_TILE_START * 32));
 }
 
 void LoadKyotoBattleMessageUi(void)

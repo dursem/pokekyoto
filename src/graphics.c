@@ -12,6 +12,9 @@ const u32 gKyotoBattleActionNameBg[] = INCGFX_U32("graphics/battle_interface/tex
 const u32 gKyotoBattleMessageTiles[] = INCGFX_U32("graphics/battle_interface/textbox_message.png", ".4bpp.smol");
 const u16 gKyotoBattleMessageTilemap[] = INCBIN_U16("graphics/battle_interface/textbox_message_map.bin");
 const u16 gKyotoBattleUiPalette[] = INCGFX_U16("graphics/battle_interface/textbox_ui.pal", ".gbapal");
+const u32 gKyotoBattleMoveTiles[] = INCGFX_U32("graphics/battle_interface/textbox_move.png", ".4bpp.smol");
+const u16 gKyotoBattleMoveTilemap[] = INCBIN_U16("graphics/battle_interface/textbox_move_map.bin");
+const u16 gKyotoBattleMoveCursorTilemap[] = INCBIN_U16("graphics/battle_interface/textbox_move_cursor_map.bin");
 
 const u32 gUnusedGfx_OldCharmap[] = INCGFX_U32("graphics/unused/old_charmap.png", ".4bpp.smol"); // japanese table and bunch of stuff
 const u32 gUnusedTimemap_OldCharmap[] = INCGFX_U32("graphics/unused/old_charmap.bin", ".smolTM");

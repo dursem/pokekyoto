@@ -54,6 +54,8 @@
 #define KYOTO_ACTION_MAP_TOP 34
 #define KYOTO_ACTION_MAP_WIDTH 30
 #define KYOTO_ACTION_PALETTE 12
+#define KYOTO_MOVE_PALETTE 12
+#define KYOTO_MOVE_MAP_TOP 54
 
 static bool32 UseKyotoActionUi(void);
 
@@ -1811,20 +1813,51 @@ static void MoveSelectionDisplayMoveDescription(enum BattlerId battler)
 void MoveSelectionCreateCursorAt(enum MoveSlot cursorPosition, u8 baseTileNum)
 {
     u16 src[2];
-    src[0] = baseTileNum + 1;
-    src[1] = baseTileNum + 2;
 
-    CopyToBgTilemapBufferRect_ChangePalette(0, src, 9 * (cursorPosition & 1) + 1, 55 + (cursorPosition & 2), 1, 2, 0x11);
+    if (UseKyotoActionUi())
+    {
+        // POKEKYOTO_MOVE_UI_V62: same 8x16 cursor as the user's reference.
+        src[0] = gKyotoBattleMoveCursorTilemap[2 * cursorPosition];
+        src[1] = gKyotoBattleMoveCursorTilemap[2 * cursorPosition + 1];
+        CopyToBgTilemapBufferRect_ChangePalette(0, src,
+                                               9 * (cursorPosition & 1) + 1,
+                                               55 + (cursorPosition & 2), 1, 2,
+                                               KYOTO_MOVE_PALETTE);
+    }
+    else
+    {
+        src[0] = baseTileNum + 1;
+        src[1] = baseTileNum + 2;
+        CopyToBgTilemapBufferRect_ChangePalette(0, src,
+                                               9 * (cursorPosition & 1) + 1,
+                                               55 + (cursorPosition & 2), 1, 2, 0x11);
+    }
     CopyBgTilemapBufferToVram(0);
 }
 
 void MoveSelectionDestroyCursorAt(enum MoveSlot cursorPosition)
 {
     u16 src[2];
-    src[0] = 0x1016;
-    src[1] = 0x1016;
 
-    CopyToBgTilemapBufferRect_ChangePalette(0, src, 9 * (cursorPosition & 1) + 1, 55 + (cursorPosition & 2), 1, 2, 0x11);
+    if (UseKyotoActionUi())
+    {
+        u8 x = 9 * (cursorPosition & 1) + 1;
+        u8 y = 1 + (cursorPosition & 2);
+        // Restore BOTH background cells instead of drawing the gray vanilla cursor eraser.
+        src[0] = gKyotoBattleMoveTilemap[y * KYOTO_ACTION_MAP_WIDTH + x];
+        src[1] = gKyotoBattleMoveTilemap[(y + 1) * KYOTO_ACTION_MAP_WIDTH + x];
+        CopyToBgTilemapBufferRect_ChangePalette(0, src,
+                                               x, KYOTO_MOVE_MAP_TOP + y,
+                                               1, 2, KYOTO_MOVE_PALETTE);
+    }
+    else
+    {
+        src[0] = 0x1016;
+        src[1] = 0x1016;
+        CopyToBgTilemapBufferRect_ChangePalette(0, src,
+                                               9 * (cursorPosition & 1) + 1,
+                                               55 + (cursorPosition & 2), 1, 2, 0x11);
+    }
     CopyBgTilemapBufferToVram(0);
 }
 
@@ -2136,6 +2169,9 @@ void HandleChooseMoveAfterDma3(enum BattlerId battler)
 {
     if (!IsDma3ManagerBusyWithBgCopy())
     {
+        // POKEKYOTO_MOVE_UI_V62: swap the graphics at the instant BG0 switches pages.
+        if (UseKyotoActionUi())
+            LoadKyotoBattleMoveTiles();
         gBattle_BG0_X = 0;
         gBattle_BG0_Y = DISPLAY_HEIGHT * 2;
         gBattlerControllerFuncs[battler] = HandleInputChooseMove;
@@ -2185,6 +2221,9 @@ void PlayerHandleChooseMove(enum BattlerId battler)
 
 void InitMoveSelectionsVarsAndStrings(enum BattlerId battler)
 {
+    // POKEKYOTO_MOVE_UI_V62: install 240x48 background before native text/windows.
+    if (UseKyotoActionUi())
+        LoadKyotoBattleMoveUi();
     LoadTypeIcons(battler);
     MoveSelectionDisplayMoveNames(battler);
     gMultiUsePlayerCursor = 0xFF;

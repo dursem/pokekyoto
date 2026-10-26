@@ -285,8 +285,7 @@
       "y": 6,
       "respawn_map": "MAP_ROUTE4_POKEMON_CENTER_1F",
       "respawn_npc": "LOCALID_ROUTE4_NURSE"
-  
- },
+    },
     {
       "id": "HEAL_LOCATION_ROUTE10",
       "map": "MAP_ROUTE10",
