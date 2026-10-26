@@ -5,6 +5,14 @@ const u32 gBattleTextboxTiles[] = INCGFX_U32("graphics/battle_interface/textbox.
 const u16 gBattleTextboxPalette[] = INCBIN_U16("graphics/battle_interface/textbox.gbapal");
 const u32 gBattleTextboxTilemap[] = INCGFX_U32("graphics/battle_interface/textbox_map.bin", ".smolTM");
 
+const u32 gKyotoBattleActionTiles[] = INCGFX_U32("graphics/battle_interface/textbox_action.png", ".4bpp.smol");
+const u16 gKyotoBattleActionTilemap[] = INCBIN_U16("graphics/battle_interface/textbox_action_map.bin");
+const u16 gKyotoBattleActionCursorTilemap[] = INCBIN_U16("graphics/battle_interface/textbox_action_cursor_map.bin");
+const u32 gKyotoBattleActionNameBg[] = INCGFX_U32("graphics/battle_interface/textbox_action_name_bg.png", ".4bpp");
+const u32 gKyotoBattleMessageTiles[] = INCGFX_U32("graphics/battle_interface/textbox_message.png", ".4bpp.smol");
+const u16 gKyotoBattleMessageTilemap[] = INCBIN_U16("graphics/battle_interface/textbox_message_map.bin");
+const u16 gKyotoBattleUiPalette[] = INCGFX_U16("graphics/battle_interface/textbox_ui.pal", ".gbapal");
+
 const u32 gUnusedGfx_OldCharmap[] = INCGFX_U32("graphics/unused/old_charmap.png", ".4bpp.smol"); // japanese table and bunch of stuff
 const u32 gUnusedTimemap_OldCharmap[] = INCGFX_U32("graphics/unused/old_charmap.bin", ".smolTM");
 const u16 gUnusedPal_OldCharmap[] = INCGFX_U16("graphics/unused/old_charmap.png", ".gbapal");

@@ -598,6 +598,7 @@ enum BattleEnvironments
 #define B_WIN_MOVE_DESCRIPTION   24
 #define B_WIN_OAK_OLD_MAN        25
 #define B_CATCH_OR_NOT           26
+#define B_WIN_ACTION_NAME        27 // PokéKyoto dynamic Pokémon-name buffer
 
 // The following are duplicate id values for windows that Battle Arena uses differently.
 #define ARENA_WIN_PLAYER_NAME      15

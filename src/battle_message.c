@@ -1,5 +1,6 @@
 #include "global.h"
 #include "battle.h"
+#include "battle_bg.h"
 #include "battle_anim.h"
 #include "battle_ai_record.h"
 #include "battle_controllers.h"
@@ -1615,15 +1616,15 @@ static const u8 sText_EmptyStatus[] = _("$$$$$$$");
 static const struct BattleWindowText sTextOnWindowsInfo_Normal[] =
 {
     [B_WIN_MSG] = {
-        .fillValue = PIXEL_FILL(0xF),
+        .fillValue = PIXEL_FILL(1),
         .fontId = FONT_NORMAL,
         .x = 0,
         .y = 1,
         .speed = 1,
-        .color.foreground = 1,
-        .color.background = 15,
-        .color.accent = 15,
-        .color.shadow = 6,
+        .color.foreground = 6,
+        .color.background = 1,
+        .color.accent = 1,
+        .color.shadow = 7,
     },
     [B_WIN_ACTION_PROMPT] = {
         .fillValue = PIXEL_FILL(0xF),
@@ -1893,7 +1894,18 @@ static const struct BattleWindowText sTextOnWindowsInfo_Normal[] =
         .color.background = 14,
         .color.accent = 14,
         .color.shadow = 15,
+    },    [B_WIN_ACTION_NAME] = {
+        .fillValue = PIXEL_FILL(1),
+        .fontId = FONT_NORMAL,
+        .x = 2,
+        .y = 1,
+        .speed = 0,
+        .color.foreground = 6,
+        .color.background = 1,
+        .color.accent = 1,
+        .color.shadow = 7,
     },
+
 };
 
 static const struct BattleWindowText sTextOnWindowsInfo_KantoTutorial[] =
@@ -3894,7 +3906,13 @@ void BattlePutTextOnWindow(const u8 *text, u8 windowId)
     }
     else
     {
-        FillWindowPixelBuffer(windowId, textInfo[windowId].fillValue);
+        if (windowId == B_WIN_MSG && gBattleScripting.windowsType == B_WIN_TYPE_NORMAL)
+            LoadKyotoBattleMessageUi();
+
+        if (windowId == B_WIN_ACTION_NAME && gBattleScripting.windowsType == B_WIN_TYPE_NORMAL)
+            CopyToWindowPixelBuffer(windowId, gKyotoBattleActionNameBg, 6 * 2 * 32, 0);
+        else
+            FillWindowPixelBuffer(windowId, textInfo[windowId].fillValue);
         copyToVram = TRUE;
     }
 
@@ -3910,7 +3928,12 @@ void BattlePutTextOnWindow(const u8 *text, u8 windowId)
     printerTemplate.lineSpacing = textInfo[windowId].lineSpacing;
     printerTemplate.color = textInfo[windowId].color;
 
-    if (B_WIN_MOVE_NAME_1 <= windowId && windowId <= B_WIN_MOVE_NAME_4)
+    if (windowId == B_WIN_ACTION_NAME)
+    {
+        printerTemplate.fontId = GetFontIdToFit(text, printerTemplate.fontId,
+                                               printerTemplate.letterSpacing, 46);
+    }
+    else if (B_WIN_MOVE_NAME_1 <= windowId && windowId <= B_WIN_MOVE_NAME_4)
     {
         // We cannot check the actual width of the window because
         // B_WIN_MOVE_NAME_1 and B_WIN_MOVE_NAME_3 are 16 wide for

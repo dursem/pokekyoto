@@ -1,5 +1,7 @@
 #include "global.h"
+#include "graphics.h"
 #include "battle.h"
+#include "battle_bg.h"
 #include "battle_anim.h"
 #include "battle_arena.h"
 #include "battle_controllers.h"
@@ -48,6 +50,12 @@
 #include "type_icons.h"
 #include "pokedex.h"
 #include "test/battle.h"
+
+#define KYOTO_ACTION_MAP_TOP 34
+#define KYOTO_ACTION_MAP_WIDTH 30
+#define KYOTO_ACTION_PALETTE 12
+
+static bool32 UseKyotoActionUi(void);
 
 static void PlayerHandleLoadMonSprite(enum BattlerId battler);
 static void PlayerHandleDrawTrainerPic(enum BattlerId battler);
@@ -1823,20 +1831,51 @@ void MoveSelectionDestroyCursorAt(enum MoveSlot cursorPosition)
 void ActionSelectionCreateCursorAt(u8 cursorPosition, u8 baseTileNum)
 {
     u16 src[2];
-    src[0] = 1;
-    src[1] = 2;
 
-    CopyToBgTilemapBufferRect_ChangePalette(0, src, 7 * (cursorPosition & 1) + 16, 35 + (cursorPosition & 2), 1, 2, 0x11);
+    if (UseKyotoActionUi())
+    {
+        src[0] = gKyotoBattleActionCursorTilemap[cursorPosition * 2];
+        src[1] = gKyotoBattleActionCursorTilemap[cursorPosition * 2 + 1];
+        CopyToBgTilemapBufferRect_ChangePalette(0, src,
+                                               7 * (cursorPosition & 1) + 16,
+                                               35 + (cursorPosition & 2),
+                                               1, 2, KYOTO_ACTION_PALETTE);
+    }
+    else
+    {
+        src[0] = 1;
+        src[1] = 2;
+        CopyToBgTilemapBufferRect_ChangePalette(0, src,
+                                               7 * (cursorPosition & 1) + 16,
+                                               35 + (cursorPosition & 2),
+                                               1, 2, 0x11);
+    }
     CopyBgTilemapBufferToVram(0);
 }
 
 void ActionSelectionDestroyCursorAt(u8 cursorPosition)
 {
     u16 src[2];
-    src[0] = 0x1016;
-    src[1] = 0x1016;
 
-    CopyToBgTilemapBufferRect_ChangePalette(0, src, 7 * (cursorPosition & 1) + 16, 35 + (cursorPosition & 2), 1, 2, 0x11);
+    if (UseKyotoActionUi())
+    {
+        u8 relX = 7 * (cursorPosition & 1) + 16;
+        u8 relY = 1 + (cursorPosition & 2);
+        src[0] = gKyotoBattleActionTilemap[relY * KYOTO_ACTION_MAP_WIDTH + relX];
+        src[1] = gKyotoBattleActionTilemap[(relY + 1) * KYOTO_ACTION_MAP_WIDTH + relX];
+        CopyToBgTilemapBufferRect_ChangePalette(0, src,
+                                               relX, KYOTO_ACTION_MAP_TOP + relY,
+                                               1, 2, KYOTO_ACTION_PALETTE);
+    }
+    else
+    {
+        src[0] = 0x1016;
+        src[1] = 0x1016;
+        CopyToBgTilemapBufferRect_ChangePalette(0, src,
+                                               7 * (cursorPosition & 1) + 16,
+                                               35 + (cursorPosition & 2),
+                                               1, 2, 0x11);
+    }
     CopyBgTilemapBufferToVram(0);
 }
 
@@ -1974,6 +2013,12 @@ static void PlayerHandlePause(enum BattlerId battler)
     BtlController_Complete(battler);
 }
 
+static bool32 UseKyotoActionUi(void)
+{
+    return gBattleScripting.windowsType == B_WIN_TYPE_NORMAL
+        && !(gBattleTypeFlags & (BATTLE_TYPE_INGAME_PARTNER | BATTLE_TYPE_POKEDUDE));
+}
+
 static void HandleChooseActionAfterDma3(enum BattlerId battler)
 {
     if (!IsDma3ManagerBusyWithBgCopy())
@@ -2004,18 +2049,29 @@ static void HandleChooseActionAfterDma3(enum BattlerId battler)
 static void PlayerHandleChooseAction(enum BattlerId battler)
 {
     s32 i;
+    bool32 useKyotoActionUi = UseKyotoActionUi();
 
     gBattlerControllerFuncs[battler] = HandleChooseActionAfterDma3;
     BattleTv_ClearExplosionFaintCause();
-    BattlePutTextOnWindow(gText_BattleMenu, B_WIN_ACTION_MENU);
 
-    for (i = 0; i < 4; i++)
-        ActionSelectionDestroyCursorAt(i);
+    if (useKyotoActionUi)
+        LoadKyotoBattleActionUi();
+    else
+        BattlePutTextOnWindow(gText_BattleMenu, B_WIN_ACTION_MENU);
+
+    if (!useKyotoActionUi)
+    {
+        for (i = 0; i < 4; i++)
+            ActionSelectionDestroyCursorAt(i);
+    }
 
     TryRestoreLastUsedBall();
     ActionSelectionCreateCursorAt(gActionSelectionCursor[battler], 0);
     PREPARE_MON_NICK_BUFFER(gBattleTextBuff1, battler, gBattlerPartyIndexes[battler]);
-    BattleStringExpandPlaceholdersToDisplayedString(gText_WhatWillPkmnDo);
+    if (useKyotoActionUi)
+        BattleStringExpandPlaceholdersToDisplayedString(COMPOUND_STRING("{B_BUFF1}"));
+    else
+        BattleStringExpandPlaceholdersToDisplayedString(gText_WhatWillPkmnDo);
 
     enum BattlerId partner = GetBattlerAtPosition(B_POSITION_PLAYER_RIGHT);
     if (B_SHOW_PARTNER_TARGET && gBattleTypeFlags & BATTLE_TYPE_INGAME_PARTNER && IsBattlerAlive(partner))
@@ -2055,7 +2111,8 @@ static void PlayerHandleChooseAction(enum BattlerId battler)
     }
     else
     {
-        BattlePutTextOnWindow(gDisplayedStringBattle, B_WIN_ACTION_PROMPT);
+        BattlePutTextOnWindow(gDisplayedStringBattle,
+                              useKyotoActionUi ? B_WIN_ACTION_NAME : B_WIN_ACTION_PROMPT);
     }
 }
 

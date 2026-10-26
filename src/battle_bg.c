@@ -159,7 +159,7 @@ static const struct WindowTemplate sStandardBattleWindowTemplates[] =
         .tilemapTop = 15,
         .width = 26,
         .height = 4,
-        .paletteNum = 0,
+        .paletteNum = 12,
         .baseBlock = 0x0090,
     },
     [B_WIN_ACTION_PROMPT] = {
@@ -386,6 +386,15 @@ static const struct WindowTemplate sStandardBattleWindowTemplates[] =
         .height = 4,
         .paletteNum = 5,
         .baseBlock = 0x03BC,
+    },
+    [B_WIN_ACTION_NAME] = {
+        .bg = 0,
+        .tilemapLeft = 1,
+        .tilemapTop = 37,
+        .width = 6,
+        .height = 2,
+        .paletteNum = 12,
+        .baseBlock = 0x0170,
     },
     DUMMY_WIN_TEMPLATE
 };
@@ -985,6 +994,34 @@ void LoadBattleMenuWindowGfx(void)
     }
 }
 
+#define KYOTO_BATTLE_UI_TILE_START 0x110
+#define KYOTO_ACTION_MAP_TOP 34
+#define KYOTO_MESSAGE_MAP_TOP 14
+#define KYOTO_UI_MAP_WIDTH 30
+#define KYOTO_UI_MAP_HEIGHT 6
+
+void LoadKyotoBattleActionUi(void)
+{
+    DecompressDataWithHeaderVram(gKyotoBattleActionTiles,
+                                 (void *)(BG_CHAR_ADDR(0) + KYOTO_BATTLE_UI_TILE_START * 32));
+    LoadPalette(gKyotoBattleUiPalette, BG_PLTT_ID(12), PLTT_SIZE_4BPP);
+    CopyToBgTilemapBufferRect_ChangePalette(0, gKyotoBattleActionTilemap,
+                                           0, KYOTO_ACTION_MAP_TOP,
+                                           KYOTO_UI_MAP_WIDTH, KYOTO_UI_MAP_HEIGHT, 12);
+    CopyBgTilemapBufferToVram(0);
+}
+
+void LoadKyotoBattleMessageUi(void)
+{
+    DecompressDataWithHeaderVram(gKyotoBattleMessageTiles,
+                                 (void *)(BG_CHAR_ADDR(0) + KYOTO_BATTLE_UI_TILE_START * 32));
+    LoadPalette(gKyotoBattleUiPalette, BG_PLTT_ID(12), PLTT_SIZE_4BPP);
+    CopyToBgTilemapBufferRect_ChangePalette(0, gKyotoBattleMessageTilemap,
+                                           0, KYOTO_MESSAGE_MAP_TOP,
+                                           KYOTO_UI_MAP_WIDTH, KYOTO_UI_MAP_HEIGHT, 12);
+    CopyBgTilemapBufferToVram(0);
+}
+
 void DrawMainBattleBackground(void)
 {
     LoadBattleEnvironmentGfx(GetBattleEnvironmentOverride());
@@ -997,6 +1034,9 @@ void LoadBattleTextboxAndBackground(void)
     CopyBgTilemapBufferToVram(0);
     LoadPalette(gBattleTextboxPalette, BG_PLTT_ID(0), 2 * PLTT_SIZE_4BPP);
     LoadBattleMenuWindowGfx();
+    // Draw the Kyoto message frame *before* encounter/send-out text first appears.
+    if (gBattleScripting.windowsType == B_WIN_TYPE_NORMAL)
+        LoadKyotoBattleMessageUi();
     if (B_TERRAIN_BG_CHANGE == TRUE)
         DrawTerrainTypeBattleBackground();
     else
@@ -1348,6 +1388,9 @@ bool8 LoadChosenBattleElement(u8 caseId)
         break;
     case 6:
         LoadBattleMenuWindowGfx();
+        // The staged boot path is used for normal wild and trainer battle intros.
+        if (gBattleScripting.windowsType == B_WIN_TYPE_NORMAL)
+            LoadKyotoBattleMessageUi();
         break;
     default:
         ret = TRUE;
