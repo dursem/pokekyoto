@@ -2508,7 +2508,10 @@ static void DebugAction_Trainers_TryBattle(u8 taskId)
         FillPartnerParty(gPartnerTrainerId);
     }
 
-    gBattleEnvironment = BattleSetup_GetEnvironmentId();
+    // POKEKYOTO_DEBUG_LAND_V647: Preview LAND only in Trainers > Try Battle.
+    // Normal battles keep their own terrain/background selection.
+    gIsDebugBattle = TRUE;
+    gBattleEnvironment = BATTLE_ENVIRONMENT_PLAIN;
     CalculateEnemyPartyCount();
     BattleSetup_StartTrainerBattle_Debug();
     Debug_DestroyMenu_Full(taskId);

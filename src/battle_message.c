@@ -1624,7 +1624,7 @@ static const struct BattleWindowText sTextOnWindowsInfo_Normal[] =
         .color.foreground = 6,
         .color.background = 1,
         .color.accent = 1,
-        .color.shadow = 7,
+        .color.shadow = 10,
     },
     [B_WIN_ACTION_PROMPT] = {
         .fillValue = PIXEL_FILL(0xF),
@@ -3910,7 +3910,7 @@ void BattlePutTextOnWindow(const u8 *text, u8 windowId)
             LoadKyotoBattleMessageUi();
 
         if (windowId == B_WIN_ACTION_NAME && gBattleScripting.windowsType == B_WIN_TYPE_NORMAL)
-            CopyToWindowPixelBuffer(windowId, gKyotoBattleActionNameBg, 6 * 2 * 32, 0);
+            FillWindowPixelBuffer(windowId, PIXEL_FILL(1));
         else
             FillWindowPixelBuffer(windowId, textInfo[windowId].fillValue);
         copyToVram = TRUE;
@@ -3931,7 +3931,7 @@ void BattlePutTextOnWindow(const u8 *text, u8 windowId)
     if (windowId == B_WIN_ACTION_NAME)
     {
         printerTemplate.fontId = GetFontIdToFit(text, printerTemplate.fontId,
-                                               printerTemplate.letterSpacing, 46);
+                                               printerTemplate.letterSpacing, 84);
     }
     else if (B_WIN_MOVE_NAME_1 <= windowId && windowId <= B_WIN_MOVE_NAME_4)
     {

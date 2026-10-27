@@ -82,8 +82,8 @@ const struct BattleEnvironment gBattleEnvironmentInfo[BATTLE_ENVIRONMENT_COUNT] 
         .camouflageType = TYPE_GRASS,
         .camouflageBlend = RGB(12, 24, 2),
         .entry = ENVIRONMENT_ENTRY(TallGrass),
-        .background = ENVIRONMENT_BACKGROUND(KyotoLand),
-        .palette = gBattleEnvironmentPalette_KyotoLand,
+        .background = ENVIRONMENT_BACKGROUND(TallGrass),
+        .palette = gBattleEnvironmentPalette_TallGrass,
         .battleIntroSlide = BattleIntroSlide1,
     },
 
@@ -102,8 +102,8 @@ const struct BattleEnvironment gBattleEnvironmentInfo[BATTLE_ENVIRONMENT_COUNT] 
         .camouflageType = TYPE_GRASS,
         .camouflageBlend = RGB(0, 15, 2),
         .entry = ENVIRONMENT_ENTRY(LongGrass),
-        .background = ENVIRONMENT_BACKGROUND(KyotoLand),
-        .palette = gBattleEnvironmentPalette_KyotoLand,
+        .background = ENVIRONMENT_BACKGROUND(LongGrass),
+        .palette = gBattleEnvironmentPalette_LongGrass,
         .battleIntroSlide = BattleIntroSlide1,
     },
 

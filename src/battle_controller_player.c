@@ -2102,7 +2102,7 @@ static void PlayerHandleChooseAction(enum BattlerId battler)
     ActionSelectionCreateCursorAt(gActionSelectionCursor[battler], 0);
     PREPARE_MON_NICK_BUFFER(gBattleTextBuff1, battler, gBattlerPartyIndexes[battler]);
     if (useKyotoActionUi)
-        BattleStringExpandPlaceholdersToDisplayedString(COMPOUND_STRING("{B_BUFF1}"));
+        BattleStringExpandPlaceholdersToDisplayedString(COMPOUND_STRING("{B_BUFF1} do?"));
     else
         BattleStringExpandPlaceholdersToDisplayedString(gText_WhatWillPkmnDo);
 
