@@ -226,6 +226,10 @@ extern const u32 gMultiBattleIntroBg_Player_Tilemap[];
 
 // battle environments
 // PokéKyoto V6.4 Land battle background
+// POKEKYOTO_KYOTO_GRASS_V1
+extern const u32 gBattleEnvironmentTiles_KyotoGrass[];
+extern const u32 gBattleEnvironmentTilemap_KyotoGrass[];
+extern const u16 gBattleEnvironmentPalette_KyotoGrass[];
 extern const u32 gBattleEnvironmentTiles_KyotoLand[];
 extern const u32 gBattleEnvironmentTilemap_KyotoLand[];
 extern const u16 gBattleEnvironmentPalette_KyotoLand[];

@@ -1,0 +1,22 @@
+[
+  {
+    "rate": 19500,
+    "sample_bytes": 2590184,
+    "saved_bytes": 202428,
+    "free_after_screen_overflow": 108028,
+    "duration_seconds": 132.829,
+    "peak_dbfs": -1.16,
+    "rms_dbfs": -18.84,
+    "sha256": "277836bf068730c7a0f18d923c027defa6900e7c56966aedbd83894c9f7ad20e"
+  },
+  {
+    "rate": 20000,
+    "sample_bytes": 2656596,
+    "saved_bytes": 136016,
+    "free_after_screen_overflow": 41616,
+    "duration_seconds": 132.829,
+    "peak_dbfs": -0.93,
+    "rms_dbfs": -18.84,
+    "sha256": "4929840201743a8c67f2c03f9664ebcd589d9dab1abfd4aac5e2841247fceadd"
+  }
+]

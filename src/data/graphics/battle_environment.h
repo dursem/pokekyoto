@@ -1,4 +1,8 @@
 // PokéKyoto V6.4: exact user-provided Land battle background (no edits to other battle environments).
+// POKEKYOTO_KYOTO_GRASS_V1
+const u32 gBattleEnvironmentTiles_KyotoGrass[] = INCGFX_U32("graphics/battle_environment/kyoto_grass/tiles.png", ".4bpp.smol");
+const u16 gBattleEnvironmentPalette_KyotoGrass[] = INCGFX_U16("graphics/battle_environment/kyoto_grass/palette.pal", ".gbapal");
+const u32 gBattleEnvironmentTilemap_KyotoGrass[] = INCGFX_U32("graphics/battle_environment/kyoto_grass/map.bin", ".smolTM");
 const u32 gBattleEnvironmentTiles_KyotoLand[] = INCGFX_U32("graphics/battle_environment/kyoto_land/tiles.png", ".4bpp.smol");
 const u16 gBattleEnvironmentPalette_KyotoLand[] = INCGFX_U16("graphics/battle_environment/kyoto_land/palette.pal", ".gbapal");
 const u32 gBattleEnvironmentTilemap_KyotoLand[] = INCGFX_U32("graphics/battle_environment/kyoto_land/map.bin", ".smolTM");

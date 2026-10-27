@@ -82,8 +82,8 @@ const struct BattleEnvironment gBattleEnvironmentInfo[BATTLE_ENVIRONMENT_COUNT] 
         .camouflageType = TYPE_GRASS,
         .camouflageBlend = RGB(12, 24, 2),
         .entry = ENVIRONMENT_ENTRY(TallGrass),
-        .background = ENVIRONMENT_BACKGROUND(TallGrass),
-        .palette = gBattleEnvironmentPalette_TallGrass,
+        .background = ENVIRONMENT_BACKGROUND(KyotoGrass),
+        .palette = gBattleEnvironmentPalette_KyotoGrass,
         .battleIntroSlide = BattleIntroSlide1,
     },
 

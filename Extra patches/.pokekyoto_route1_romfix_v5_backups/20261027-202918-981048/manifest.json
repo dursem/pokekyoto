@@ -1,0 +1,16 @@
+{
+  "path": "data/kyoto_audio/route1_pcm.bin",
+  "old": {
+    "rate": 21024,
+    "seconds": 132.82895738203956,
+    "bytes": 2792612,
+    "sha256": "a6cba5297c891e39c2660cd41b521daafa540c04669c407db7f46076c28bda08"
+  },
+  "new": {
+    "rate": 19500,
+    "seconds": 132.82897435897436,
+    "bytes": 2590184,
+    "sha256": "277836bf068730c7a0f18d923c027defa6900e7c56966aedbd83894c9f7ad20e"
+  },
+  "warning": "Restoring the older sample can make the ROM exceed 32 MiB again."
+}

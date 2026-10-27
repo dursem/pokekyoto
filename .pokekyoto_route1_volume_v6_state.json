@@ -1,0 +1,11 @@
+{
+  "gain_db": 3.0,
+  "before_sha256": "277836bf068730c7a0f18d923c027defa6900e7c56966aedbd83894c9f7ad20e",
+  "after_sha256": "a5203b704e868a26631428b6e8420a3290b173526056ff2d2c277e3c51e38460",
+  "before_config_sha256": "160469eedc6449a03d0e10ac85b8578713aa7f03be5a334a0885c003cabe69cb",
+  "after_config_sha256": "d3b3f7b77081751e04132efb0ec5c6f702fd0fe78aeab79f2b8ccd163080293b",
+  "previous_midi_volume": 115,
+  "new_midi_volume": 127,
+  "backup": ".pokekyoto_route1_volume_v6_backups/20261027-204315-627923",
+  "bytes": 2590184
+}
