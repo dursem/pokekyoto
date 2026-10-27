@@ -1,0 +1,35 @@
+{
+  "shadow": {
+    "changed_pixels": 64,
+    "max_channel_rounding_error": 0.75,
+    "underlying_ground_contribution": "12/16 via OBJ-window brightness",
+    "black_pixels": 0
+  },
+  "party_icons_cleanup": true,
+  "pc_summary_roundtrips": 5,
+  "pc_normal_shiny_pairs": 15,
+  "pc_exact_imported_tile_matches": 30,
+  "pc_box_scroll_and_eggs": true,
+  "pc_swap_palettes": true,
+  "bag_native_palettes_and_return": 5,
+  "cloud_frame_updates": {
+    "updates": 537,
+    "video_frames": 600
+  },
+  "cloud_to_noncloud_map_and_night": true,
+  "emissive_window_colors": 2,
+  "rom_sha256": "d51673b8070929ede2723f0f68c07eac92e1a940e583864afee657ec1d9f76ca",
+  "pc_hardware_obj_budget": 128,
+  "box_scroll_roundtrips": 8,
+  "wide_pc_tile_matches": 30,
+  "pc_deposit": true,
+  "pc_withdraw": true,
+  "pc_items": true,
+  "release_callback": "0x81d31c5",
+  "contest_results_open": true,
+  "lamp_palette_stable_frames": 12,
+  "night_lamp_underlying_bg_contribution": "12/16",
+  "pc_held_icon_marking_return": true,
+  "pc_bulk_selection_and_placement": true,
+  "cloud_art_matches_foreground_commit": true
+}

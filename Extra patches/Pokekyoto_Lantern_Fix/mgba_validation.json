@@ -1,0 +1,66 @@
+{
+  "lantern_validation": {
+    "left_lantern_cap_mean_rgb_increase": 45.58333333333333,
+    "right_lantern_cap_mean_rgb_increase": 45.58333333333333,
+    "day_lantern_pixels_unchanged": true,
+    "visible_ball_lamps": 6,
+    "lamp_source_sprite_priority": 1,
+    "opaque_player_pixels_preserved": 214
+  },
+  "menu_validation": {
+    "night_pokedex": {
+      "ui": "CB2_Pokedex",
+      "black_frames": 34,
+      "max_return_step": 19.624131944444443,
+      "returned": true
+    },
+    "night_party": {
+      "ui": "CB2_UpdatePartyMenu",
+      "black_frames": 35,
+      "max_return_step": 19.624131944444443,
+      "returned": true
+    },
+    "night_bag": {
+      "ui": "CB2_BagMenuRun",
+      "black_frames": 35,
+      "max_return_step": 19.624131944444443,
+      "returned": true
+    },
+    "night_card": {
+      "ui": "CB2_TrainerCard",
+      "black_frames": 31,
+      "max_return_step": 19.624131944444443,
+      "returned": true
+    },
+    "night_options": {
+      "ui": "0x8198601",
+      "black_frames": 35,
+      "max_return_step": 19.624131944444443,
+      "returned": true
+    }
+  },
+  "lighting_validation": {
+    "player_lighting": {
+      "strength": 213,
+      "original_palette": 1,
+      "rendered_palette": 6
+    },
+    "light_ramp_max_step": 12,
+    "palette_released_outside": true,
+    "npc_independent_shared_palette": {
+      "near_npc": 1,
+      "near_strength": 213,
+      "far_npc": 3,
+      "far_strength": 0,
+      "native_palette_unchanged": true
+    },
+    "lit_player_bag_roundtrip": true,
+    "lamp_private_tiles_released_before_bag": true
+  },
+  "performance_validation": {
+    "frames_sampled": 600,
+    "night_updates": 600,
+    "day_updates": 600,
+    "cloud_updates": 546
+  }
+}

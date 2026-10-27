@@ -1,0 +1,1884 @@
+diff --git a/asm/kyoto_cloud_fast.s b/asm/kyoto_cloud_fast.s
+new file mode 100644
+index 0000000000000000000000000000000000000000..f3df1f4bd34f35b82c7cee39a620960d058f94a7
+--- /dev/null
++++ b/asm/kyoto_cloud_fast.s
+@@ -0,0 +1,176 @@
++.cpu arm7tdmi
++.syntax unified
++.arm
++.text
++.global KyotoCloudShadePixels
++KyotoCloudShadePixels:
++    push {r4-r11,lr}
++    sub sp,sp,#16
++    str r0,[sp]
++    str r1,[sp,#4]
++    mov r10,r2
++    mov r11,r3
++    ldr r0,[r11,#24]
++    str r0,[sp,#8]
++    mov r0,#0
++    str r0,[sp,#12]
++    ldr r0,[r11,#20]
++    ldr r1,[r11,#28]
++    cmp r0,r1
++    bge .Lshade_done
++    ldr r0,[r11,#24]
++    ldr r1,[r11,#32]
++    cmp r0,r1
++    bge .Lshade_done
++.Lshade_row:
++    ldr r0,[sp,#8]
++    ldr r1,[r11,#4]
++    sub r0,r0,r1
++    ldr r2,[r11,#16]
++    tst r2,#8192
++    ldrne r1,[r11,#12]
++    subne r0,r1,r0
++    subne r0,r0,#1
++    ldr r1,[r11,#8]
++    and r3,r0,#7
++    lsr r0,r0,#3
++    mla r0,r1,r0,r3
++    ldr r4,[sp,#4]
++    add r4,r4,r0,lsl #2
++    ldr r6,[r11,#20]
++    ldr r0,[r11]
++    sub r6,r6,r0
++    tst r2,#4096
++    subne r6,r1,r6
++    subne r6,r6,#1
++    and r0,r6,#7
++    lsr r6,r6,#3
++    add r4,r4,r6,lsl #5
++    ldr r6,[r4]
++    beq .Lshade_forward_start
++    add r9,r0,#1
++    rsb r0,r0,#7
++    lsl r0,r0,#2
++    lsl r6,r6,r0
++    b .Lshade_dest_start
++.Lshade_forward_start:
++    rsb r9,r0,#8
++    lsl r0,r0,#2
++    lsr r6,r6,r0
++.Lshade_dest_start:
++    ldr r0,[sp,#8]
++    ldr r1,[r11,#40]
++    sub r0,r0,r1
++    and r1,r0,#7
++    lsr r0,r0,#3
++    ldr r5,[sp]
++    add r5,r5,r0,lsl #8
++    add r5,r5,r1,lsl #2
++    ldr r7,[r11,#20]
++    ldr r0,[r11,#36]
++    sub r7,r7,r0
++    and r12,r7,#7
++    lsl r12,r12,#2
++    lsr r7,r7,#3
++    add r5,r5,r7,lsl #5
++    ldr r7,[r5]
++    ror r7,r7,r12
++    ldr r8,[r11,#28]
++    ldr r0,[r11,#20]
++    sub r8,r8,r0
++    adr lr,.Lshade_tones
++    tst r2,#4096
++    bne .Lshade_reverse
++
++@ Work a tile row as packed 32-bit words. Each source/destination word is
++@ loaded once for eight pixels, instead of a byte read/modify/write per pixel.
++@ Return nonzero when anything was shaded; callers do not require a count.
++.macro SHADE_LOOP name, reverse
++\name:
++    cmp r6,#0
++    beq 2f
++    .if \reverse
++    movs r0,r6,lsr #28
++    lsl r6,r6,#4
++    .else
++    ands r0,r6,#15
++    lsr r6,r6,#4
++    .endif
++    beq 1f
++    ands r1,r7,#15
++    beq 1f
++    ldrb r1,[lr,r1]
++    ldrb r0,[r10,r0]
++    add r0,r0,r1
++    add r0,r0,#4
++    bic r7,r7,#15
++    orr r7,r7,r0
++    str r0,[sp,#12]
++1:
++    ror r7,r7,#4
++    add r12,r12,#4
++    cmp r12,#32
++    streq r7,[r5]
++    moveq r12,#0
++    addeq r5,r5,#32
++    ldreq r7,[r5]
++    subs r8,r8,#1
++    beq .Lshade_row_finished
++    subs r9,r9,#1
++    .if \reverse
++    ldreq r6,[r4,#-32]!
++    .else
++    ldreq r6,[r4,#32]!
++    .endif
++    moveq r9,#8
++    b \name
++2:
++    @ Skip a fully transparent source run, bounded by both tile rows.
++    mov r0,r9
++    cmp r0,r8
++    movhi r0,r8
++    rsb r1,r12,#32
++    lsr r1,r1,#2
++    cmp r0,r1
++    movhi r0,r1
++    lsl r1,r0,#2
++    ror r7,r7,r1
++    add r12,r12,r1
++    cmp r12,#32
++    streq r7,[r5]
++    moveq r12,#0
++    addeq r5,r5,#32
++    ldreq r7,[r5]
++    subs r8,r8,r0
++    beq .Lshade_row_finished
++    subs r9,r9,r0
++    .if \reverse
++    ldreq r6,[r4,#-32]!
++    .else
++    ldreq r6,[r4,#32]!
++    .endif
++    moveq r9,#8
++    b \name
++.endm
++    SHADE_LOOP .Lshade_forward,0
++    SHADE_LOOP .Lshade_reverse,1
++.Lshade_row_finished:
++    cmp r12,#0
++    rsbne r0,r12,#32
++    rorne r7,r7,r0
++    strne r7,[r5]
++    ldr r0,[sp,#8]
++    add r0,r0,#1
++    str r0,[sp,#8]
++    ldr r1,[r11,#32]
++    cmp r0,r1
++    blt .Lshade_row
++.Lshade_done:
++    ldr r0,[sp,#12]
++    add sp,sp,#16
++    pop {r4-r11,lr}
++    bx lr
++.align 2
++.Lshade_tones: .byte 0,0,3,6,0,0,0,3,3,3,6,6,6,0,0,0
++.global KyotoCloudShadePixelsEnd
++KyotoCloudShadePixelsEnd:
+diff --git a/docs/CLOUDS_GLIDE_EN.md b/docs/CLOUDS_GLIDE_EN.md
+new file mode 100644
+index 0000000000000000000000000000000000000000..7e83f68ea38ba626fb9521f300583170d0fa18b2
+--- /dev/null
++++ b/docs/CLOUDS_GLIDE_EN.md
+@@ -0,0 +1,127 @@
++# Kyoto foreground cloud weather and Paraglider
++
++Native source integration for `dursem/pokekyoto`, based on master
++`17149d664f15f4edb50dd050d90818bdeb603ed6` (the Kyoto/Opal triple-metatile fork of
++pokeemerald-expansion 1.17.0).
++
++This revision keeps the three foreground cloud shapes, player/NPC silhouettes,
++and the Paraglider Key Item. The lower animated cloud-surface renderer and its
++atlas assets have been removed. Cloud weather no longer rewrites BG tilemaps,
++reserves BG palette 13, or reserves any background character tiles. Your map's
++existing tiles and triple layers remain managed by the native Kyoto engine.
++
++## Install and build
++
++The accompanying ZIP contains `Kyoto_Foreground_Install/install.sh`, a complete
++patch against the base commit, and an upgrade patch against the previous
++Clouds + Glide source package (`0bc21df2`). Do not install the old package first.
++
++Place the installer directory inside the repository, beside `Makefile`, and run
++from the repository root in Ubuntu/WSL:
++
++```sh
++bash Kyoto_Foreground_Install/install.sh
++make -j4
++```
++
++The installer requires saved/committed tracked changes, validates a patch before
++making changes, creates a feature branch, and applies the changes to the working
++tree and Git index. It does not reset the repository, commit, push, or merge.
++The package directory is excluded locally from source commits. Review and
++commit the changes with GitHub Desktop, then publish the feature branch.
++
++The ordinary build produces `pokeemerald.gba`. The production source does not
++auto-grant the item or replace maps, tilesets, event scripts, or the intro.
++No binary-address patch or HMA metadata is required.
++
++## Enable cloud weather and gliding
++
++| Setting | Value | Result |
++| --- | --- | --- |
++| Map weather | `WEATHER_SUNNY_CLOUDS` | Three drifting foreground cloud shapes |
++| Air terrain behavior | `MB_GLIDE_CLOUD` (`0xD7`) | Passable only while gliding |
++| Landing behavior | `MB_GLIDE_LANDING` (`0xD8`) | Launch and landing surface |
++| Key Item | `ITEM_PARAGLIDER` (`874`) | Use from Bag or register for SELECT |
++
++Use the existing customized Porymap. Reload it after source installation to
++read the new behavior names. Cloud tiles are now ordinary map artwork: no blue
++marker tile or special surface palette is needed. Cloud terrain behavior and
++visual artwork are independent choices.
++
++Give the item through an event script:
++
++```asm
++    giveitem ITEM_PARAGLIDER, 1
++```
++
++The new item ID is appended, preserving all previous item IDs. Set landings to
++passable collision and a compatible elevation. Stand on a landing, face an
++adjacent air tile, and use the Paraglider. Move in four directions. Landing
++puts the glider away after the step finishes. Midair dismounting is rejected.
++
++NPC current/previous cells and map edges stay blocked. Place a landing before
++warps or connections. Do not remove the item or force Surf/bike states while
++airborne. Glide state is derived from cloud terrain plus item ownership after
++menus/loading; there is no save-block extension. Cold-boot saved-game continue
++still needs explicit route-level validation.
++
++## Art and palettes
++
++`graphics/glide/paraglider.png` is the indexed 64x256 build sheet: four 64x64
++poses, south/north/west/east. Individual pose PNGs are editing exports. The
++fixed runtime palette is `paraglider.gbapal`, with a matching `.pal` source.
++`item.png` is the 24x24 Bag icon.
++
++Foreground runtime assets live in `graphics/weather/kyoto_clouds/`. The
++`editing/` directory contains the large, medium and small PNGs and the complete
++indexed 64x704 cell sheet. Repack an edited cell sheet with Python/Pillow:
++
++```sh
++python3 tools/rebuild_kyoto_clouds.py graphics/weather/kyoto_clouds/editing/cloud_cells.png graphics/weather/kyoto_clouds
++```
++
++Keep index 0 transparent and the silhouette shade slots 4..12 intact. Cloud
++and silhouette colors follow the project's existing weather/time palette
++handling. This feature does not install another clock or day/night cycle.
++
++## Runtime integration
++
++The foreground uses eleven 64x64 OBJ cells (704 OBJ tiles) and a 22,528-byte
++heap buffer. The paraglider uses one further 64x64 sprite allocation (64 OBJ
++tiles) and palette tag `0x11FE`. Keep this tag unique. Allocation failures
++preserve native actors and glide terrain permissions.
++
++The weather buffer is freed before full-screen menu allocation. Full-screen
++callback changes invalidate old weather sprites, and rendering waits for
++recreation on returning to the field. Custom menus that allocate before
++changing callback2 need the same early cleanup entry point as Bag/Trainer Card.
++The fade guard keeps field reconstruction black until the foreground is ready.
++
++Silhouettes are prepared after the Opal frame transaction from current OAM and
++pending sprite animation uploads, then transferred after native VBlank/DMA.
++The ARM pixel shader executes in an 832-byte stack buffer with a linker size
++assertion. The lower-layer IWRAM raster routine has been removed; a stack
++headroom assertion remains to catch future over-allocation.
++
++## Validation (mGBA 0.10.5)
++
++The production source builds. A temporary 20x20 fixture with air terrain,
++landings and an NPC was used for runtime tests; it is not included in the
++production changes. Both normal and triple native BG tilemaps were compared
++against VRAM, with native character-block selection intact.
++
++Passed: walking blocked at air terrain, launching from both Bag and SELECT,
++four-direction movement, NPC collision, rejected midair dismounting, automatic
++landing, and five Bag round trips. Bag palette banks 0 and 1 match the project's
++original `gBagScreenMale_Pal`. Foreground sprites and glider return after Bag.
++
++Performance: 1,800 updates in 1,800 video frames while idle; 89 in 90 in each
++horizontal scrolling sample. Update detection uses both cloud sprite position
++and camera coordinates, since their screen motions can cancel while walking
++left. These measurements are close to GBA's 59.73 Hz; they are not a blanket
++60-fps guarantee for every map/NPC load. The recording is real emulator output
++at native timing, enlarged with nearest-neighbor scaling.
++
++Not yet covered: physical hardware, every Kyoto route, battles/scripted warps
++while gliding, and a cold boot continuing a saved game above clouds. Emulator
++save states used in the test harness are not a substitute for that last test.
+diff --git a/graphics/glide/east.png b/graphics/glide/east.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..c455900df732ffc20b1487e8758784e85f08763e
+GIT binary patch
+literal 1131
+zcmeAS@N?(olHy`uVBq!ia0vp^4j|0I3?%1nZ+yeRz|0Wf6XN<~#fcvue!RGFW5I+K
+z2>}Hkc1*Z2qoBe8q*z14!ehdY9V=!4r5ijZBv=$oh%f+(kAl$<7&aj=KkS@0&@+rB
+zL4Lsu4$p3+0ojtCE{-7;bKYLNop)G4fF(eWdyRM2zyJBh2h65kKE~-Sx>D$I_aCF<
+z61O+?Mgl=)xWr7YcmdJC)4!j)8hLH`6yC-uS^iJW>XXvN+mo!Hus#a-&synLaL&F#
+zdDDEMn4l^Lg=$}|r!f^iPv!_0@g?wCO?*G)o?eFi+!KB(fwPP+>=SgI@{DI|YXXpS
+z!%pLD;J*HrrPf7DSoqxEv*y|6{?BLVf5A9KcM+RS<m)-gucy|A+-6wgr!eRCPQHk{
+z#Sd0Lcw%Kz%edjH^+F-52c>_@#7}PB%h%u#p_~}{mG`<4E1%*^hQo#dJo2yXT3ig>
+zYVUt=+mrk2KQ}|8g+HU9^9+U+X^Z+5A5_j`-nP=x<n3yMtMNb8cQQpB5s`YJD$fUs
+Neot3Fmvv4FO#o{ct3Ln$
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/glide/item.png b/graphics/glide/item.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..6b5849f1c3d1ecbd6202bf62a70e1062fc5c249e
+GIT binary patch
+literal 984
+zcmeAS@N?(olHy`uVBq!ia0vp^5+KaM3?#3wJbQ|Pftew|C&U%V{r~PN7#)3gbj_0H
+z;^wHJYRl$g%jO_MF9it+2@VDh1_lA3IuJbyMnhm&g+Rwqjuk);F_r}R1v5B2yO9Ru
+zw0XKXhE&X1Iw6qnumX>>ve)K>O?UtA@P3hy`?TNFSjeNUYpuek_B(TTCPlwc4399|
+z%%VDfQ^fTTY!(~7NiP0T@mTAJo2J_hj;49uCIP<^*Dr{C;vf2bwzc@e-(O4bI)(%U
+zc&`vj@a!?UZp$~@p@e}Yr8>DTyIRz1L4{$wf**TJ{fYNg%!S98|BCYMTL21gPgg&e
+IbxsLQ0IL>aVE_OC
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/glide/north.png b/graphics/glide/north.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..05a073b0c939fb059e9eed5d97c0b6edc1e93148
+GIT binary patch
+literal 1210
+zcmeAS@N?(olHy`uVBq!ia0vp^4j|0I3?%1nZ+yeRz|0Wf6XN<~#fcvue!RGFW5I+K
+z2>}Hkc1*Z2qoBe8q*z14!ehdY9V=!4r5ijZBv=$oh%f+(kAl$<7&aj=KkS@0&@+rB
+zL4Lsu4$p3+0ofUzE{-7;bKXwN?Qd2PXqkGK%Vo*`|M&0l=|>gG9iMb(dbe<sL%AGV
+zwD0t%7Z<zt|BK<vV)ObgT_n#u_3z(po*%AVG*G(z-L@;?XzBfS!J~3c7A}u^cAP2^
+zD7@utBsa78NP$w_XYp!7v*w-`LPz4?d}mPD#lm>y)D5Pj*!N6%%o$2|*e<xP2z|Tm
+ztV+rIgL<zRKUDtD7FeiJ$9^P5u2L<aW&V3nE14Pn_ETaMo?38BIcxK5ed$+=>*p3X
+z1f5{Lq?5sDugk;Sk-;{>JMzuzT}=nQ>es0nt)94T)_IA?3__bZ<{B<xS(4<}z>>ID
+z{%VfKTm4>#84ORP8<w%_=rEqq>|F5Wblo(4hUi=dhHaA%%$8GNJ3gh)(U?)FL81Aa
+zFJpv~%E<(#4I94lag?3A&H4Y3{%hNN?DuY87fHCCz?O15jiGz%Ic`U*?DRjM?39~X
+v+OGVcpyj}EuCrcB;b*qJ^ut&3f3s^DV^&D7P_yZs2TDzzu6{1-oD!M<#<kJQ
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/glide/paraglider.gbapal b/graphics/glide/paraglider.gbapal
+new file mode 100644
+index 0000000000000000000000000000000000000000..de05c4b1600c3bdcd71bd26a0e1d4eda24163835
+GIT binary patch
+literal 32
+ocmdm=cE3J0KP1e@@}F0=6~7__!%`W~xb1%Xvkg4oSQJSD0NIZWYXATM
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/glide/paraglider.pal b/graphics/glide/paraglider.pal
+new file mode 100644
+index 0000000000000000000000000000000000000000..42e5450d7643168b37b63d5dacf232fd3b3d39f5
+--- /dev/null
++++ b/graphics/glide/paraglider.pal
+@@ -0,0 +1,19 @@
++JASC-PAL
++0100
++16
++248 168 200
++248 240 248
++232 208 216
++160 144 168
++96 80 112
++240 184 144
++216 152 112
++120 64 64
++0 0 0
++40 40 56
++72 144 184
++184 168 152
++248 232 208
++128 72 144
++96 56 112
++144 88 48
+diff --git a/graphics/glide/paraglider.png b/graphics/glide/paraglider.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..1cd0417170095a15fa3138bc7efa09772779f6b3
+GIT binary patch
+literal 1983
+zcmeH{|3A|S9LGN&`?w+Pi}hs;8{%OPM5uU3wxZh}E|wfqu68x!Qc_gp+s8>bU$#o9
+z6c-g2ZG9n%YjZfIaLRn?)|S<F%eN)5XxpvF{TKJ>`OEA5c)wr2yk0-N3m75aE;q9>
+z0{~z-ofa5oPznHmfC<7dc~`*R0Du4(--QQh>UuP4%|8Pp)x0_uBT?PL8>vW4p%~17
+zv$GG4*V0l~VK~Dy9?K_@$Mi7lzw)(#|4jo`5q-giFko_6$WDNw7~uc_bch~E4Ns|@
+zx>S6$#>4!SXjQYbX{!FdKfQTftA!v?naOE8#~DN|1!2ZG8#(v~26Q+(RoN%1Cv{{l
+z{ou*pNc%WbK!X#_GA+ZQXJdTtw9I9#Uq6B5A3Z)%!~mDD?|^bxjvYh#*iyYH_O3Ji
+zyOGRWS}3LK6mtPyKPsQFpt!TC>@D-LX}zj&j7y=9Ywl&pRAjHbXnWgc>@%X4%zXT0
+zJT?*-q!;fiVTQ;eD6e?Pf=Q{CvdlS)F$s&(4g<B@vn74Lk23gBN<c|ME#EuWN;bM_
+z5b9tUvG-&649bMEv8xJm#dH^-eow&Vpw>8p2%z1llVvVRV=Tr%nJeFRANMC&fawni
+zSFI@DKtvJ%q3aetY-Uv?UL{m#qCH9J+n-08I0=Cx-FO;S8K*{L@<|u>3qU}bdfgqu
+zvGP%OqVH)`{bxdPDH9K^1C`izuSeU*CGHDi?7NJ}FAV!1B7<)4ZIaj`3F3S^`?^J%
+z_n8T|Cc1j?TJu5o>~lW8@CN%0ORKKLCnwNvF(>mzqcFuPJ$@jJQtHN)>*Ytxe5@&6
+z9j}20*e4OhVEmwJ9kWcjR4DZ;it){|q_zFEgS$o{_WUJOnsKg6dS4&5<@6iL>+G{p
+zL&O)7`u>I)bS6ocrJ;Js+*)=oB2ayuf_Y@=W#7$y@mV}Gh>R`Lic;<d&{pPq%_E~J
+zJ)rE8tp`IKJVbqmuKYD1p8-~L^^gf6J4|ppfG1Ixfsic8biBO@=2>;6?FQ|%paamT
+z6|IORV-&t2%{r3cf}LoD7+AXaV|Uy%+B#I0Fo*oxCNYm?Jg2L^X<(viu(1housolW
+zOA@!S;T21F<Gx>aRvXo{HudnuDd|(kd(Ef1LlsU?ZWk`e?2PiG$VGvE%591c$G2+9
+z;OBwN9oe+0WT6atxl7*WRpyws{)ZP=u<<oRdt#<6`NQIRRcNeh$jccV^7Nep!nr*U
+z$8@V$AELAYM(X-a0z`K>1rO#B9bvAlQMY3osi;86;Vl}i(cRSkbh6}CUowUg0kh%r
+zGMrH3*)xVfqn`3>8vIG-%>Eqbcr<>WmS}T>PZqA2)XP&pft`dIEL#QpYmPoH^pF^-
+z$8!B(Fh<*91AkD=+kpzgTdMus?0?Z?KW<%3!aw`CKhn+UgxzBOwl}Ti$I9g^^T#sM
+z^Sp<UQilcGqq)M+)^@Sk4HMU8dbH!SjvyU>7-ijr3@%YC|0LO=7IR8F`Tf0zu)zta
+z<mu(N-Qa><C$^P3`dr&8*i(G>n8|?!K@cbK<&EO@fRUov3yqet81Rp{Z&G-@t6BHN
+z$hG&8HN}91Bq@(&E+s$YrfRcaRe`Em<LA)tFVJEgD<0jT%??L~*;jl<xQ`-b!T6%8
+zN;KZd<azmMf20Gr_YrG;=WMPYvC@lWv}v#LabsB_DFLYUZ&|HZrB7?A!&L+B2`<rD
+TSm-tP%S)vPg#_N(!ut7NV0cQ6
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/glide/south.png b/graphics/glide/south.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..c409c7d479e46f5a383c8dd8312882db3ef073aa
+GIT binary patch
+literal 1199
+zcmeAS@N?(olHy`uVBq!ia0vp^4j|0I3?%1nZ+yeRz|0Wf6XN<~#fcvue!RGFW5I+K
+z2>}Hkc1*Z2qoBe8q*z14!ehdY9V=!4r5ijZBv=$oh%f+(kAl$<7&aj=KkS@0&@+rB
+zL4Lsu4$p3+0ok#hE{-7;bKXvSxUN}&$8BO*)U&qt|F>;lYG4|<Zra~n=5>WG;^#g(
+z_ZqfXm%qF7Q#tWu_=jL4mB1HYYo0%y6cVvnI782~>TQw1mFA*U%RQGiCG#=ej?MUc
+zb_3@((QQo2o6d`_6aNu&F!%t^>5qG&8=uY*Kj^hgquSAM&b8piJ15p<v>h}5bL#OG
+zQCDTTUgqfwG)<huZU@V(|H!zu^;kgfyt|4U+GlC|+>w8<y2&iCd%~yP_IsNCIZ2AM
+zFh~g82nn$|#_>LRIYYv%M=JK&55*b|O*UD<w|s%$u~T8(Rh4sND}x)P_Ap&}Z9dak
+zPsNIrG4Nf3MToNUg30Sezvx}_E!^L5q#?msVY>r^o5u_RVTIq7vCPY7rr(_KS39HW
+z%Z%slUd~MoQ)W(TvAE12Z_v3=Em%re;rX1W$1PMiL^i5k;?Q5Oyn)T&*VMx@jgpT(
+mq)*b@-@jON+sAYJ&+$tJN-X=aH2p3p33<BuxvX<aXaWEdsnhNN
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/glide/west.png b/graphics/glide/west.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..4aabc94583a041335264c56b6368186861804d4e
+GIT binary patch
+literal 1130
+zcmeAS@N?(olHy`uVBq!ia0vp^4j|0I3?%1nZ+yeRz|0Wf6XN<~#fcvue!RGFW5I+K
+z2>}Hkc1*Z2qoBe8q*z14!ehdY9V=!4r5ijZBv=$oh%f+(kAl$<7&aj=KkS@0&@+rB
+zL4Lsu4$p3+0of9sE{-7;bKXw7op)G)$6=?$n<=V){@*{Rw&e0G)6{PvnL_R>r%W$C
+zwRX`tU$x06r4^1XsW*6aVjcJEWgRlVsy6&xwej_9@#vSEC9nAxr7Jjo@saZq$Q9od
+za4NJh>!|OKi@8=wdo?^7G@stwzPaw{_RZnZPc{a&EZZM*tldrX?oq?PR~+8t$zI!U
+zp7nO!GmFcKuj>3CESUXg8PA-1_oR1JNB#F_nrO&sbC@^vfGfWu%X`JF+WTz>Btsoj
+zezqKV9N@F4->zeQ6wAFvwe1bt1im*ENh^3UF|GJ6X!Jptam#at;6*G#7w=u1k*Dc=
+z>X)@#@wtY!{~TL%Sh`gMI3{TxU_LReL0LeD(eCIp#uHkz(k|qQPqzQ5Uc(f<N<?a3
+SdZ_>?_B~zwT-G@yGywolq_#x>
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/weather/kyoto_clouds/editing/cloud_cells.png b/graphics/weather/kyoto_clouds/editing/cloud_cells.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..e073a71726f6644b434ab7c3a0d08f1078d7a4bf
+GIT binary patch
+literal 4556
+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
+bcGhsP?W1MBTKmGkkG7?mwdqS^V(fna!0tYo
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/weather/kyoto_clouds/editing/large_cloud.png b/graphics/weather/kyoto_clouds/editing/large_cloud.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..bf5d6843c6b809694cf3be7dec685dc3dcd6ee54
+GIT binary patch
+literal 3123
+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
+HzLokvRWsAO
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/weather/kyoto_clouds/editing/medium_cloud.png b/graphics/weather/kyoto_clouds/editing/medium_cloud.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..aeceb6982bd88299cb98a8ce93233f06228ed4b6
+GIT binary patch
+literal 1563
+zcmeAS@N?(olHy`uVBq!ia0vp^4M6O`!3-pya`gK$FfcO&_=LCuxhEdHc<|!Gj~_o)
+z95}Jz#DyIfZX7sq;lza-7j8VbapT5=2M=DncmY&43PwX<_=UiU53#X8Uon;h`2{mL
+zJiC#`z`%6U)5S5QV$R!$o7)Z<aEN^R|G#Fo07vw$8%Nutzr3)#mDZN1aPj=}Uh{hu
+zj{_Wf;}3~<%`Zs!AojzCy?K8|!+zBUR{6Aqj|+_|uJk|93J^W;?UMle`-Wo+_Sqge
+z@X(y?MyAa})_8^_h9w7>g<O8TV$!*>w!pYqWS)q^pK4B(SJ|u`2Xc85xbz=XEN8Q5
+z&F8w~pTJsolUpufgZcm6ZJ)9j*RW1wudUJS-^wJx#$Bg+!6N2Ff-A$8A3(djUI(#V
+zDE9j7zTBbOl!xKmJo(vYZvPBs&ARY4rMa-`&orm2TffX<nQ<_<#!exG?bo*TDH)s#
+z!Wo=CU25rNyv*_WvjVf+0n>U7XO=S`96v0az47P8@V6FL%6x)6W<UGx@v^@<@#41f
+zCF$L~(h3nZ3<tMsDIEKE(^Db4Rwkt6=F7~5l?o1*Y=29ruo&p>Et;F&F!`PA<HS~n
+zvh=JPpMxulKfl~+qW*=;U-N_xC(oo45<YC|@(Jw+gV+@0KC`U&webJ9L)x5IXEidP
+z*)sb}y@J8+-CP&uI5vlfwKmxE&pPSH>aVbOeVx^=>D+hDZ;t+F?tN8yfeM#G`D2%z
+z`)n6v2Jq}(abur`b)UA!2gl=2ufLE9Hs5)oCW9qm*Pn)_iH9t>jf}qil;BA@m=d)}
+zEmh>j=@lPzSMHy-^00W-wtHI>@)xSwO>8{Y-oW3-7^rviOUIAo>(hS6O3(P)E0isB
+z>*4|xzB4I8+w5vfvjiLu$*>4s4^ceFD8V!(@%qNX<7=Hu*LF-ibLd~|tC+vx9jlkk
+zIau<3!=HC2vfQt+%$L+~7r85IRr%B*lYf@=i#p?qFLRft=3eidz9pYqoacpvyG!t&
+z^Vj;;c&hxEReNgU|IG$@x2KoJ2_>s;_gQ!O$%+qG-!lhvF1c1H;vn@#=*K~Zq;J2t
+z3Rd>(`yKk-x@|p&suk~gv0H~fnOu?1|8x8Yvs0RkeL#a+J1F0Jy85}Sb4q9e06LO~
+AEC2ui
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/weather/kyoto_clouds/editing/small_cloud.png b/graphics/weather/kyoto_clouds/editing/small_cloud.png
+new file mode 100644
+index 0000000000000000000000000000000000000000..1b231046278953b08f17627b9da9a4bc9e51b6bd
+GIT binary patch
+literal 1075
+zcmeAS@N?(olHy`uVBq!ia0vp^4j|0I3?%1nZ+yeRz|0Wf6XFWwo_O%$!HW++e*9Q*
+z;KYU#7j|5@ap1&-6Blk=xbfh|jT;XhJb3Zq1yI>27!85p7Xl|f#Kr=B#aI&L7tG-B
+z>_!@p^U%}9F{EP7+sU{28Web(-~RYtFIFy`sInkGt@l{srDXQc7C|dRUaeQU7XClm
+z#Z>H?b<6FkAJ6XheR1b@%f)@}2Us?EaeRvZSL(#-!V&eh=|{9-a%aP#4x!RbE)BoB
+z+iuKdclhgbVG(1)lJhtHgZ^%JV>;RY@NI7oJHyjwJDTrromq9j*lGTeZ|S?V6P&mW
+zo1~hB<v0~M4tL$^j*&{5SkSyhc0R9tawSXbj1zgXshtP>GbH7YYTTC4K4`pfeN$!!
+z$Gi09YCFRoTWl54zj61I!hz1(X&N#40&1^Aw5I-A>}UCqJ#{tv^fFL<db;|#taD0e
+F0s#M$pOpXr
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/weather/kyoto_clouds/foreground.bin b/graphics/weather/kyoto_clouds/foreground.bin
+new file mode 100644
+index 0000000000000000000000000000000000000000..dfdaeb0288f3841007a50511bf48228796ace58a
+GIT binary patch
+literal 22528
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/graphics/weather/kyoto_clouds/foreground_palette.bin b/graphics/weather/kyoto_clouds/foreground_palette.bin
+new file mode 100644
+index 0000000000000000000000000000000000000000..dd9f3c3564098d84e1d45510647bd22a50440735
+GIT binary patch
+literal 32
+kcmZQzm|4E3`hUG>x><I3zD0IqepPXG{+!~y<qTi|0MLL7E&u=k
+
+literal 0
+HcmV?d00001
+
+diff --git a/include/constants/items.h b/include/constants/items.h
+index bf4522306bea70779738e27f10c542a6440b5e14..5a0b159761f795621c17fe5b355202591d0ddb9e 100644
+--- a/include/constants/items.h
++++ b/include/constants/items.h
+@@ -1052,6 +1052,8 @@ enum __attribute__((packed)) Item
+     ITEM_TATSUGIRINITE = 872,
+     ITEM_GLIMMORANITE = 873,
+ 
++    ITEM_PARAGLIDER = 874,
++
+     ITEMS_COUNT,
+     ITEM_FIELD_ARROW = ITEMS_COUNT,
+ };
+diff --git a/include/constants/metatile_behaviors.h b/include/constants/metatile_behaviors.h
+index c0b9a711033d27da81260ede19a06b6fa61c6c68..ca7bda192fa119aaa309e7126c14ec87de076f81 100755
+--- a/include/constants/metatile_behaviors.h
++++ b/include/constants/metatile_behaviors.h
+@@ -217,8 +217,8 @@ enum {
+     MB_ISOLATED_HORIZONTAL_RAIL,
+     MB_VERTICAL_RAIL,
+     MB_HORIZONTAL_RAIL,
+-    MB_UNUSED_D7,
+-    MB_UNUSED_D8,
++    MB_GLIDE_CLOUD,
++    MB_GLIDE_LANDING,
+     MB_UNUSED_D9,
+     MB_UNUSED_DA,
+     MB_UNUSED_DB,
+diff --git a/include/glide.h b/include/glide.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..0e974c18a525367bcc53804b0b27089201834ded
+--- /dev/null
++++ b/include/glide.h
+@@ -0,0 +1,12 @@
++#ifndef GUARD_GLIDE_H
++#define GUARD_GLIDE_H
++#include "global.h"
++#include "constants/event_object_movement.h"
++bool8 Glide_IsActive(void);
++bool8 Glide_CanUse(void);
++void Glide_Toggle(void);
++void Glide_Update(void);
++void Glide_Reset(void);
++// Returns FALSE to preserve the native collision result.
++bool8 Glide_GetCollision(struct ObjectEvent *object, s16 x, s16 y, enum Collision *result);
++#endif
+diff --git a/include/item_use.h b/include/item_use.h
+index 1aa8ea2f4e5c1573d59c47a11f04de72cc12a09c..2a2dd383d6135ba72006bd287c90d2d7ba230caa 100644
+--- a/include/item_use.h
++++ b/include/item_use.h
+@@ -3,6 +3,7 @@
+ 
+ void ItemUseOutOfBattle_Mail(u8 taskId);
+ void ItemUseOutOfBattle_Bike(u8 taskId);
++void ItemUseOutOfBattle_Paraglider(u8 taskId);
+ void ItemUseOutOfBattle_Rod(u8 taskId);
+ void ItemUseOutOfBattle_Itemfinder(u8 taskId);
+ void ItemUseOutOfBattle_PokeblockCase(u8 taskId);
+diff --git a/include/kyoto_cloud_config.h b/include/kyoto_cloud_config.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..db0648d4c33e13b30299eaa51aff0875f29342c0
+--- /dev/null
++++ b/include/kyoto_cloud_config.h
+@@ -0,0 +1,7 @@
++#ifndef GUARD_KYOTO_CLOUD_CONFIG_H
++#define GUARD_KYOTO_CLOUD_CONFIG_H
++
++// Foreground weather only: no BG tile, tilemap or BG palette reservations.
++#define KYOTO_CLOUD_CODE_BUFFER_WORDS 208
++
++#endif
+diff --git a/include/kyoto_cloud_layers.h b/include/kyoto_cloud_layers.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..d7034295d3925162b5718a7c27b1ba5b404f972f
+--- /dev/null
++++ b/include/kyoto_cloud_layers.h
+@@ -0,0 +1,11 @@
++#ifndef GUARD_KYOTO_CLOUD_LAYERS_H
++#define GUARD_KYOTO_CLOUD_LAYERS_H
++
++void KyotoCloud_Create(void);
++void KyotoCloud_Destroy(void);
++void KyotoCloud_Prepare(void);
++void KyotoCloud_VBlank(void);
++void KyotoCloud_OnCallbackChange(void (*callback)(void));
++void KyotoCloud_SetFieldLoading(void);
++void KyotoCloud_BeforePaletteTransfer(void);
++#endif
+diff --git a/include/sprite.h b/include/sprite.h
+index 4cedceb0171f5f1ef9467df57c338566abf8dc01..e9ce1d650d2ee7312bfe97a5263ab6ed1ed4fdea 100644
+--- a/include/sprite.h
++++ b/include/sprite.h
+@@ -287,6 +287,7 @@ void SetOamMatrix(u8 matrixNum, u16 a, u16 b, u16 c, u16 d);
+ void CalcCenterToCornerVec(struct Sprite *sprite, u8 shape, u8 size, u8 affineMode);
+ void SpriteCallbackDummy(struct Sprite *sprite);
+ void ProcessSpriteCopyRequests(void);
++const u8 *GetSpriteGraphicsForPendingFrame(const u8 *vram, u32 size);
+ void RequestSpriteCopy(const u8 *src, u8 *dest, u16 size);
+ void FreeSpriteTiles(struct Sprite *sprite);
+ void FreeSpritePalette(struct Sprite *sprite);
+diff --git a/ld_script_modern.ld b/ld_script_modern.ld
+index 005ca633ffa4cd60c2724ca0ba1e62a425cc29fe..14a65889f40fe886f1f7b8a9b9edb114d4bf5a83 100644
+--- a/ld_script_modern.ld
++++ b/ld_script_modern.ld
+@@ -139,3 +139,8 @@ SECTIONS {
+         *(*);
+     }
+ }
++
++ASSERT(KyotoCloudShadePixelsEnd - KyotoCloudShadePixels <= 832, "Cloud shader exceeds stack buffer")
++
++/* Cloud silhouette code must leave room for field/menu call stacks. */
++ASSERT(ADDR(.iwram.bss) + SIZEOF(.iwram.bss) <= 0x03007300, "Cloud integration requires at least 3 KiB of IWRAM stack headroom")
+diff --git a/src/data/items.h b/src/data/items.h
+index c51a5acf9af4a1fb218126f9069489265102a2ed..762f1e1a8c7f431946400c11fc1f42db2a7b3e05 100644
+--- a/src/data/items.h
++++ b/src/data/items.h
+@@ -19,6 +19,9 @@
+ 
+ const u8 gQuestionMarksItemName[] = _("????????");
+ 
++static const u32 sParagliderItemIcon[] = INCGFX_U32("graphics/glide/item.png", ".4bpp.lz");
++static const u16 sParagliderItemPalette[] = INCGFX_U16("graphics/glide/item.png", ".gbapal");
++
+ const struct ItemInfo gItemsInfo[] =
+ {
+     [ITEM_NONE] =
+@@ -14023,6 +14026,22 @@ const struct ItemInfo gItemsInfo[] =
+         .iconPalette = gItemIconPalette_MachBike,
+     },
+ 
++    [ITEM_PARAGLIDER] =
++    {
++        .name = ITEM_NAME("Paraglider"),
++        .price = 0,
++        .description = COMPOUND_STRING(
++            "A glider for crossing\n"
++            "cloud paths. Use at\n"
++            "a marked landing."),
++        .importance = 1,
++        .pocket = POCKET_KEY_ITEMS,
++        .type = ITEM_USE_FIELD,
++        .fieldUseFunc = ItemUseOutOfBattle_Paraglider,
++        .iconPic = sParagliderItemIcon,
++        .iconPalette = sParagliderItemPalette,
++    },
++
+     [ITEM_ACRO_BIKE] =
+     {
+         .name = ITEM_NAME("Acro Bike"),
+diff --git a/src/event_object_movement.c b/src/event_object_movement.c
+index 20e098c13aeb50193bb2190f7808df1657f07d2f..47ce7b4c1413589bdb73de911eabdac8c1b41262 100644
+--- a/src/event_object_movement.c
++++ b/src/event_object_movement.c
+@@ -1,4 +1,5 @@
+ #include "global.h"
++#include "glide.h"
+ #include "malloc.h"
+ #include "battle_anim.h"
+ #include "battle_pyramid.h"
+@@ -6415,6 +6416,8 @@ enum Collision GetCollisionAtCoords(struct ObjectEvent *objectEvent, s16 x, s16
+     #endif
+ 
+     objectEvent->directionOverwrite = DIR_NONE;
++    if (Glide_GetCollision(objectEvent, x, y, &collision))
++        return collision;
+ 
+     //sideways stairs checks
+     if (MetatileBehavior_IsSidewaysStairsLeftSideTop(nextBehavior) && dir == DIR_EAST)
+diff --git a/src/field_player_avatar.c b/src/field_player_avatar.c
+index 25e331d6f59e9ee4d096bfac392147b4f913556c..5d10def146cad718a1f65ac375b878beb80b30ce 100644
+--- a/src/field_player_avatar.c
++++ b/src/field_player_avatar.c
+@@ -1,4 +1,5 @@
+ #include "global.h"
++#include "glide.h"
+ #include "main.h"
+ #include "bike.h"
+ #include "event_data.h"
+@@ -361,6 +362,9 @@ void PlayerStep(enum Direction direction, u16 newKeys, u16 heldKeys)
+ {
+     struct ObjectEvent *playerObjEvent = &gObjectEvents[gPlayerAvatar.objectEventId];
+ 
++    Glide_Update();
++    if (Glide_IsActive())
++        heldKeys &= ~B_BUTTON;
+     HideShowWarpArrow(playerObjEvent);
+     if (gPlayerAvatar.preventStep == FALSE && !TryUpdatePlayerSpinDirection())
+     {
+@@ -965,6 +969,8 @@ enum Collision CheckForObjectEventCollision(struct ObjectEvent *objectEvent, s16
+ {
+     enum Collision collision = GetCollisionAtCoords(objectEvent, x, y, direction);
+ 
++    if (Glide_IsActive())
++        return collision;
+     if (collision == COLLISION_ELEVATION_MISMATCH && CanStopSurfing(x, y, direction))
+         return COLLISION_STOP_SURFING;
+ 
+diff --git a/src/field_weather_effect.c b/src/field_weather_effect.c
+index ca0e9c7f8c30496b0ad0d9e5552ed5c5359ae97c..1188f70447978e561093567ade45372d4693f90a 100644
+--- a/src/field_weather_effect.c
++++ b/src/field_weather_effect.c
+@@ -1,4 +1,5 @@
+ #include "global.h"
++#include "kyoto_cloud_layers.h"
+ #include "battle_anim.h"
+ #include "event_object_movement.h"
+ #include "fieldmap.h"
+@@ -35,63 +36,6 @@ const u8 gWeatherSandstormTiles[] = INCGFX_U8("graphics/weather/sandstorm.png",
+ // WEATHER_SUNNY_CLOUDS
+ //------------------------------------------------------------------------------
+ 
+-static void CreateCloudSprites(void);
+-static void DestroyCloudSprites(void);
+-static void UpdateCloudSprite(struct Sprite *);
+-
+-// The clouds are positioned on the map's grid.
+-// These coordinates are for the lower half of Route 120.
+-static const struct Coords16 sCloudSpriteMapCoords[] =
+-{
+-    { 0, 66},
+-    { 5, 73},
+-    {10, 78},
+-};
+-
+-static const struct SpriteSheet sCloudSpriteSheet =
+-{
+-    .data = gWeatherCloudTiles,
+-    .size = sizeof(gWeatherCloudTiles),
+-    .tag = GFXTAG_CLOUD
+-};
+-
+-static const struct OamData sCloudSpriteOamData =
+-{
+-    .y = 0,
+-    .affineMode = ST_OAM_AFFINE_OFF,
+-    .objMode = ST_OAM_OBJ_BLEND,
+-    .mosaic = FALSE,
+-    .bpp = ST_OAM_4BPP,
+-    .shape = SPRITE_SHAPE(64x64),
+-    .x = 0,
+-    .matrixNum = 0,
+-    .size = SPRITE_SIZE(64x64),
+-    .tileNum = 0,
+-    .priority = 3,
+-    .paletteNum = 0,
+-    .affineParam = 0,
+-};
+-
+-static const union AnimCmd sCloudSpriteAnimCmd[] =
+-{
+-    ANIMCMD_FRAME(0, 16),
+-    ANIMCMD_END,
+-};
+-
+-static const union AnimCmd *const sCloudSpriteAnimCmds[] =
+-{
+-    sCloudSpriteAnimCmd,
+-};
+-
+-static const struct SpriteTemplate sCloudSpriteTemplate =
+-{
+-    .tileTag = GFXTAG_CLOUD,
+-    .paletteTag = PALTAG_WEATHER_2,
+-    .oam = &sCloudSpriteOamData,
+-    .anims = sCloudSpriteAnimCmds,
+-    .callback = UpdateCloudSprite,
+-};
+-
+ void Clouds_InitVars(void)
+ {
+     gWeatherPtr->noShadows = FALSE;
+@@ -115,11 +59,11 @@ void Clouds_Main(void)
+     switch (gWeatherPtr->initStep)
+     {
+     case 0:
+-        CreateCloudSprites();
++        KyotoCloud_Create();
+         gWeatherPtr->initStep++;
+         break;
+     case 1:
+-        Weather_SetTargetBlendCoeffs(12, 8, 1);
++        Weather_SetTargetBlendCoeffs(14, 2, 1);
+         gWeatherPtr->initStep++;
+         break;
+     case 2:
+@@ -143,7 +87,7 @@ bool8 Clouds_Finish(void)
+     case 1:
+         if (Weather_UpdateBlend())
+         {
+-            DestroyCloudSprites();
++            KyotoCloud_Destroy();
+             gWeatherPtr->finishStep++;
+         }
+         return TRUE;
+@@ -175,61 +119,6 @@ bool8 Sunny_Finish(void)
+     return FALSE;
+ }
+ 
+-static void CreateCloudSprites(void)
+-{
+-    u16 i;
+-    u8 spriteId;
+-    struct Sprite *sprite;
+-
+-    if (gWeatherPtr->cloudSpritesCreated == TRUE)
+-        return;
+-
+-    LoadSpriteSheet(&sCloudSpriteSheet);
+-    LoadCustomWeatherSpritePalette(gCloudsWeatherPalette);
+-    for (i = 0; i < NUM_CLOUD_SPRITES; i++)
+-    {
+-        spriteId = CreateSpriteUnchecked(&sCloudSpriteTemplate, 0, 0, 0xFF);
+-        if (spriteId != MAX_SPRITES)
+-        {
+-            gWeatherPtr->sprites.s1.cloudSprites[i] = &gSprites[spriteId];
+-            sprite = gWeatherPtr->sprites.s1.cloudSprites[i];
+-            SetSpritePosToMapCoords(sCloudSpriteMapCoords[i].x + MAP_OFFSET, sCloudSpriteMapCoords[i].y + MAP_OFFSET, &sprite->x, &sprite->y);
+-            sprite->coordOffsetEnabled = TRUE;
+-        }
+-        else
+-        {
+-            gWeatherPtr->sprites.s1.cloudSprites[i] = NULL;
+-        }
+-    }
+-
+-    gWeatherPtr->cloudSpritesCreated = TRUE;
+-}
+-
+-static void DestroyCloudSprites(void)
+-{
+-    u16 i;
+-
+-    if (!gWeatherPtr->cloudSpritesCreated)
+-        return;
+-
+-    for (i = 0; i < NUM_CLOUD_SPRITES; i++)
+-    {
+-        if (gWeatherPtr->sprites.s1.cloudSprites[i] != NULL)
+-            DestroySprite(gWeatherPtr->sprites.s1.cloudSprites[i]);
+-    }
+-
+-    FreeSpriteTilesByTag(GFXTAG_CLOUD);
+-    gWeatherPtr->cloudSpritesCreated = FALSE;
+-}
+-
+-static void UpdateCloudSprite(struct Sprite *sprite)
+-{
+-    // Move 1 pixel left every 2 frames.
+-    sprite->data[0] = (sprite->data[0] + 1) & 1;
+-    if (sprite->data[0])
+-        sprite->x--;
+-}
+-
+ //------------------------------------------------------------------------------
+ // WEATHER_DROUGHT
+ //------------------------------------------------------------------------------
+diff --git a/src/glide.c b/src/glide.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..ac8991a07c5779ef6054fe7a0d757238e3e99a22
+--- /dev/null
++++ b/src/glide.c
+@@ -0,0 +1,211 @@
++#include "global.h"
++#include "glide.h"
++#include "event_object_movement.h"
++#include "field_player_avatar.h"
++#include "fieldmap.h"
++#include "item.h"
++#include "main.h"
++#include "sprite.h"
++#include "constants/items.h"
++#include "constants/metatile_behaviors.h"
++#include "constants/event_objects.h"
++
++// Reserve this palette tag in forks that add custom sprites.
++#define GLIDE_PALETTE_TAG 0x11FE
++static const u8 sTiles[] = INCGFX_U8("graphics/glide/paraglider.png", ".4bpp");
++static const u16 sPalette[] = INCBIN_U16("graphics/glide/paraglider.gbapal");
++static const struct SpriteFrameImage sImages[] = {
++    {sTiles, 2048}, {sTiles + 2048, 2048}, {sTiles + 4096, 2048}, {sTiles + 6144, 2048},
++};
++static const struct SpritePalette sPal = {sPalette, GLIDE_PALETTE_TAG};
++static const struct OamData sOam = {
++    .shape = SPRITE_SHAPE(64x64), .size = SPRITE_SIZE(64x64), .priority = 1,
++};
++static const union AnimCmd sSouth[] = {ANIMCMD_FRAME(0, 1), ANIMCMD_END};
++static const union AnimCmd sNorth[] = {ANIMCMD_FRAME(1, 1), ANIMCMD_END};
++static const union AnimCmd sWest[] = {ANIMCMD_FRAME(2, 1), ANIMCMD_END};
++static const union AnimCmd sEast[] = {ANIMCMD_FRAME(3, 1), ANIMCMD_END};
++static const union AnimCmd *const sAnims[] = {sSouth, sNorth, sWest, sEast};
++static void SpriteCB_Glide(struct Sprite *sprite);
++static const struct SpriteTemplate sTemplate = {
++    .tileTag = TAG_NONE, .paletteTag = GLIDE_PALETTE_TAG,
++    .oam = &sOam, .anims = sAnims, .images = sImages,
++    .affineAnims = gDummySpriteAffineAnimTable, .callback = SpriteCB_Glide,
++};
++EWRAM_DATA static bool8 sGlideActive = FALSE;
++EWRAM_DATA static bool8 sGlideReachedCloud = FALSE;
++EWRAM_DATA static u8 sGlideSpriteId = 0;
++EWRAM_DATA static bool8 sGlideHidPlayer = FALSE;
++
++static struct ObjectEvent *Player(void)
++{
++    if (gPlayerAvatar.objectEventId >= OBJECT_EVENTS_COUNT)
++        return NULL;
++    return &gObjectEvents[gPlayerAvatar.objectEventId];
++}
++static u8 Behavior(s16 x, s16 y)
++{
++    return MapGridGetMetatileBehaviorAt(x, y);
++}
++static bool8 OnFoot(void)
++{
++    return (gPlayerAvatar.flags & (PLAYER_AVATAR_FLAG_ON_FOOT
++        | PLAYER_AVATAR_FLAG_MACH_BIKE | PLAYER_AVATAR_FLAG_ACRO_BIKE
++        | PLAYER_AVATAR_FLAG_SURFING | PLAYER_AVATAR_FLAG_UNDERWATER))
++        == PLAYER_AVATAR_FLAG_ON_FOOT;
++}
++bool8 Glide_IsActive(void)
++{
++    struct ObjectEvent *p = Player();
++    return sGlideActive || (p != NULL && p->active && OnFoot()
++        && Behavior(p->currentCoords.x, p->currentCoords.y) == MB_GLIDE_CLOUD
++        && CheckBagHasItem(ITEM_PARAGLIDER, 1));
++}
++
++static void ShowPlayer(void)
++{
++    struct ObjectEvent *p = Player();
++    if (sGlideHidPlayer && p != NULL && p->spriteId < MAX_SPRITES)
++        gSprites[p->spriteId].invisible = p->invisible;
++    sGlideHidPlayer = FALSE;
++}
++void Glide_Reset(void)
++{
++    ShowPlayer();
++    if (sGlideSpriteId < MAX_SPRITES && gSprites[sGlideSpriteId].inUse
++        && gSprites[sGlideSpriteId].callback == SpriteCB_Glide)
++        DestroySprite(&gSprites[sGlideSpriteId]);
++    sGlideSpriteId = MAX_SPRITES;
++    FreeSpritePaletteByTag(GLIDE_PALETTE_TAG);
++    sGlideActive = FALSE;
++    sGlideReachedCloud = FALSE;
++}
++static bool8 CreateGlider(void)
++{
++    if (sGlideSpriteId < MAX_SPRITES && gSprites[sGlideSpriteId].inUse
++        && gSprites[sGlideSpriteId].callback == SpriteCB_Glide)
++        return TRUE;
++    if (LoadSpritePalette(&sPal) == 0xFF)
++    {
++        return FALSE;
++    }
++    sGlideSpriteId = CreateSpriteUnchecked(&sTemplate, 0, 0, 0);
++    if (sGlideSpriteId == MAX_SPRITES)
++    {
++        FreeSpritePaletteByTag(GLIDE_PALETTE_TAG);
++        return FALSE;
++    }
++    return TRUE;
++}
++static bool8 InsideMap(s16 x, s16 y)
++{
++    return x >= MAP_OFFSET && y >= MAP_OFFSET
++        && x < gMapHeader.mapLayout->width + MAP_OFFSET
++        && y < gMapHeader.mapLayout->height + MAP_OFFSET;
++}
++bool8 Glide_CanUse(void)
++{
++    struct ObjectEvent *p = Player();
++    s16 x, y;
++    if (p == NULL || !p->active || !OnFoot()
++        || !CheckBagHasItem(ITEM_PARAGLIDER, 1))
++        return FALSE;
++    x = p->currentCoords.x; y = p->currentCoords.y;
++    if (Behavior(x, y) != MB_GLIDE_LANDING)
++        return FALSE;
++    if (sGlideActive)
++        return TRUE;
++    MoveCoords(p->facingDirection, &x, &y);
++    return InsideMap(x, y) && Behavior(x, y) == MB_GLIDE_CLOUD;
++}
++void Glide_Toggle(void)
++{
++    if (!Glide_CanUse()) return;
++    if (sGlideActive) Glide_Reset();
++    else if (CreateGlider())
++    {
++        sGlideActive = TRUE;
++        sGlideReachedCloud = FALSE;
++        Glide_Update();
++    }
++}
++void Glide_Update(void)
++{
++    struct ObjectEvent *p = Player();
++    u8 b;
++    if (p == NULL || !p->active || !OnFoot())
++    {
++        if (sGlideActive) Glide_Reset();
++        return;
++    }
++    b = Behavior(p->currentCoords.x, p->currentCoords.y);
++    if (!sGlideActive && b == MB_GLIDE_CLOUD && CheckBagHasItem(ITEM_PARAGLIDER, 1))
++    {
++        // Derive air state after save/load and full-screen menus; no save extension.
++        sGlideActive = TRUE;
++        sGlideReachedCloud = TRUE;
++    }
++    if (!sGlideActive) return;
++    if (b == MB_GLIDE_CLOUD) sGlideReachedCloud = TRUE;
++    else if (sGlideReachedCloud && gPlayerAvatar.tileTransitionState != T_TILE_TRANSITION
++        && p->currentCoords.x == p->previousCoords.x
++        && p->currentCoords.y == p->previousCoords.y)
++    {
++        Glide_Reset();
++        return;
++    }
++    if (CreateGlider()) SpriteCB_Glide(&gSprites[sGlideSpriteId]);
++    // On allocation failure preserve terrain permissions and the normal player sprite.
++}
++static void SpriteCB_Glide(struct Sprite *sprite)
++{
++    struct ObjectEvent *p = Player();
++    struct Sprite *hero;
++    u8 dir;
++    if (!sGlideActive || p == NULL || p->spriteId >= MAX_SPRITES)
++    {
++        sprite->invisible = TRUE;
++        return;
++    }
++    hero = &gSprites[p->spriteId];
++    dir = p->facingDirection;
++    if (dir >= DIR_SOUTH && dir <= DIR_EAST)
++        StartSpriteAnimIfDifferent(sprite, dir - DIR_SOUTH);
++    sprite->x = hero->x;
++    // Keep the feet at the same map position as the 16x32 on-foot sprite.
++    sprite->y = hero->y - 16;
++    sprite->x2 = hero->x2;
++    sprite->y2 = hero->y2 + ((gMain.vblankCounter1 >> 4) % 3) - 1;
++    sprite->coordOffsetEnabled = hero->coordOffsetEnabled;
++    sprite->oam.priority = hero->oam.priority;
++    sprite->subpriority = hero->subpriority;
++    sprite->invisible = p->invisible;
++    hero->invisible = TRUE;
++    sGlideHidPlayer = TRUE;
++}
++bool8 Glide_GetCollision(struct ObjectEvent *object, s16 x, s16 y, enum Collision *result)
++{
++    u8 b = Behavior(x, y);
++    u8 i;
++    struct ObjectEvent *p = Player();
++    if (b != MB_GLIDE_CLOUD && (object != p || !sGlideActive)) return FALSE;
++    *result = COLLISION_IMPASSABLE;
++    if (object != p || !sGlideActive) return TRUE;
++    if (b == MB_GLIDE_LANDING) return FALSE;
++    if (b != MB_GLIDE_CLOUD) return TRUE;
++    // Deliberately block connections: place an explicit landing before a warp/edge.
++    if (!InsideMap(x, y)) return TRUE;
++    for (i = 0; i < OBJECT_EVENTS_COUNT; i++)
++    {
++        struct ObjectEvent *other = &gObjectEvents[i];
++        if (other == p || !other->active) continue;
++        if ((other->currentCoords.x == x && other->currentCoords.y == y)
++            || (other->previousCoords.x == x && other->previousCoords.y == y))
++        {
++            *result = COLLISION_OBJECT_EVENT;
++            return TRUE;
++        }
++    }
++    *result = COLLISION_NONE;
++    return TRUE;
++}
+diff --git a/src/item_menu.c b/src/item_menu.c
+index d5acdfd9aa3f496a541c8d42480cfff237772d41..283bcc1b4ed5ce458246eeef3c6fdf69a5719769 100755
+--- a/src/item_menu.c
++++ b/src/item_menu.c
+@@ -1,4 +1,5 @@
+ #include "global.h"
++#include "kyoto_cloud_layers.h"
+ #include "item_menu.h"
+ #include "battle.h"
+ #include "battle_controllers.h"
+@@ -657,6 +658,7 @@ void QuizLadyOpenBagMenu(void)
+ 
+ void GoToBagMenu(u8 location, u8 pocket, MainCallback exitCallback)
+ {
++    KyotoCloud_OnCallbackChange(NULL);
+     gBagMenu = AllocZeroed(sizeof(*gBagMenu));
+     if (gBagMenu == NULL)
+     {
+diff --git a/src/item_use.c b/src/item_use.c
+index 88c611f7a7e5ccf8312133c72865f07b4b4dd55c..381dbef0ba20c3268c081a8821dd081a9196c327 100644
+--- a/src/item_use.c
++++ b/src/item_use.c
+@@ -1,4 +1,5 @@
+ #include "global.h"
++#include "glide.h"
+ #include "item_use.h"
+ #include "battle.h"
+ #include "battle_anim.h"
+@@ -272,6 +273,25 @@ void ItemUseOutOfBattle_ExpShare(u8 taskId)
+ #endif
+ }
+ 
++static void ItemUseOnFieldCB_Paraglider(u8 taskId)
++{
++    Glide_Toggle();
++    ScriptUnfreezeObjectEvents();
++    UnlockPlayerFieldControls();
++    DestroyTask(taskId);
++}
++
++void ItemUseOutOfBattle_Paraglider(u8 taskId)
++{
++    if (Glide_CanUse())
++    {
++        sItemUseOnFieldCB = ItemUseOnFieldCB_Paraglider;
++        SetUpItemUseOnFieldCallback(taskId);
++    }
++    else
++        DisplayDadsAdviceCannotUseItemMessage(taskId, gTasks[taskId].tUsingRegisteredKeyItem);
++}
++
+ void ItemUseOutOfBattle_Bike(u8 taskId)
+ {
+     s16 *data = gTasks[taskId].data;
+@@ -280,6 +300,11 @@ void ItemUseOutOfBattle_Bike(u8 taskId)
+     u8 behavior;
+     PlayerGetDestCoords(&coordsX, &coordsY);
+     behavior = MapGridGetMetatileBehaviorAt(coordsX, coordsY);
++    if (Glide_IsActive())
++    {
++        DisplayDadsAdviceCannotUseItemMessage(taskId, tUsingRegisteredKeyItem);
++        return;
++    }
+     if (FlagGet(FLAG_SYS_CYCLING_ROAD) == TRUE || MetatileBehavior_IsVerticalRail(behavior) == TRUE || MetatileBehavior_IsHorizontalRail(behavior) == TRUE || MetatileBehavior_IsIsolatedVerticalRail(behavior) == TRUE || MetatileBehavior_IsIsolatedHorizontalRail(behavior) == TRUE)
+     {
+         DisplayCannotDismountBikeMessage(taskId, tUsingRegisteredKeyItem);
+diff --git a/src/kyoto_cloud_layers.c b/src/kyoto_cloud_layers.c
+new file mode 100644
+index 0000000000000000000000000000000000000000..a10920897fd44db5a93d50f5b5457bac314532dc
+--- /dev/null
++++ b/src/kyoto_cloud_layers.c
+@@ -0,0 +1,319 @@
++#include "global.h"
++#include "field_camera.h"
++#include "field_weather.h"
++#include "main.h"
++#include "malloc.h"
++#include "overworld.h"
++#include "palette.h"
++#include "sprite.h"
++#include "util.h"
++#include "constants/weather.h"
++#include "kyoto_cloud_layers.h"
++#include "kyoto_cloud_config.h"
++
++#define CLOUD_COUNT 11
++#define CLOUD_CELL_BYTES 2048
++#define CLOUD_OBJ_BYTES (CLOUD_COUNT * CLOUD_CELL_BYTES)
++#define ALL_CLOUD_CELLS ((1 << CLOUD_COUNT) - 1)
++static const u8 sCloudTiles[] = INCBIN_U8("graphics/weather/kyoto_clouds/foreground.bin");
++static const u16 sCloudPalette[] = INCBIN_U16("graphics/weather/kyoto_clouds/foreground_palette.bin");
++extern const u32 KyotoCloudShadePixels[], KyotoCloudShadePixelsEnd[];
++
++struct CloudState
++{
++    u8 *buffer;
++    int shadowX[11], shadowY[11], shadowArgs[11];
++    u8 tones[16];
++    u8 sprites[CLOUD_COUNT];
++    bool8 created, paused, fieldLoading, holdBlack;
++    u16 oldShadows, dirtyCells;
++    u16 lastX, lastY;
++    s32 cameraX, cameraY;
++    u32 tickBase, pauseFrame, pauseTickBase;
++};
++EWRAM_DATA static struct CloudState sCloud = {0};
++
++static void CloudSpriteCallback(struct Sprite *sprite);
++static const struct OamData sCloudOam =
++{
++    .affineMode = ST_OAM_AFFINE_OFF,
++    .objMode = ST_OAM_OBJ_BLEND,
++    .bpp = ST_OAM_4BPP,
++    .shape = SPRITE_SHAPE(64x64),
++    .size = SPRITE_SIZE(64x64),
++    .priority = 1,
++};
++static const union AnimCmd sCloudAnim[] = { ANIMCMD_FRAME(0, 16), ANIMCMD_END };
++static const union AnimCmd *const sCloudAnims[] = { sCloudAnim };
++static const struct SpriteTemplate sCloudTemplate =
++{
++    .tileTag = GFXTAG_CLOUD,
++    .paletteTag = PALTAG_WEATHER_2,
++    .oam = &sCloudOam,
++    .anims = sCloudAnims,
++    .images = NULL,
++    .affineAnims = gDummySpriteAffineAnimTable,
++    .callback = CloudSpriteCallback,
++};
++
++static void UpdateCamera(void)
++{
++    s16 x, y;
++    GetCameraOffsetWithPan(&x, &y);
++    sCloud.cameraX += (s8)(x - sCloud.lastX);
++    sCloud.cameraY += (s8)(y - sCloud.lastY);
++    sCloud.lastX = x;
++    sCloud.lastY = y;
++}
++
++static void FreeBuffer(void)
++{
++    sCloud.dirtyCells = 0;
++    if (sCloud.buffer != NULL)
++        Free(sCloud.buffer);
++    sCloud.buffer = NULL;
++}
++
++void KyotoCloud_Create(void)
++{
++    u32 i;
++    s16 x, y;
++    struct SpriteSheet sheet;
++    if (gWeatherPtr->cloudSpritesCreated)
++        return;
++    sheet.data = sCloudTiles;
++    sheet.size = sizeof(sCloudTiles);
++    sheet.tag = GFXTAG_CLOUD;
++    LoadSpriteSheet(&sheet);
++    if (GetSpriteTileStartByTag(GFXTAG_CLOUD) == TAG_NONE)
++    {
++        gWeatherPtr->cloudSpritesCreated = TRUE;
++        return; // No OBJ allocation: leave the rest of the field intact.
++    }
++    LoadCustomWeatherSpritePalette(sCloudPalette);
++    for (i = 0; i < CLOUD_COUNT; i++)
++    {
++        u8 id = CreateSpriteUnchecked(&sCloudTemplate, 0, 0, 0);
++        sCloud.sprites[i] = id;
++        if (id != MAX_SPRITES)
++        {
++            gSprites[id].data[0] = i;
++            gSprites[id].sheetTileStart += i * 64;
++            gSprites[id].oam.tileNum = gSprites[id].sheetTileStart;
++            gSprites[id].coordOffsetEnabled = FALSE;
++            gSprites[id].animPaused = TRUE;
++        }
++    }
++    GetCameraOffsetWithPan(&x, &y);
++    sCloud.lastX = x;
++    sCloud.lastY = y;
++    sCloud.cameraX = sCloud.cameraY = 0;
++    sCloud.tickBase = gMain.vblankCounter1;
++    sCloud.created = TRUE;
++    gWeatherPtr->cloudSpritesCreated = TRUE;
++}
++
++void KyotoCloud_Destroy(void)
++{
++    u32 i;
++    for (i = 0; i < CLOUD_COUNT; i++)
++    {
++        u8 id = sCloud.sprites[i];
++        if (sCloud.created && id < MAX_SPRITES && gSprites[id].inUse && gSprites[id].callback == CloudSpriteCallback)
++            DestroySprite(&gSprites[id]);
++    }
++    FreeSpriteTilesByTag(GFXTAG_CLOUD);
++    FreeBuffer();
++    memset(&sCloud, 0, sizeof(sCloud));
++    gWeatherPtr->cloudSpritesCreated = FALSE;
++}
++
++static void CloudSpriteCallback(struct Sprite *sprite)
++{
++    u32 tick, index = sprite->data[0];
++    s32 x, y, lane;
++    if (sCloud.paused)
++    {
++        sprite->invisible = TRUE;
++        return;
++    }
++    UpdateCamera();
++    tick = (gMain.vblankCounter1 - sCloud.tickBase) & 4095;
++    // Each off-screen horizontal wrap advances one world lane. Keep camera
++    // subtraction so walking never drags the weather along with the player.
++    if (index < 8)
++    {
++        x = 256 - (s32)tick - sCloud.cameraX;
++        lane = ((x >> 9) & 3) * 64;
++        x = (x & 511) - 224;
++        y = ((160 + lane - sCloud.cameraY) & 255) - 96;
++        x += (index & 3) * 64;
++        y += (index / 4) * 64;
++    }
++    else if (index < 10)
++    {
++        x = 416 - (s32)tick - sCloud.cameraX;
++        lane = ((x >> 9) & 3) * 64;
++        x = (x & 511) - 96;
++        y = ((224 + lane - sCloud.cameraY) & 255) - 32;
++        x += (index - 8) * 64;
++    }
++    else
++    {
++        x = 496 - (s32)tick - sCloud.cameraX;
++        lane = ((x >> 9) & 3) * 64;
++        x = (x & 511) - 32;
++        y = ((32 + lane - sCloud.cameraY) & 255) - 32;
++    }
++    sprite->x = x;
++    sprite->y = y;
++    sprite->x2 = sprite->y2 = 0;
++    sprite->oam.priority = 1;
++    sprite->subpriority = 0;
++    sprite->oam.tileNum = sprite->sheetTileStart;
++    sprite->invisible = (x <= -32 || x >= 272 || y <= -32 || y >= 192);
++}
++
++void KyotoCloud_OnCallbackChange(void (*callback)(void))
++{
++    if (sCloud.created && gMain.callback2 == CB2_Overworld && callback != CB2_Overworld)
++    {
++        sCloud.paused = TRUE;
++        sCloud.pauseFrame = gMain.vblankCounter1;
++        sCloud.pauseTickBase = sCloud.tickBase;
++        sCloud.holdBlack = TRUE;
++        sCloud.fieldLoading = FALSE;
++        sCloud.created = FALSE; // Wait for weather sprite recreation before touching new field VRAM.
++        FreeBuffer();
++    }
++}
++
++void KyotoCloud_SetFieldLoading(void)
++{
++    if (sCloud.holdBlack)
++        sCloud.fieldLoading = TRUE;
++}
++
++void KyotoCloud_BeforePaletteTransfer(void)
++{
++    // UpdatePaletteFade clears the selection mask before the field callback
++    // hands control to Bag. Field reconstruction must remain black until ready.
++    if ((sCloud.holdBlack && sCloud.fieldLoading)
++     || (sCloud.created && gMain.callback2 == CB2_Overworld
++      && gPaletteFade.y == 16 && gPaletteFade.blendColor == 0
++      && (gPaletteFadeSelectedPalettes == 0
++       || gPaletteFadeSelectedPalettes == PALETTES_ALL)))
++        CpuFill16(0, gPlttBufferFaded, PLTT_SIZE);
++}
++
++static inline __attribute__((always_inline)) int OamX(u16 b) { int x = b & 511; return x >= 256 ? x - 512 : x; }
++static inline __attribute__((always_inline)) int OamY(u16 a) { int y = a & 255; return y >= 160 ? y - 256 : y; }
++static const u8 sWidths[] = {8,16,32,64,16,32,32,64,8,8,16,32};
++static const u8 sHeights[] = {8,16,32,64,8,8,16,32,16,32,32,64};
++
++static void PrepareShadows(u32 *code)
++{
++    u32 i, j, k, base = GetSpriteTileStartByTag(GFXTAG_CLOUD), present = 0, touched = 0;
++    int *cloudX = sCloud.shadowX, *cloudY = sCloud.shadowY;
++    const u16 *oam = (const u16 *)gMain.oamBuffer;
++    u8 *buffer = sCloud.buffer;
++    u32 (*shade)(u8 *, const u8 *, const u8 *, const int *) = (void *)code;
++    for (j = 0; j < CLOUD_COUNT; j++)
++        if (sCloud.oldShadows & (1 << j))
++            DmaCopy32(3, sCloudTiles + j * CLOUD_CELL_BYTES, buffer + j * CLOUD_CELL_BYTES, CLOUD_CELL_BYTES);
++    for (i = 0; i < 128; i++)
++    {
++        u16 a = oam[i * 4], b = oam[i * 4 + 1], c = oam[i * 4 + 2];
++        u32 tile = c & 1023;
++        if ((a & 0x300) == 0x200 || tile < base || tile >= base + 704 || ((tile - base) & 63))
++            continue;
++        j = (tile - base) >> 6;
++        cloudX[j] = OamX(b);
++        cloudY[j] = OamY(a);
++        present |= 1 << j;
++    }
++    for (i = 0; i < 128; i++)
++    {
++        u16 a = oam[i * 4], b = oam[i * 4 + 1], c = oam[i * 4 + 2];
++        u32 tile = c & 1023, shape, dim, width, height;
++        int x, y;
++        u8 *tones = sCloud.tones;
++        const u8 *pixels;
++        const u16 *palette;
++        // Native unused OAM entries have y=160 and cannot reach the screen.
++        // Ground-shadow/blend sprites do not cast another silhouette.
++        if (a == DISPLAY_HEIGHT || (a & 0x2F00) || !(c & 0xC00) || (tile >= base && tile < base + 704))
++            continue;
++        shape = a >> 14;
++        if (shape == 3)
++            continue;
++        dim = shape * 4 + (b >> 14);
++        width = sWidths[dim]; height = sHeights[dim]; x = OamX(b); y = OamY(a);
++        if (x >= 240 || y >= 160 || x + (int)width <= 0 || y + (int)height <= 0)
++            continue;
++        pixels = GetSpriteGraphicsForPendingFrame((const u8 *)(OBJ_VRAM0 + tile * 32), width * height / 2);
++        palette = &gPlttBufferFaded[OBJ_PLTT_OFFSET + (c >> 12) * 16];
++        for (k = 0; k < 16; k++)
++        {
++            u16 color = palette[k];
++            u32 lum = (color & 31) + 2 * ((color >> 5) & 31) + ((color >> 10) & 31);
++            tones[k] = lum < 40 ? 0 : lum < 80 ? 1 : 2;
++        }
++        for (j = 0; j < CLOUD_COUNT; j++)
++        {
++            int x0, y0, x1, y1;
++            int *args = sCloud.shadowArgs;
++            if (!(present & (1 << j))) continue;
++            x0 = x > cloudX[j] ? x : cloudX[j]; y0 = y > cloudY[j] ? y : cloudY[j];
++            x1 = x + (int)width < cloudX[j] + 64 ? x + (int)width : cloudX[j] + 64;
++            y1 = y + (int)height < cloudY[j] + 64 ? y + (int)height : cloudY[j] + 64;
++            if (x0 < 0) x0 = 0;
++            if (y0 < 0) y0 = 0;
++            if (x1 > 240) x1 = 240;
++            if (y1 > 160) y1 = 160;
++            if (x0 >= x1 || y0 >= y1) continue;
++            args[0]=x; args[1]=y; args[2]=width; args[3]=height; args[4]=b;
++            args[5]=x0; args[6]=y0; args[7]=x1; args[8]=y1; args[9]=cloudX[j]; args[10]=cloudY[j];
++            if (shade(buffer + j * CLOUD_CELL_BYTES, pixels, tones, args)) touched |= 1 << j;
++        }
++    }
++    sCloud.dirtyCells = touched | sCloud.oldShadows;
++    sCloud.oldShadows = touched;
++}
++
++void KyotoCloud_Prepare(void)
++{
++    u32 code[KYOTO_CLOUD_CODE_BUFFER_WORDS];
++    if (!sCloud.created || gWeatherPtr->currWeather != WEATHER_SUNNY_CLOUDS || gMain.callback2 != CB2_Overworld)
++        return;
++    sCloud.fieldLoading = FALSE;
++    sCloud.holdBlack = FALSE;
++    if (sCloud.paused)
++    {
++        if (sCloud.tickBase == sCloud.pauseTickBase)
++            sCloud.tickBase += gMain.vblankCounter1 - sCloud.pauseFrame;
++        sCloud.paused = FALSE;
++    }
++    if (sCloud.buffer == NULL)
++    {
++        sCloud.buffer = AllocUnchecked(CLOUD_OBJ_BYTES);
++        if (sCloud.buffer == NULL) return;
++        sCloud.oldShadows = ALL_CLOUD_CELLS;
++    }
++    CpuCopy32(KyotoCloudShadePixels, code, (u32)KyotoCloudShadePixelsEnd - (u32)KyotoCloudShadePixels);
++    PrepareShadows(code);
++}
++
++void KyotoCloud_VBlank(void)
++{
++    u32 base;
++    if (!sCloud.created || sCloud.buffer == NULL || gMain.callback2 != CB2_Overworld)
++        return;
++    base = GetSpriteTileStartByTag(GFXTAG_CLOUD);
++    if (base == TAG_NONE)
++        return;
++    for (u32 j = 0; j < CLOUD_COUNT; j++)
++        if (sCloud.dirtyCells & (1 << j))
++            DmaCopy32(3, sCloud.buffer + j * CLOUD_CELL_BYTES, (void *)(OBJ_VRAM0 + base * 32 + j * CLOUD_CELL_BYTES), CLOUD_CELL_BYTES);
++    sCloud.dirtyCells = 0;
++}
+diff --git a/src/main.c b/src/main.c
+index d5fcd27d009c1d82cfdaa074b8554687db5b8f1c..745d2248bd5e0a4dd2e24bc8b2cf7fba451bff38 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -1,4 +1,6 @@
+ #include "global.h"
++#include "kyoto_cloud_layers.h"
++#include "glide.h"
+ #include "opal_map_palette.h"
+ #include "crt0.h"
+ #include "malloc.h"
+@@ -206,6 +208,9 @@ static void CallCallbacks(void)
+ 
+ void SetMainCallback2(MainCallback callback)
+ {
++    if (callback != CB2_Overworld)
++        Glide_Reset();
++    KyotoCloud_OnCallbackChange(callback);
+     gMain.callback2 = callback;
+     gMain.state = 0;
+ }
+@@ -380,6 +385,7 @@ static void VBlankIntr(void)
+     {
+         CopyBufferedValuesToGpuRegs();
+         ProcessDma3Requests();
++        KyotoCloud_VBlank();
+     }
+ 
+     gPcmDmaCounter = gSoundInfo.pcmDmaCounter;
+diff --git a/src/opal_map_palette.c b/src/opal_map_palette.c
+index 1d249879006e2172d5b47520976c0a11caf23fe8..456fb52494f5b7967746a2268daa31c865db38c8 100644
+--- a/src/opal_map_palette.c
++++ b/src/opal_map_palette.c
+@@ -1,4 +1,5 @@
+ #include "global.h"
++#include "kyoto_cloud_layers.h"
+ #include "opal_map_palette.h"
+ #include "bg.h"
+ #include "field_weather.h"
+@@ -450,6 +451,7 @@ void OpalMapPalettesEndFrame(void)
+ {
+     if (sState && sState->dirty)
+         Prepare();
++    KyotoCloud_Prepare();
+     sInFrame = FALSE;
+ }
+ 
+diff --git a/src/overworld.c b/src/overworld.c
+index 129b037b07be325ca12b560966ab70c20d84545b..1a12d1288d3e0272f4a120ddcc41b2cacb509485 100644
+--- a/src/overworld.c
++++ b/src/overworld.c
+@@ -1,4 +1,6 @@
+ #include "global.h"
++#include "kyoto_cloud_layers.h"
++#include "glide.h"
+ #include "opal_map_palette.h"
+ #include "overworld.h"
+ #include "battle_pyramid.h"
+@@ -1859,6 +1861,7 @@ static void OverworldBasic(void)
+     ScriptContext_RunScript();
+     RunTasks();
+     AnimateSprites();
++    Glide_Update();
+     CameraUpdate();
+     UpdateCameraPanning();
+     BuildOamBuffer();
+@@ -2507,6 +2510,8 @@ static void ResetMirageTowerAndSaveBlockPtrs(void)
+ 
+ static void ResetScreenForMapLoad(void)
+ {
++    Glide_Reset();
++    KyotoCloud_SetFieldLoading();
+     SetGpuReg(REG_OFFSET_DISPCNT, 0);
+     ScanlineEffect_Stop();
+ 
+diff --git a/src/palette.c b/src/palette.c
+index c88168eed1c838b8aa70d3cd1fbf44091dde0bfb..23c26083d69127a7af69170aecd5957cb598d909 100644
+--- a/src/palette.c
++++ b/src/palette.c
+@@ -1,4 +1,5 @@
+ #include "global.h"
++#include "kyoto_cloud_layers.h"
+ #include "opal_map_palette.h"
+ #include "palette.h"
+ #include "util.h"
+@@ -130,6 +131,7 @@ void FillPalette(u32 value, u32 offset, u32 size)
+ 
+ void TransferPlttBuffer(void)
+ {
++    KyotoCloud_BeforePaletteTransfer();
+     if (!gPaletteFade.bufferTransferDisabled)
+     {
+         DmaCopy16Defvars(3, gPlttBufferFaded, (void *)PLTT, PLTT_SIZE);
+diff --git a/src/sprite.c b/src/sprite.c
+index 400ff93fee8c4029e60b0fd1a090fe1d389c0726..979ba69bdcdcaa5a42b6f23d30c94c81e8c54267 100644
+--- a/src/sprite.c
++++ b/src/sprite.c
+@@ -817,6 +817,22 @@ void RequestSpriteCopy(const u8 *src, u8 *dest, u16 size)
+     }
+ }
+ 
++// Use the animation frame queued for this OAM snapshot when shading clouds.
++const u8 *GetSpriteGraphicsForPendingFrame(const u8 *vram, u32 size)
++{
++    s32 i;
++    if (!sShouldProcessSpriteCopyRequests)
++        return vram;
++    for (i = sSpriteCopyRequestCount - 1; i >= 0; i--)
++    {
++        u32 start = (u32)sSpriteCopyRequests[i].dest;
++        u32 address = (u32)vram;
++        if (address >= start && address - start + size <= sSpriteCopyRequests[i].size)
++            return sSpriteCopyRequests[i].src + (address - start);
++    }
++    return vram;
++}
++
+ void CopyFromSprites(u8 *dest)
+ {
+     u32 i;
+diff --git a/src/trainer_card.c b/src/trainer_card.c
+index fd0208d66457f5497c8a887fb7d85fae3a25d338..725b6b94ca81c7e05d7c28607ba01ba904931bd7 100755
+--- a/src/trainer_card.c
++++ b/src/trainer_card.c
+@@ -1,4 +1,5 @@
+ #include "global.h"
++#include "kyoto_cloud_layers.h"
+ #include "scanline_effect.h"
+ #include "palette.h"
+ #include "task.h"
+@@ -1811,6 +1812,7 @@ static bool8 Task_EndCardFlip(struct Task *task)
+ 
+ void ShowPlayerTrainerCard(void (*callback)(void))
+ {
++    KyotoCloud_OnCallbackChange(NULL);
+     sData = AllocZeroed(sizeof(*sData));
+     sData->callback2 = callback;
+     if (callback == CB2_ReshowFrontierPass)
+diff --git a/tools/rebuild_kyoto_clouds.py b/tools/rebuild_kyoto_clouds.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..368a47edf6e9d5b4802f8439abebb8d020683e40
+--- /dev/null
++++ b/tools/rebuild_kyoto_clouds.py
+@@ -0,0 +1,19 @@
++#!/usr/bin/env python3
++"""Repack the indexed 64x704 cloud cell PNG into the runtime 4bpp cloud data."""
++from pathlib import Path
++from PIL import Image
++import argparse,struct
++p=argparse.ArgumentParser(description=__doc__);p.add_argument('png',type=Path);p.add_argument('output_directory',type=Path);a=p.parse_args()
++im=Image.open(a.png)
++if im.mode!='P' or im.size!=(64,704):raise SystemExit('Expected indexed 64x704 PNG; keep the eleven cells in their existing order.')
++if max(im.getdata())>15:raise SystemExit('Only indices 0..15 are supported.')
++b=bytearray()
++for ty in range(0,704,8):
++ for tx in range(0,64,8):
++  for y in range(8):
++   for x in range(0,8,2):b.append(im.getpixel((tx+x,ty+y))|(im.getpixel((tx+x+1,ty+y))<<4))
++a.output_directory.mkdir(parents=True,exist_ok=True)
++(a.output_directory/'foreground.bin').write_bytes(b)
++pal=im.getpalette()[:48];v=[(pal[i]>>3)|((pal[i+1]>>3)<<5)|((pal[i+2]>>3)<<10) for i in range(0,48,3)]
++(a.output_directory/'foreground_palette.bin').write_bytes(struct.pack('<16H',*v))
++print('Wrote',len(b),'bytes and 16 colors. Preserve silhouette shade slots 4..12.')

@@ -1,0 +1,22 @@
+[
+  {
+    "rate": 21024,
+    "samples": 2792596,
+    "seconds": 132.829,
+    "gba_bytes": 2792612,
+    "preview_bytes": 3720821,
+    "signal_peak_dbfs": -1.0061023662279154,
+    "signal_rms_dbfs": -18.836445396133154,
+    "sha256": "a6cba5297c891e39c2660cd41b521daafa540c04669c407db7f46076c28bda08"
+  },
+  {
+    "rate": 18157,
+    "samples": 2411776,
+    "seconds": 132.829,
+    "gba_bytes": 2411792,
+    "preview_bytes": 3720821,
+    "signal_peak_dbfs": -0.9302425858851336,
+    "signal_rms_dbfs": -18.836942342684416,
+    "sha256": "2c4318f7c53fa3b9ed0545e01acf960aa942122f5a748763130bc532b3e7cdbf"
+  }
+]

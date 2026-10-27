@@ -1,0 +1,34 @@
+{
+  "walking_blocked": true,
+  "select_launch": true,
+  "midair_dismount_blocked": true,
+  "npc_collision": true,
+  "landing": true,
+  "bag_roundtrips_native_palette": 5,
+  "bag_launch": true,
+  "performance": {
+    "idle": {
+      "game_updates": 1800,
+      "video_frames": 1800
+    },
+    "scroll_right": {
+      "game_updates": 89,
+      "video_frames": 90
+    },
+    "scroll_left": {
+      "game_updates": 89,
+      "video_frames": 90
+    }
+  },
+  "native_bg_tilemaps_unchanged": true,
+  "foreground_buffer_bytes": 22528,
+  "fixture_rom_sha256": "df120d4ed7d28e93ad0e6482486cd01d7147a33d6b2cae2123569a3ecd6c9503",
+  "installer": {
+    "fresh": "PASS",
+    "upgrade": "PASS",
+    "repeat": "PASS",
+    "user_changes_protected": "PASS"
+  },
+  "production_build": "PASS",
+  "source_commit": "b53c80f45086b5e0a651cd1d74da13b8864be055"
+}

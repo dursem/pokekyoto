@@ -1,0 +1,17 @@
+POKÉKYOTO TITELSCHERM – VOLUME FIX (+2,08 dB)
+
+Deze patch is voor wie de originele titelnummer-conversie al heeft geïnstalleerd.
+De GBA PCM-opname, sample-loops en muziek blijven identiek; enkel het MIDI-mastervolume
+van de titelmelodie wordt verhoogd van V100 naar V127, zonder andere muziek aan te passen.
+
+Download de zip en pak uit in de hoofdmap van je bestaande Pokekyoto-project.
+Open Ubuntu en voer uit:
+
+cd ~/PokemonDev/pokekyoto
+python3 Pokekyoto_Titel_VolumeFix/volume_fix.py .
+make -j4
+
+Het script maakt een back-up van midi.cfg en kan veilig meerdere keren worden uitgevoerd.
+Voor geen extra downloads kan dezelfde aanpassing ook rechtstreeks met:
+sed -i 's/-G_kyoto_title -V100/-G_kyoto_title -V127/' sound/songs/midi/midi.cfg
+make -j4

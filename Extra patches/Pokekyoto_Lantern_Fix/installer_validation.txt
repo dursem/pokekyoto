@@ -1,0 +1,9 @@
+Installed on branch: feature/lantern-fix
+The lantern-cap correction is already installed.
+from-light-menu.patch exact final tree
+from-native-icons.patch exact final tree
+from-cloud-icons.patch exact final tree
+from-lighting.patch exact final tree
+from-foreground.patch exact final tree
+from-master.patch exact final tree
+Installer b514 route and idempotence pass; all six routes produce the exact source tree.

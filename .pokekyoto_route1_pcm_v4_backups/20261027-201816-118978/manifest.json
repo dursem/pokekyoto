@@ -1,0 +1,8 @@
+{
+  "restore": [
+    "sound/direct_sound_data.inc"
+  ],
+  "delete": [
+    "data/kyoto_audio/route1_pcm.bin"
+  ]
+}

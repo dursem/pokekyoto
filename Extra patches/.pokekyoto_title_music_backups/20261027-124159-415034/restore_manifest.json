@@ -1,0 +1,23 @@
+{
+  "installation_id": "POKEKYOTO_TITLE_PCM_2026",
+  "modified": [
+    "sound/songs/midi/mus_title.mid",
+    "sound/songs/midi/midi.cfg",
+    "sound/voice_groups.inc",
+    "sound/direct_sound_data.inc",
+    "sound/voicegroups/kyoto_title.inc",
+    "sound/direct_sound_samples/kyoto_title.wav",
+    "sound/direct_sound_samples/kyoto_title.bin"
+  ],
+  "backed_up_existing": [
+    "sound/songs/midi/mus_title.mid",
+    "sound/songs/midi/midi.cfg",
+    "sound/voice_groups.inc",
+    "sound/direct_sound_data.inc"
+  ],
+  "originals_absent": [
+    "sound/voicegroups/kyoto_title.inc",
+    "sound/direct_sound_samples/kyoto_title.wav",
+    "sound/direct_sound_samples/kyoto_title.bin"
+  ]
+}

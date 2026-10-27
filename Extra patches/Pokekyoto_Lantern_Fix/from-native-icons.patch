@@ -1,0 +1,684 @@
+diff --git a/docs/KYOTO_LIGHTING_ICONS_EN.md b/docs/KYOTO_LIGHTING_ICONS_EN.md
+index 12026d55..d67f416b 100644
+--- a/docs/KYOTO_LIGHTING_ICONS_EN.md
++++ b/docs/KYOTO_LIGHTING_ICONS_EN.md
+@@ -1,13 +1,32 @@
+-# Kyoto native-size PokéSprite icons and softer lamp glow
++# Kyoto local lighting, menu transitions and native-size PokéSprite icons
+ 
+-This corrected package targets dursem/pokekyoto. It can update the previous cloud/icons correction, the earlier lighting/icons package, the foreground-clouds/paraglider package, or the original supported master checkout. Do not merge Merrp's followers branch into this project.
++This corrected package targets dursem/pokekyoto. It can update the native-size icon package (ce185ed5), the previous cloud/icons correction, the earlier lighting/icons package, the foreground-clouds/paraglider package, or the original supported master checkout. Do not merge Merrp's followers branch into this project.
+ 
+ ## Corrections in this version
+ 
+ - Removes the 24px icon downscaling. All 2,126 regular/shiny assets preserve their source pixel geometry and transparency masks. Charizard is now 32x27 visible pixels; designs up to 40x30 retain their complete wings and tails.
+ - Uses two hardware OBJ pieces (32x32 + 8x32) for a 40x32 transparent canvas. PC OAM capacity, tile reservations, popup ownership, bulk-selection redraws and release animation are adapted to these larger assets. The box grid remains six columns by five rows; large source designs can overlap neighbouring cells at their original size. Icons are shifted down four pixels to clear the title.
+ - Keeps icon type/shiny metadata separate from scrolling and party-animation scratch fields, fixing tile-cache leaks when changing boxes repeatedly.
+-- Softens the lamp palette and removes alternating-frame lamp colors. On the tested clear-weather Rustboro map, lamp alpha retains 12/16 of the underlying background. No emulator interframe filter is needed. Weather still owns the shared GBA alpha coefficients, so lamp strength can differ under other weather; this patch does not replace cloud blending with lamp blending.
++- Restores the original brighter lamp palette while retaining steady, non-alternating colors. On the tested clear-weather Rustboro map, lamp alpha retains 12/16 of the underlying background. No emulator interframe filter is needed. Weather still owns the shared GBA alpha coefficients, so lamp strength can differ under other weather; this patch does not replace cloud blending with lamp blending.
++
++## Local actor lighting and menu fixes in this revision
++
++- The original `light.pal` brightness is restored. Ball lamps render at priority 1, subpriority 255; the lantern-cap correction below preserves visible actor pixels. Their existing alpha remains controlled by weather; no global blending changes are made.
++- `kyoto_lighting.c` samples the existing 32x32 ball-light texture at five actor positions, with double weight at the center. Nearby lamps add together, clamped to 256. Strength ramps by at most 12/256 per rendered field frame. An illuminated actor moves from its current night/weather colors toward its own daytime palette with a warm cast. This is a whole-sprite palette tint based on overlap, not a per-pixel lighting mask. Sign lights are not part of the actor-light sampler.
++- Each lit actor receives a private OBJ palette, tagged `0xD9C0 + objectId`. Only the matching rendered OAM entries are redirected; the object event's original palette reference and shared colors stay intact. Two NPCs sharing a native palette can therefore have different lighting. The player gets allocation priority. If no palette bank is available, the actor keeps its valid native palette; nothing is evicted. Banks are released outside the light, on callback changes and on sprite reset.
++- Lighting runs after field OAM/fade updates and before the cloud silhouette compositor. Normal and time-of-day screen fades are applied to the target colors. The existing atomic video-transfer gate publishes the palette and rendered OAM together.
++- Menu returns previously displayed an unfinished map for about eleven captured frames before fading in: tilemaps were visible while the camera, actors and Start menu were still being reconstructed. The field-loading palette guard now covers all maps, including maps without cloud weather. It remains black until the overworld callback is ready, so Pokédex, Party, Bag, Trainer Card and Options share the corrected return path.
++- The male Bag resource contained magenta/blue alternating stripe colors. Entries 12/13 and 28/29 in `graphics/bag/menu_male.pal` now use a coherent light/dark blue pair. The female Bag's intentional pink palette is unchanged. This correction is independent of the field palette guard.
++
++## Lantern-cap correction
++
++The preceding local-lighting update placed ball glows at priority 2, which left the lantern artwork on BG1 dark. Ball lights now render at priority 1 again. `kyoto_lamp_mask.c` removes glow pixels only where a normal 4bpp object pixel is visible, allowing the original character and its private illuminated palette to show through. It checks BG1/BG2 occlusion, so a lantern cap or wall in front of the actor keeps its light and proper depth. Actor priorities and map metatiles are unchanged.
++
++Each visible ball glow uses fixed 32x32 art without a shared affine transform. A private 512-byte OBJ sheet is allocated only when a cutout is needed and cached until field cleanup. The source bitmap and palette are unchanged. Up to sixteen CPU masks reserve 8,192 bytes of EWRAM, plus 128 bytes of metadata. VBlank uploads the used masks behind the existing complete-frame transfer gate. Tagged sheets are released when leaving the field or resetting sprites. If private OBJ tile allocation fails, that glow is hidden for the frame so it cannot erase an actor.
++
++The mask reads queued sprite frames and queued map-tile graphics as well as the current camera offset. `OpalMapPalettesGetTileGraphics()` exposes pending tile bytes for that purpose. This avoids masking against the previous camera/animation frame. No new palettes are reserved. Empty mask slots skip tag searches, preserving the prior cloud-weather update rate.
++
++mGBA checks for this correction: both lantern caps are visibly brighter; all 214 opaque pixels of the resting player match the preceding actor-lighting build; daytime lantern pixels are identical; the player and a nearby NPC retain independent local lighting; the five night-menu returns remain clean; and Bag cleanup releases actor palettes. At rest, the night fixture updates on all 600 sampled frames, while the cloud fixture advances on 546/600 frames (comparable to the previous 549/600).
+ 
+ ## Preserved cloud corrections
+ 
+@@ -51,7 +70,7 @@ The helper releases its tile/palette allocations on destruction, sprite reset an
+ 
+ Kyoto's existing RTC and day/night tinting remain: `OW_ENABLE_DNS` is enabled and `OW_USE_FAKE_RTC` is unchanged. Followers remain disabled. This package does not introduce a second clock or change save layouts.
+ 
+-The previous Rustboro lighting additions remain: 17 lamp events and emissive window metatiles 58, 66, 88, 92, 93 and 120–124. Four additional logical palettes preserve the original tile colors while `.pla` flags mark glass indices 9 and 10. The Opal compiler preserves those flags and checks the 13-bank physical BG limit. Lamps now use one steady, softer palette while stationary, moving and fading. They do not overwrite weather alpha.
++The previous Rustboro lighting additions remain: 17 lamp events and emissive window metatiles 58, 66, 88, 92, 93 and 120–124. Four additional logical palettes preserve the original tile colors while `.pla` flags mark glass indices 9 and 10. The Opal compiler preserves those flags and checks the 13-bank physical BG limit. Lamps use the original brighter palette, without alternating frames. Player/NPC illumination uses private rendered palettes as explained below. They do not overwrite weather alpha.
+ 
+ The checkout already contains Gen 1–7 ball assets. They remain separate from enabling followers; no duplicate ball system is installed.
+ 
+@@ -61,9 +80,11 @@ For lighting your own maps, see `docs/tutorials/dns.md`. Use `OBJ_EVENT_GFX_LIGH
+ 
+ Built with ARM GCC 12.2.1 and tested in the real mGBA 0.10.5 core. The MP4 uses captured native 240×160 emulator frames, enlarged with nearest-neighbor scaling, without audio. A temporary test fixture supplies normal/shiny Pokémon and demo warps. It is removed from the production source and installer.
+ 
+-Validated: all 2,126 PNG masks/dimensions match their source; 30 ordinary and 30 wide PC icon tile blocks match the imported binaries; eight repeated box-scroll round trips; box chooser, deposit, withdraw, item mode and release animation; four visible normal/shiny contest-result icons; stable night-lamp palette; 15 normal/shiny pairs; five Summary round trips; individual pick-up/swap/placement; box scrolling and eggs; Party allocation cleanup; five Bag round trips with native palettes and restored cloud alpha; transparent ground-shadow pixels; cloud-map exit; and retained day/night window colors. Additional captures cover PC party, held-icon marking and bulk selection.
++Retained validation from the preceding native-icon release: all 2,126 PNG masks/dimensions match their source; 30 ordinary and 30 wide PC icon tile blocks match the imported binaries; eight repeated box-scroll round trips; box chooser, deposit, withdraw, item mode and release animation; four visible normal/shiny contest-result icons; stable night-lamp palette; 15 normal/shiny pairs; five Summary round trips; individual pick-up/swap/placement; box scrolling and eggs; Party allocation cleanup; five Bag round trips with native palettes and restored cloud alpha; transparent ground-shadow pixels; cloud-map exit; and retained day/night window colors. Additional captures cover PC party, held-icon marking and bulk selection.
++
++The current busy Littleroot fixture measures 549 updates per 600 video frames (about 55 field updates per second) while the emulator video runs at 60 frames per second. This is not a guaranteed 60-FPS performance release. Trade and level-up code compile but have not been exercised through complete gameplay sessions. Contest-result rendering is tested, but a complete contest playthrough is not part of this check. Original baseline map-streaming warnings remain for Petalburg–Route104 and Route103–Route110.
+ 
+-The busy Littleroot fixture measures about 54 field updates per second while the emulator video runs at 60 frames per second. This is not a guaranteed 60-FPS performance release. Trade and level-up code compile but have not been exercised through complete gameplay sessions. Contest-result rendering is tested, but a complete contest playthrough is not part of this check. Original baseline map-streaming warnings remain for Petalburg–Route104 and Route103–Route110.
++Current revision tested in mGBA: all five menu return paths above on daytime, nighttime and foreground-cloud maps (15 combinations), including frame-by-frame checks for a bright incomplete map between black frames; an additional Bag return with the player actively illuminated; private palette release before Bag and PC; independently lit NPCs sharing a native palette; bounded illumination changes while walking into/out of a real lamp; brighter actor pixels in the rendered image; Save cancellation on all three maps; and unchanged approved cloud art, palette and compositor. The video labels the controlled NPC placement and clock fixture. Production files contain no test party, forced clock, boot skip or demo warps.
+ 
+ ## Credits
+ 
+diff --git a/graphics/bag/menu_male.pal b/graphics/bag/menu_male.pal
+index e773c384..00fe1547 100644
+--- a/graphics/bag/menu_male.pal
++++ b/graphics/bag/menu_male.pal
+@@ -13,8 +13,8 @@ JASC-PAL
+ 255 255 205
+ 255 230 139
+ 255 32 32
+-213 106 255
+-74 131 255
++123 197 246
++90 164 222
+ 189 156 90
+ 0 0 0
+ 98 98 115
+@@ -29,7 +29,7 @@ JASC-PAL
+ 238 205 131
+ 255 255 205
+ 90 0 123
+-213 106 255
+-74 131 255
++123 197 246
++90 164 222
+ 255 0 0
+ 255 148 180
+diff --git a/graphics/object_events/palettes/light.pal b/graphics/object_events/palettes/light.pal
+index 3424d304..92a4477f 100644
+--- a/graphics/object_events/palettes/light.pal
++++ b/graphics/object_events/palettes/light.pal
+@@ -2,18 +2,18 @@ JASC-PAL
+ 0100
+ 16
+ 110 198 165
+-51 49 34
+-61 58 39
+-66 63 45
+-77 72 51
+-84 80 57
+-89 84 57
+-103 96 68
+-112 105 75
+-122 114 79
+-131 122 87
+-136 127 89
+-143 133 95
+-150 140 98
+-155 145 102
+-162 151 105
++64 61 42
++77 73 50
++85 81 58
++100 94 66
++111 105 75
++119 112 77
++140 131 92
++154 145 103
++171 159 111
++186 174 123
++197 183 128
++209 195 139
++224 209 146
++234 219 155
++249 232 161
+diff --git a/include/kyoto_lamp_mask.h b/include/kyoto_lamp_mask.h
+new file mode 100644
+index 00000000..368a2f34
+--- /dev/null
++++ b/include/kyoto_lamp_mask.h
+@@ -0,0 +1,10 @@
++#ifndef GUARD_KYOTO_LAMP_MASK_H
++#define GUARD_KYOTO_LAMP_MASK_H
++
++#include "sprite.h"
++
++void KyotoLamp_Prepare(const struct Sprite *sprite, u32 index);
++void KyotoLamp_Finish(u32 count);
++void KyotoLamp_VBlank(void);
++
++#endif
+diff --git a/include/kyoto_lighting.h b/include/kyoto_lighting.h
+new file mode 100644
+index 00000000..db3d9ef0
+--- /dev/null
++++ b/include/kyoto_lighting.h
+@@ -0,0 +1,7 @@
++#ifndef GUARD_KYOTO_LIGHTING_H
++#define GUARD_KYOTO_LIGHTING_H
++
++void KyotoLight_Prepare(void);
++void KyotoLight_Reset(void);
++
++#endif
+diff --git a/include/opal_map_palette.h b/include/opal_map_palette.h
+index 79dbe281..e1959aeb 100644
+--- a/include/opal_map_palette.h
++++ b/include/opal_map_palette.h
+@@ -62,6 +62,7 @@ bool32 OpalMapPalettesQueueBg(u32 bg);
+ u32 OpalMapPalettesTilemapsPrepared(void);
+ u32 OpalMapPalettesTilemapsCommitted(void);
+ bool32 OpalMapPalettesQueueTile(const void *source, u32 tile);
++const u8 *OpalMapPalettesGetTileGraphics(u32 tile);
+ void OpalMapPalettesSetMetatile(u32 offset, u32 layerType, const u16 *tiles, const u8 *references, const u16 *thirdTiles);
+ const u8 *OpalMapPalettesGetReferences(const struct Tileset *tileset, u32 metatile);
+ u32 OpalMapPalettesWeatherType(u32 bank, u32 fallback);
+diff --git a/src/event_object_movement.c b/src/event_object_movement.c
+index fbb3801b..387c33a1 100644
+--- a/src/event_object_movement.c
++++ b/src/event_object_movement.c
+@@ -2802,6 +2802,8 @@ static void SpawnLightSprite(s16 x, s16 y, s16 camX, s16 camY, u32 lightType)
+         sprite->centerToCornerVecX = -(32 >> 1);
+         sprite->centerToCornerVecY = -(32 >> 1);
+         sprite->oam.priority = 1;
++        // Lamp caps receive glow; visible actor pixels are cut out at frame end.
++        sprite->subpriority = 0xFF;
+         sprite->oam.objMode = ST_OAM_OBJ_BLEND;
+         sprite->oam.affineMode = ST_OAM_AFFINE_NORMAL;
+         sprite->x += 8;
+diff --git a/src/kyoto_cloud_layers.c b/src/kyoto_cloud_layers.c
+index 5bbd4acf..05a87272 100644
+--- a/src/kyoto_cloud_layers.c
++++ b/src/kyoto_cloud_layers.c
+@@ -227,15 +227,16 @@ void KyotoCloud_OnCallbackChange(void (*callback)(void))
+ 
+ void KyotoCloud_SetFieldLoading(void)
+ {
+-    if (sCloud.holdBlack)
+-        sCloud.fieldLoading = TRUE;
++    // Every map rebuild needs this guard, including clear-weather maps.
++    // Start-menu reconstruction spans several frames before its fade starts.
++    sCloud.fieldLoading = TRUE;
+ }
+ 
+ void KyotoCloud_BeforePaletteTransfer(void)
+ {
+     // UpdatePaletteFade clears the selection mask before the field callback
+     // hands control to Bag. Field reconstruction must remain black until ready.
+-    if ((sCloud.holdBlack && sCloud.fieldLoading)
++    if (sCloud.fieldLoading
+      || (sCloud.created && gMain.callback2 == CB2_Overworld
+       && gPaletteFade.y == 16 && gPaletteFade.blendColor == 0
+       && (gPaletteFadeSelectedPalettes == 0
+diff --git a/src/kyoto_lamp_mask.c b/src/kyoto_lamp_mask.c
+new file mode 100644
+index 00000000..30c32901
+--- /dev/null
++++ b/src/kyoto_lamp_mask.c
+@@ -0,0 +1,175 @@
++// A priority-1 glow illuminates lamp caps on BG1. Transparent cutouts preserve
++// the visible pixels of actors underneath it, without changing actor priority.
++#include "global.h"
++#include "bg.h"
++#include "field_camera.h"
++#include "gpu_regs.h"
++#include "main.h"
++#include "opal_map_palette.h"
++#include "sprite.h"
++#include "kyoto_lamp_mask.h"
++
++#define MASK_COUNT 16
++#define MASK_TAG_BASE 0xD9E0
++#define MASK_BYTES (32 * 32 / 2)
++
++extern const u32 gFieldEffectObjectPic_BallLight[];
++static EWRAM_DATA u32 sLampPixels[MASK_COUNT][MASK_BYTES / 4] = {0};
++static EWRAM_DATA struct { u16 tilePlusOne, originalTile; bool8 dirty; } sMasks[MASK_COUNT] = {0};
++static const u8 sWidths[] = {8,16,32,64,16,32,32,64,8,8,16,32};
++static const u8 sHeights[] = {8,16,32,64,8,8,16,32,16,32,32,64};
++
++static void ReleaseMask(u32 index)
++{
++    u32 tile;
++    if (!sMasks[index].tilePlusOne)
++        return;
++    tile = GetSpriteTileStartByTag(MASK_TAG_BASE + index);
++    if (tile == sMasks[index].tilePlusOne - 1)
++    {
++        for (u32 i = 0; i < 128; i++)
++            if (gMain.oamBuffer[i].tileNum == tile)
++                gMain.oamBuffer[i].tileNum = sMasks[index].originalTile;
++        FreeSpriteTilesByTag(MASK_TAG_BASE + index);
++    }
++    memset(&sMasks[index], 0, sizeof(sMasks[index]));
++}
++
++void KyotoLamp_Finish(u32 count)
++{
++    for (u32 i = count; i < MASK_COUNT; i++)
++        ReleaseMask(i);
++}
++
++static u32 Pixel4(const u8 *pixels, u32 width, u32 x, u32 y)
++{
++    u32 offset = ((y / 8) * (width / 8) + x / 8) * 32 + (y & 7) * 4 + (x & 7) / 2;
++    return (pixels[offset] >> ((x & 1) * 4)) & 15;
++}
++
++static bool32 BehindMap(u32 x, u32 y, u32 priority, s16 scrollX, s16 scrollY)
++{
++    x = (x + scrollX) & 255;
++    y = (y + scrollY) & 255;
++    for (u32 bg = 1; bg < 3; bg++)
++    {
++        u32 cnt = GetGpuReg(REG_OFFSET_BG0CNT + bg * 2);
++        const u16 *map = GetBgTilemapBuffer(bg);
++        u32 entry, tx = x & 7, ty = y & 7;
++        if (!map || (cnt & 3) >= priority)
++            continue;
++        entry = map[(y / 8) * 32 + x / 8];
++        if (entry & 0x400) tx ^= 7;
++        if (entry & 0x800) ty ^= 7;
++        if (Pixel4(OpalMapPalettesGetTileGraphics((entry & 1023) + ((cnt >> 2) & 3) * 512), 8, tx, ty))
++            return TRUE;
++    }
++    return FALSE;
++}
++
++void KyotoLamp_Prepare(const struct Sprite *sprite, u32 index)
++{
++    struct OamData *lamp = NULL;
++    s32 lx = sprite->oam.x, ly = sprite->oam.y;
++    s16 scrollX, scrollY;
++    bool32 cut = FALSE;
++    u8 *pixels = (u8 *)sLampPixels[index];
++    if (lx >= 256) lx -= 512;
++    if (ly >= 160) ly -= 256;
++    for (u32 i = 0; i < 128; i++)
++    {
++        struct OamData *oam = &gMain.oamBuffer[i];
++        if (oam->objMode == ST_OAM_OBJ_BLEND && oam->affineMode == ST_OAM_AFFINE_NORMAL
++         && oam->tileNum == sprite->oam.tileNum && oam->paletteNum == sprite->oam.paletteNum
++         && oam->x == sprite->oam.x && oam->y == sprite->oam.y)
++        {
++            lamp = oam;
++            break;
++        }
++    }
++    if (!lamp || lx >= 240 || ly >= 160 || lx + 32 <= 0 || ly + 32 <= 0)
++    {
++        ReleaseMask(index);
++        return;
++    }
++    CpuCopy32(gFieldEffectObjectPic_BallLight, pixels, MASK_BYTES);
++    GetCameraOffsetWithPan(&scrollX, &scrollY);
++    for (u32 i = 0; i < 128; i++)
++    {
++        const struct OamData *actor = &gMain.oamBuffer[i];
++        s32 ax = actor->x, ay = actor->y, width, height;
++        s32 x0, y0, x1, y1;
++        const u8 *art;
++        u32 dim;
++        if (actor->objMode != ST_OAM_OBJ_NORMAL || actor->affineMode != ST_OAM_AFFINE_OFF
++         || actor->bpp != ST_OAM_4BPP || actor->shape == 3 || actor->y == 160 || actor->priority < 1)
++            continue;
++        dim = actor->shape * 4 + actor->size;
++        width = sWidths[dim]; height = sHeights[dim];
++        if (ax >= 256) ax -= 512;
++        if (ay >= 160) ay -= 256;
++        x0 = max(max(ax, lx), 0); y0 = max(max(ay, ly), 0);
++        x1 = min(min(ax + width, lx + 32), 240); y1 = min(min(ay + height, ly + 32), 160);
++        if (x0 >= x1 || y0 >= y1) continue;
++        art = GetSpriteGraphicsForPendingFrame((const u8 *)(OBJ_VRAM0 + actor->tileNum * 32), width * height / 2);
++        for (s32 y = y0; y < y1; y++)
++            for (s32 x = x0; x < x1; x++)
++            {
++                u32 sx = x - ax, sy = y - ay, dx = x - lx, dy = y - ly;
++                u32 offset, shift;
++                if (actor->matrixNum & 8) sx = width - 1 - sx;
++                if (actor->matrixNum & 16) sy = height - 1 - sy;
++                if (!Pixel4(art, width, sx, sy) || BehindMap(x, y, actor->priority, scrollX, scrollY))
++                    continue;
++                offset = ((dy / 8) * 4 + dx / 8) * 32 + (dy & 7) * 4 + (dx & 7) / 2;
++                shift = (dx & 1) * 4;
++                if ((pixels[offset] >> shift) & 15)
++                {
++                    pixels[offset] &= ~(15 << shift);
++                    cut = TRUE;
++                }
++            }
++    }
++    if (cut)
++    {
++        u32 tile = GetSpriteTileStartByTag(MASK_TAG_BASE + index);
++        if (tile == 0xFFFF)
++        {
++            struct SpriteSheet sheet = {pixels, MASK_BYTES, MASK_TAG_BASE + index};
++            if (!CanAllocSpriteTiles(MASK_BYTES / 32))
++            {
++                lamp->affineMode = ST_OAM_AFFINE_OFF;
++                lamp->y = DISPLAY_HEIGHT; // Hide only this glow if OBJ tiles are exhausted.
++                return;
++            }
++            LoadSpriteSheet(&sheet);
++            tile = GetSpriteTileStartByTag(sheet.tag);
++            if (tile == 0xFFFF)
++            {
++                lamp->affineMode = ST_OAM_AFFINE_OFF;
++                lamp->y = DISPLAY_HEIGHT;
++                return;
++            }
++        }
++        sMasks[index].tilePlusOne = tile + 1;
++        sMasks[index].originalTile = sprite->oam.tileNum;
++        sMasks[index].dirty = TRUE;
++        lamp->tileNum = tile;
++    }
++    else
++        sMasks[index].dirty = FALSE; // Cache the private tiles until field cleanup.
++    // Ball lights are fixed 32x32 art; render without a shared affine matrix.
++    lamp->affineMode = ST_OAM_AFFINE_OFF;
++    lamp->matrixNum = 0;
++    lamp->priority = 1;
++}
++
++void KyotoLamp_VBlank(void)
++{
++    for (u32 i = 0; i < MASK_COUNT; i++)
++        if (sMasks[i].dirty && sMasks[i].tilePlusOne)
++        {
++            DmaCopy16(3, sLampPixels[i], (void *)(OBJ_VRAM0 + (sMasks[i].tilePlusOne - 1) * 32), MASK_BYTES);
++            sMasks[i].dirty = FALSE;
++        }
++}
+diff --git a/src/kyoto_lighting.c b/src/kyoto_lighting.c
+new file mode 100644
+index 00000000..a3b9498c
+--- /dev/null
++++ b/src/kyoto_lighting.c
+@@ -0,0 +1,213 @@
++// Local, warm light for overworld actors. Native object-event palettes remain
++// untouched: only the rendered OAM entries select a private illuminated copy.
++#include "global.h"
++#include "event_object_movement.h"
++#include "graphics.h"
++#include "main.h"
++#include "overworld.h"
++#include "palette.h"
++#include "sprite.h"
++#include "kyoto_lighting.h"
++#include "kyoto_lamp_mask.h"
++#include "constants/event_objects.h"
++#include "constants/rgb.h"
++#include "constants/rtc.h"
++
++extern const u32 gFieldEffectObjectPic_BallLight[];
++
++#define LIGHT_PAL_TAG_BASE 0xD9C0
++#define MAX_LOCAL_LIGHTS 16
++#define LIGHT_RAMP_STEP 12
++
++struct ActorLight
++{
++    u16 strength;
++    u8 slotPlusOne;
++    u8 sourceSlot;
++    u8 spriteId;
++};
++struct LampPosition { s16 x, y; };
++static EWRAM_DATA struct ActorLight sActorLights[OBJECT_EVENTS_COUNT] = {0};
++
++static void ReleaseLight(u32 objectId)
++{
++    struct ActorLight *state = &sActorLights[objectId];
++    if (state->slotPlusOne)
++    {
++        u32 slot = state->slotPlusOne - 1;
++        // Restore any last field OAM before handing ownership to another UI.
++        if (IndexOfSpritePaletteTag(LIGHT_PAL_TAG_BASE + objectId) == slot)
++        {
++            for (u32 i = 0; i < 128; i++)
++                if (gMain.oamBuffer[i].paletteNum == slot)
++                    gMain.oamBuffer[i].paletteNum = state->sourceSlot;
++            FreeSpritePaletteByTag(LIGHT_PAL_TAG_BASE + objectId);
++        }
++    }
++    memset(state, 0, sizeof(*state));
++}
++
++void KyotoLight_Reset(void)
++{
++    KyotoLamp_Finish(0);
++    for (u32 i = 0; i < OBJECT_EVENTS_COUNT; i++)
++        ReleaseLight(i);
++}
++
++static u32 SampleLamp(s32 x, s32 y)
++{
++    u32 offset;
++    if (x < 0 || x >= 32 || y < 0 || y >= 32)
++        return 0;
++    offset = ((y / 8) * 4 + x / 8) * 32 + (y & 7) * 4 + (x & 7) / 2;
++    // The original lamp art has an ordered 1..15 dark-to-bright ramp.
++    return (((const u8 *)gFieldEffectObjectPic_BallLight)[offset] >> ((x & 1) * 4)) & 15;
++}
++
++static u32 ActorStrength(const struct Sprite *sprite, const struct LampPosition *lamps, u32 count)
++{
++    s32 x = sprite->x + sprite->x2;
++    s32 y = sprite->y + sprite->y2;
++    s32 halfWidth = -sprite->centerToCornerVecX;
++    s32 halfHeight = -sprite->centerToCornerVecY;
++    u32 strength = 0;
++    if (sprite->coordOffsetEnabled)
++    {
++        x += gSpriteCoordOffsetX;
++        y += gSpriteCoordOffsetY;
++    }
++    for (u32 i = 0; i < count; i++)
++    {
++        s32 dx = x - lamps[i].x + 16;
++        s32 dy = y - lamps[i].y + 16;
++        u32 sum = SampleLamp(dx, dy) * 2;
++        sum += SampleLamp(dx, dy - halfHeight / 2);
++        sum += SampleLamp(dx, dy + halfHeight / 2);
++        sum += SampleLamp(dx - halfWidth / 2, dy);
++        sum += SampleLamp(dx + halfWidth / 2, dy);
++        strength += sum * 256 / 90;
++    }
++    return min(strength, 256);
++}
++
++static u32 MixChannel(u32 a, u32 b, u32 amount)
++{
++    return (a * (256 - amount) + b * amount + 128) >> 8;
++}
++
++static u16 LitColor(u16 source, u16 daylight, u32 amount)
++{
++    u32 r = daylight & 31;
++    u32 g = (daylight >> 5) & 31;
++    u32 b = (daylight >> 10) & 31;
++    // Lift the night tint toward the original colors, with a warm lamp cast.
++    r += (31 - r) / 5;
++    g += (31 - g) / 10;
++    b = b * 7 / 8;
++    // Use the same screen fade as the source, never flash bright during a warp
++    // or Bag/Party transition. Hardware fades already cover all OBJ pixels.
++    if (gPaletteFade.mode == 0 || gPaletteFade.mode == 3)
++    {
++        u32 fade = gPaletteFade.y * 16;
++        r = MixChannel(r, gPaletteFade.blendColor & 31, fade);
++        g = MixChannel(g, (gPaletteFade.blendColor >> 5) & 31, fade);
++        b = MixChannel(b, (gPaletteFade.blendColor >> 10) & 31, fade);
++    }
++    return RGB(MixChannel(source & 31, r, amount),
++               MixChannel((source >> 5) & 31, g, amount),
++               MixChannel((source >> 10) & 31, b, amount));
++}
++
++static void LightActor(u32 objectId, const struct LampPosition *lamps, u32 count)
++{
++    struct ObjectEvent *object = &gObjectEvents[objectId];
++    struct ActorLight *state = &sActorLights[objectId];
++    struct Sprite *sprite;
++    u32 target, slot, source, tileCount;
++    if (!object->active || object->inanimate || object->spriteId >= MAX_SPRITES)
++    {
++        ReleaseLight(objectId);
++        return;
++    }
++    sprite = &gSprites[object->spriteId];
++    if (!sprite->inUse || sprite->invisible || sprite->oam.bpp != ST_OAM_4BPP)
++    {
++        ReleaseLight(objectId);
++        return;
++    }
++    source = sprite->oam.paletteNum;
++    if (state->slotPlusOne && (state->spriteId != object->spriteId || state->sourceSlot != source))
++        ReleaseLight(objectId);
++    target = ActorStrength(sprite, lamps, count);
++    if (state->strength < target)
++        state->strength = min(state->strength + LIGHT_RAMP_STEP, target);
++    else if (state->strength > target)
++        state->strength = max((s32)state->strength - LIGHT_RAMP_STEP, (s32)target);
++    if (!state->strength)
++    {
++        ReleaseLight(objectId);
++        return;
++    }
++    slot = IndexOfSpritePaletteTag(LIGHT_PAL_TAG_BASE + objectId);
++    if (slot == 0xFF)
++        slot = AllocSpritePalette(LIGHT_PAL_TAG_BASE + objectId);
++    if (slot == 0xFF)
++        return; // Never evict another sprite/weather/UI palette.
++    state->slotPlusOne = slot + 1;
++    state->sourceSlot = source;
++    state->spriteId = object->spriteId;
++    for (u32 i = 0; i < 16; i++)
++    {
++        u16 color = LitColor(gPlttBufferFaded[OBJ_PLTT_ID(source) + i],
++                            gPlttBufferUnfaded[OBJ_PLTT_ID(source) + i], state->strength);
++        gPlttBufferUnfaded[OBJ_PLTT_ID(slot) + i] = color;
++        gPlttBufferFaded[OBJ_PLTT_ID(slot) + i] = color;
++    }
++    tileCount = GetObjectEventGraphicsInfo(object->graphicsId)->size / TILE_SIZE_4BPP;
++    for (u32 i = 0; i < 128; i++)
++    {
++        struct OamData *oam = &gMain.oamBuffer[i];
++        s32 dx = (oam->x - sprite->oam.x) & 511;
++        s32 dy = (oam->y - sprite->oam.y) & 255;
++        // Position + tile range also identifies split object-event pieces.
++        // Another NPC sharing the native palette keeps its own lighting.
++        if (oam->paletteNum == source
++         && oam->tileNum >= sprite->oam.tileNum
++         && oam->tileNum < sprite->oam.tileNum + tileCount
++         && dx < -sprite->centerToCornerVecX * 2
++         && dy < -sprite->centerToCornerVecY * 2)
++            oam->paletteNum = slot;
++    }
++}
++
++void KyotoLight_Prepare(void)
++{
++    struct LampPosition lamps[MAX_LOCAL_LIGHTS];
++    u32 count = 0;
++    if (gMain.callback2 != CB2_Overworld)
++    {
++        KyotoLight_Reset();
++        return;
++    }
++    if (gTimeOfDay == TIME_NIGHT)
++        for (u32 i = 0; i < MAX_SPRITES && count < MAX_LOCAL_LIGHTS; i++)
++        {
++            struct Sprite *sprite = &gSprites[i];
++            if (sprite->inUse && !sprite->invisible && sprite->callback == UpdateLightSprite
++             && sprite->data[5] == LIGHT_TYPE_BALL)
++            {
++                KyotoLamp_Prepare(sprite, count);
++                lamps[count].x = sprite->x + sprite->x2 + gSpriteCoordOffsetX;
++                lamps[count].y = sprite->y + sprite->y2 + gSpriteCoordOffsetY;
++                count++;
++            }
++        }
++    KyotoLamp_Finish(count);
++    // Reserve the player's copy first if a very crowded map is palette-bound.
++    for (u32 i = 0; i < OBJECT_EVENTS_COUNT; i++)
++        if (gObjectEvents[i].isPlayer)
++            LightActor(i, lamps, count);
++    for (u32 i = 0; i < OBJECT_EVENTS_COUNT; i++)
++        if (!gObjectEvents[i].isPlayer)
++            LightActor(i, lamps, count);
++}
+diff --git a/src/main.c b/src/main.c
+index 745d2248..48091f83 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -1,4 +1,6 @@
+ #include "global.h"
++#include "kyoto_lighting.h"
++#include "kyoto_lamp_mask.h"
+ #include "kyoto_cloud_layers.h"
+ #include "glide.h"
+ #include "opal_map_palette.h"
+@@ -210,6 +212,8 @@ void SetMainCallback2(MainCallback callback)
+ {
+     if (callback != CB2_Overworld)
+         Glide_Reset();
++    if (callback != CB2_Overworld)
++        KyotoLight_Reset();
+     KyotoCloud_OnCallbackChange(callback);
+     gMain.callback2 = callback;
+     gMain.state = 0;
+@@ -386,6 +390,7 @@ static void VBlankIntr(void)
+         CopyBufferedValuesToGpuRegs();
+         ProcessDma3Requests();
+         KyotoCloud_VBlank();
++        KyotoLamp_VBlank();
+     }
+ 
+     gPcmDmaCounter = gSoundInfo.pcmDmaCounter;
+diff --git a/src/opal_map_palette.c b/src/opal_map_palette.c
+index 456fb524..0e9a88a9 100644
+--- a/src/opal_map_palette.c
++++ b/src/opal_map_palette.c
+@@ -1,4 +1,5 @@
+ #include "global.h"
++#include "kyoto_lighting.h"
+ #include "kyoto_cloud_layers.h"
+ #include "opal_map_palette.h"
+ #include "bg.h"
+@@ -451,6 +452,7 @@ void OpalMapPalettesEndFrame(void)
+ {
+     if (sState && sState->dirty)
+         Prepare();
++    KyotoLight_Prepare();
+     KyotoCloud_Prepare();
+     sInFrame = FALSE;
+ }
+@@ -507,6 +509,15 @@ u32 OpalMapPalettesTilemapsCommitted(void)
+     return sTilemapsCommitted;
+ }
+ 
++const u8 *OpalMapPalettesGetTileGraphics(u32 tile)
++{
++    if (sState)
++        for (u32 i = 0; i < sState->tileCopyCount; i++)
++            if (sState->tileIds[i] == tile)
++                return sState->tileSources[i];
++    return (const u8 *)(BG_VRAM + TILE_OFFSET_4BPP(tile));
++}
++
+ bool32 OpalMapPalettesQueueTile(const void *source, u32 tile)
+ {
+     if (!sState)
+diff --git a/src/sprite.c b/src/sprite.c
+index 2a1d60b2..c97c18ef 100644
+--- a/src/sprite.c
++++ b/src/sprite.c
+@@ -1,4 +1,5 @@
+ #include "global.h"
++#include "kyoto_lighting.h"
+ #include "kyoto_icons.h"
+ #include "sprite.h"
+ #include "main.h"
+@@ -276,6 +277,7 @@ EWRAM_DATA bool8 gAffineAnimsDisabled = FALSE;
+ 
+ void ResetSpriteData(void)
+ {
++    KyotoLight_Reset();
+     KyotoIconReset(TRUE);
+     ResetOamRange(0, 128);
+     sOamDummyIndex = 0;

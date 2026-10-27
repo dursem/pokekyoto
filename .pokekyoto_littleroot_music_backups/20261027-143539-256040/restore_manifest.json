@@ -1,0 +1,31 @@
+{
+  "id": "MUS_KYOTO_LITTLEROOT",
+  "song_index": 610,
+  "quality": "compatible",
+  "originals_present": [
+    "sound/song_table.inc",
+    "include/constants/songs.h",
+    "sound/songs/midi/midi.cfg",
+    "sound/voice_groups.inc",
+    "sound/direct_sound_data.inc",
+    "data/maps/LittlerootTown/map.json"
+  ],
+  "files_new": [
+    "sound/direct_sound_samples/kyoto_littleroot.wav",
+    "sound/direct_sound_samples/kyoto_littleroot.bin",
+    "sound/songs/midi/mus_kyoto_littleroot.mid",
+    "sound/voicegroups/kyoto_littleroot.inc"
+  ],
+  "files_modified": [
+    "sound/direct_sound_samples/kyoto_littleroot.wav",
+    "sound/direct_sound_samples/kyoto_littleroot.bin",
+    "sound/songs/midi/mus_kyoto_littleroot.mid",
+    "sound/song_table.inc",
+    "include/constants/songs.h",
+    "sound/songs/midi/midi.cfg",
+    "sound/voice_groups.inc",
+    "sound/direct_sound_data.inc",
+    "sound/voicegroups/kyoto_littleroot.inc",
+    "data/maps/LittlerootTown/map.json"
+  ]
+}

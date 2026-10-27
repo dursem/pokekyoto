@@ -9041,3 +9041,15 @@ DirectSoundWaveData_sd90_classical_whistle::
 	.align 2
 DirectSoundWaveData_sd90_enhanced_delay_shaku::
 	.incbin "sound/direct_sound_samples/sd90_enhanced_delay_shaku.bin"
+
+	.align 2
+DirectSoundWaveData_kyoto_title::
+	.incbin "sound/direct_sound_samples/kyoto_title.bin"
+	.align 2
+DirectSoundWaveData_kyoto_littleroot::
+	.incbin "sound/direct_sound_samples/kyoto_littleroot.bin"
+
+	@ PokeKyoto Route 1 compact DPCM recording
+	.align 2
+DirectSoundWaveData_kyoto_route1::
+	.incbin "data/kyoto_audio/route1_pcm.bin"

@@ -1,0 +1,76 @@
+POKÉKYOTO – ORIGINELE ORKESTRALE TITELSCHERMMUZIEK
+==============================================
+
+Dit is jouw aangeleverde 'theme song.mp3', omgezet voor de standaard
+GBA m4a/DirectSound-geluidsengine van pokeemerald-expansion.
+
+Wat is behouden?
+- De volledige compositie en de originele instrumenten (geen MIDI-remake).
+- Speelduur circa 1:22.
+- Automatisch herhalende muziek zolang je op het titelscherm blijft.
+- Originele andere muziekstukken en geluidseffecten blijven ongewijzigd.
+
+GBA-beperkingen:
+- Stereo wordt mono, en 48 kHz wordt 13.379 Hz.
+- Originele 16-bit audio wordt 8-bit PCM (en kan dus minder helder klinken).
+- Sample heeft circa 1,05 MiB ruimte nodig in je uiteindelijke ROM.
+- De hele opname is één sample. Dit belast normaal één DirectSound-stem.
+- Dit is een broncode-installatie, geen patch voor een bestaande losse ROM.
+
+BESTANDEN:
+ assets/kyoto_title.wav = 8-bit, mono, 13.379 Hz met loopmetadata.
+ assets/kyoto_title.bin = DirectSound-waveheader + getekende 8-bit sampledata.
+ assets/mus_title.mid   = Eén aangehouden C4-noot; de WAV bevat de echte muziek.
+ install_title_music.py = Plaatst bestanden in PokéKyoto en maakt back-ups.
+ audio_info.json = Technische informatie over de audio.
+
+INSTALLEREN IN UBUNTU / WSL
+---------------------------
+1. Pak de ZIP uit. Kopieer de complete map 'Pokekyoto_TitleMusic'
+   naar de hoofdmap van jouw bestaande PokéKyoto-repository.
+2. Open Ubuntu/WSL en ga naar de PokéKyoto-hoofdmap (die met Makefile).
+   Bijvoorbeeld:
+
+     cd ~/PokemonDev/pokekyoto
+
+3. Installeer (werkt met Python 3 zonder extra packages):
+
+     python3 Pokekyoto_TitleMusic/install_title_music.py .
+
+4. Bouw daarna PokéKyoto:
+
+     make -j4
+
+5. Open de NIEUW GEBOUWDE pokeemerald.gba in mGBA.
+   Start het titelscherm en luister ruim 1:22 om de loop te controleren.
+
+Je kunt eerst testen zonder wijzigingen:
+
+     python3 Pokekyoto_TitleMusic/install_title_music.py . --dry-run
+
+DE INSTALLER WIJZIGT ALLEEN:
+- sound/songs/midi/mus_title.mid
+- sound/songs/midi/midi.cfg (alleen regel voor mus_title.mid)
+- sound/voice_groups.inc (één include)
+- sound/direct_sound_data.inc (één sampledefinitie)
+- sound/voicegroups/kyoto_title.inc (nieuw)
+- sound/direct_sound_samples/kyoto_title.wav (nieuw)
+- sound/direct_sound_samples/kyoto_title.bin (nieuw)
+
+Bij herinstallatie worden geen dubbele includes toegevoegd. Bestaande
+versies van gewijzigde bestanden worden bewaard in:
+
+   .pokekyoto_title_music_backups/[datum-tijd]/
+
+WERKING VAN DE LOOP
+-------------------
+De WAV bevat een sampleloop van begin tot einde. De MIDI houdt één
+noot aan en herhaalt alleen een leeg tijdsegment in de GBA sequencer.
+Zo wordt de opname niet omgezet naar losse MIDI-instrumenten.
+
+TESTSTATUS
+----------
+De WAV-header, sampledata, .bin-header en MIDI-structuur zijn lokaal
+gecontroleerd. De complete PokéKyoto-ROM is nog NIET gecompileerd of
+in mGBA getest, omdat de actuele lokale projectbuild niet is meegestuurd.
+Het resultaat is dus voorbereid voor de compilatie, niet al bewezen in-game.

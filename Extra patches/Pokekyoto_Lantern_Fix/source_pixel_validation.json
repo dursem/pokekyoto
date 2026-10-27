@@ -1,0 +1,17 @@
+{
+  "assets_checked": 2126,
+  "all_alpha_masks_and_dimensions_preserved": true,
+  "exact_rgb555_pixel_matches_without_quantization": 2052,
+  "charizard_visible_size": [
+    32,
+    27
+  ],
+  "source_canvas": [
+    40,
+    30
+  ],
+  "export_canvas": [
+    40,
+    32
+  ]
+}

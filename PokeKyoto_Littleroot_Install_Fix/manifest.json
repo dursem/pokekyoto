@@ -1,0 +1,41 @@
+{
+  "source": "Town.mp3",
+  "purpose": "Littleroot Town (MAP_LITTLEROOT_TOWN)",
+  "method": "original full ensemble downmixed to mono, without MIDI resynthesis",
+  "sample_format": "8-bit signed PCM with GBA wave header, loop enabled",
+  "loop_start_sample": 0,
+  "song_constant": "MUS_KYOTO_LITTLEROOT",
+  "song_symbol": "mus_kyoto_littleroot",
+  "source_sha256": "f1285e272e2af9ac5d2328138dea6be9f9522b8be18d6e8def34251a30001203",
+  "versions": {
+    "compatible": {
+      "rate": 13379,
+      "duration_seconds": 157.2129456611107,
+      "samples": 2103352,
+      "peak_original_mono": 0.8220773935317993,
+      "gain_db": 0.79,
+      "peak_pcm8_dbfs": -0.86,
+      "rms_pcm8_dbfs": -18.38,
+      "estimated_rom_bytes": 2103368
+    }
+  },
+  "files": {
+    "assets/compatible/kyoto_littleroot.wav": {
+      "bytes": 4206816,
+      "sha256": "ddbd53bec3874af0ca44bc643d54806842a82c669c7830a8bda685852122a080"
+    },
+    "assets/compatible/kyoto_littleroot.bin": {
+      "bytes": 2103368,
+      "sha256": "98175b0caafd565124a011119532edb022ec0ee1a6272efb8700f03144fd706d"
+    },
+    "assets/compatible/kyoto_littleroot_preview.mp3": {
+      "bytes": 1259756,
+      "sha256": "7d767b9966e921a4150b10698d06c55231f57f8e7d67a0ec35a32df1f42de156"
+    },
+    "assets/mus_kyoto_littleroot.mid": {
+      "bytes": 156,
+      "sha256": "7c871be58bd74b83f538d0845007eab6df0516ed62f3f5c92b3e1012e9ec6c08"
+    }
+  },
+  "package_notes": "Compatible 13379 Hz only: HQ installer from original pack refuses existing drumsets/emerald_1.inc no_resample voice. Keeps music ID append-only and supports existing MUS_LITTLEROOT_TEST assignment."
+}

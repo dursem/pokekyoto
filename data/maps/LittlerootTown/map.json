@@ -2,7 +2,7 @@
   "id": "MAP_LITTLEROOT_TOWN",
   "name": "LittlerootTown",
   "layout": "LAYOUT_LITTLEROOT_TOWN",
-  "music": "MUS_RG_CELADON",
+  "music": "MUS_KYOTO_LITTLEROOT",
   "region_map_section": "MAPSEC_LITTLEROOT_TOWN",
   "requires_flash": false,
   "weather": "WEATHER_SAKURA_PETALS",
@@ -285,8 +285,8 @@
       "movement_range_x": 0,
       "movement_range_y": 0,
       "trainer_type": "TRAINER_TYPE_NONE",
-      "trainer_sight_or_berry_tree_id": "0",
-      "script": "NULL",
+      "trainer_sight_or_berry_tree_id": "92",
+      "script": "BerryTreeScript",
       "flag": "0"
     },
     {
@@ -298,8 +298,8 @@
       "movement_range_x": 0,
       "movement_range_y": 0,
       "trainer_type": "TRAINER_TYPE_NONE",
-      "trainer_sight_or_berry_tree_id": "0",
-      "script": "NULL",
+      "trainer_sight_or_berry_tree_id": "93",
+      "script": "BerryTreeScript",
       "flag": "0"
     },
     {
@@ -376,8 +376,8 @@
       "movement_range_x": 0,
       "movement_range_y": 0,
       "trainer_type": "TRAINER_TYPE_NONE",
-      "trainer_sight_or_berry_tree_id": "0",
-      "script": "NULL",
+      "trainer_sight_or_berry_tree_id": "90",
+      "script": "BerryTreeScript",
       "flag": "0"
     },
     {
@@ -389,8 +389,8 @@
       "movement_range_x": 0,
       "movement_range_y": 0,
       "trainer_type": "TRAINER_TYPE_NONE",
-      "trainer_sight_or_berry_tree_id": "0",
-      "script": "NULL",
+      "trainer_sight_or_berry_tree_id": "91",
+      "script": "BerryTreeScript",
       "flag": "0"
     },
     {
@@ -578,7 +578,7 @@
     {
       "graphics_id": "OBJ_EVENT_GFX_TRUCK",
       "x": 27,
-      "y": 60,
+      "y": 61,
       "elevation": 0,
       "movement_type": "MOVEMENT_TYPE_NONE",
       "movement_range_x": 0,
@@ -604,7 +604,7 @@
     {
       "graphics_id": "OBJ_EVENT_GFX_LASS",
       "x": 70,
-      "y": 44,
+      "y": 45,
       "elevation": 0,
       "movement_type": "MOVEMENT_TYPE_LOOK_AROUND",
       "movement_range_x": 0,
@@ -649,6 +649,19 @@
       "movement_range_x": 0,
       "movement_range_y": 0,
       "trainer_type": "TRAINER_TYPE_NONE",
+      "trainer_sight_or_berry_tree_id": "0",
+      "script": "NULL",
+      "flag": "0"
+    },
+    {
+      "graphics_id": "OBJ_EVENT_GFX_MAN_4",
+      "x": 73,
+      "y": 60,
+      "elevation": 0,
+      "movement_type": "MOVEMENT_TYPE_FACE_DOWN_AND_LEFT",
+      "movement_range_x": 0,
+      "movement_range_y": 0,
+      "trainer_type": "TRAINER_TYPE_SINGLE_TRAINER",
       "trainer_sight_or_berry_tree_id": "0",
       "script": "NULL",
       "flag": "0"

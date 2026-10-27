@@ -1,0 +1,16 @@
+{
+  "id": "MUS_KYOTO_LITTLEROOT",
+  "song_index": 610,
+  "quality": "compatible",
+  "originals_present": [
+    "sound/direct_sound_samples/kyoto_littleroot.wav",
+    "sound/direct_sound_samples/kyoto_littleroot.bin",
+    "sound/songs/midi/midi.cfg"
+  ],
+  "files_new": [],
+  "files_modified": [
+    "sound/direct_sound_samples/kyoto_littleroot.wav",
+    "sound/direct_sound_samples/kyoto_littleroot.bin",
+    "sound/songs/midi/midi.cfg"
+  ]
+}

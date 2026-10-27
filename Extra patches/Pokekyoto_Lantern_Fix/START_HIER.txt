@@ -1,0 +1,41 @@
+POKEKYOTO - LANTAARNKOP OOK VERLICHT
+
+1. Kies je pokekyoto-project in GitHub Desktop. Commit eerst je bestaande
+   Changes, inclusief een eventuele vorige installatie. Push hoeft niet.
+
+2. Pak deze ZIP uit. Kopieer de HELE map Pokekyoto_Lantern_Fix naar:
+   \\wsl.localhost\Ubuntu\home\dave-\PokemonDev\pokekyoto
+
+3. Open Ubuntu en voer deze regels een voor een uit:
+
+   cd ~/PokemonDev/pokekyoto
+   bash Pokekyoto_Lantern_Fix/install_lantern_fix.sh
+
+De installer kiest de passende update, maakt een nieuwe branch en bouwt
+pokeemerald.gba. Hij pusht niets. Bij afwijkende bronbestanden stopt hij
+zonder patch. Forceer niets; stuur bij een fout de laatste foutregels.
+
+4. Open de nieuwe pokeemerald.gba in mGBA met je gewone save.
+   De test-Pokemon, testklok, NPC-testposities en test-warps worden niet geplaatst.
+
+5. Bekijk en commit de nieuwe wijzigingen in GitHub Desktop.
+
+NIEUW
+- De lantaarnkop zelf wordt verlicht, zonder player/NPCs te bedekken.
+- Menu's keren terug zonder tijdelijk een verkeerd opgebouwde kaart te tonen.
+- De paarse strepen in de mannelijke Bag zijn vervangen door blauwe tinten.
+- De lampgloed heeft de oorspronkelijke, hogere helderheid en blijft stabiel.
+- Player en NPC worden warmer/lichter wanneer ze een lichtcirkel in lopen.
+- NPCs buiten de lichtcirkel houden hun eigen nachtkleuren.
+
+BEHOUDEN
+Foreground-wolken, player/NPC-silhouetten, transparante grondschaduwen,
+icons op hun oorspronkelijke pixelgrootte, paraglider en je dag/nachtklok.
+Followers blijven uit. De grote PC-icons kunnen naburige vakjes overlappen.
+De vrouwelijke Bag behoudt haar oorspronkelijke roze palet.
+
+README_EN.md bevat de uitleg voor je developer.
+source/ bevat de broncode en game-assets; original_png/ de originele icons.
+mgba_validation.json bevat de resultaten van deze update.
+previous_icon_validation.json beschrijft de behouden icon-tests van de vorige versie.
+Dit is geen gegarandeerde 60-FPS-optimalisatie.

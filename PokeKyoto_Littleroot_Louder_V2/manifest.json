@@ -1,0 +1,45 @@
+{
+  "source": "Town.mp3",
+  "purpose": "Littleroot Town (MAP_LITTLEROOT_TOWN)",
+  "method": "original full ensemble downmixed to mono, without MIDI resynthesis",
+  "sample_format": "8-bit signed PCM with GBA wave header, loop enabled",
+  "loop_start_sample": 0,
+  "song_constant": "MUS_KYOTO_LITTLEROOT",
+  "song_symbol": "mus_kyoto_littleroot",
+  "source_sha256": "f1285e272e2af9ac5d2328138dea6be9f9522b8be18d6e8def34251a30001203",
+  "versions": {
+    "compatible": {
+      "rate": 13379,
+      "duration_seconds": 157.2129456611107,
+      "samples": 2103352,
+      "peak_original_mono": 0.8220773935317993,
+      "gain_db": 4.94,
+      "peak_pcm8_dbfs": -0.71,
+      "rms_pcm8_dbfs": -13.44,
+      "estimated_rom_bytes": 2103368,
+      "relative_to_previous_compatible_db": 4.94,
+      "processing": "2:1 gentle compressor threshold -14.9 dBFS; +6.02 dB makeup; soft limiter <= -0.72 dBFS; keep original melody and tempo",
+      "midi_volume": 127,
+      "relative_midi_volume_previous": 115
+    }
+  },
+  "files": {
+    "assets/compatible/kyoto_littleroot.wav": {
+      "bytes": 4206782,
+      "sha256": "4decf425b4714f64f76464d46717db61cc15d36a81147bebafebe0b0e54e3015"
+    },
+    "assets/compatible/kyoto_littleroot.bin": {
+      "bytes": 2103368,
+      "sha256": "4fc21e04b84ba3bdce4f7daea661b4311e96c305d34f44dd93bccecedecda401"
+    },
+    "assets/compatible/kyoto_littleroot_preview.mp3": {
+      "bytes": 1887756,
+      "sha256": "aad2a016335f3e080df2e20eab699e77b83a86f41ae218f73e29e6b99d69e696"
+    },
+    "assets/mus_kyoto_littleroot.mid": {
+      "bytes": 156,
+      "sha256": "7c871be58bd74b83f538d0845007eab6df0516ed62f3f5c92b3e1012e9ec6c08"
+    }
+  },
+  "package_notes": "V2 gain update: same MUS_KYOTO_LITTLEROOT ID, map, rate, clock, instruments, and PCM format. Raises average PCM8 loudness ~5 dB vs previous package, limits peaks; the MIDI configuration -V115 changes to -V127. Does not change global mixer or other tracks. Re-installing updates existing song; backs up prior assets."
+}

@@ -1,0 +1,77 @@
+POKEKYOTO - VOORSTE WOLKEN + PARAGLIDER
+
+Gebruik dit nieuwe pakket in plaats van de eerdere ZIP met twee wolkenlagen.
+De 3 voorste wolkvormen en speler/NPC-silhouetten blijven. De onderste bewegende
+wolkenlaag is verwijderd. De Paraglider blijft inbegrepen.
+
+INSTALLEREN, STAP VOOR STAP
+
+1. Open GitHub Desktop en kies de repository pokekyoto.
+   Als er eigen wijzigingen bij Changes staan, sla die eerst op met een commit.
+   Verwijder of discard je werk niet.
+
+2. Open de projectmap via Repository > Show in Explorer.
+   Dit is de map met Makefile, src, include, graphics en data.
+
+3. Pak de nieuwe ZIP uit. Kopieer de map Kyoto_Foreground_Install naar de
+   projectmap. Het bestand install.sh moet dus staan op:
+
+   pokekyoto/Kyoto_Foreground_Install/install.sh
+
+   De Makefile staat ernaast in pokekyoto/Makefile. Kopieer geen losse src- of
+   graphics-mappen over je project heen; de installer past alleen de patch toe.
+
+4. Open Ubuntu/WSL in die projectmap.
+   Vanuit een Windows-terminal die al in de projectmap staat, kun je eerst
+   wsl invoeren. GitHub Desktop kan de projectterminal openen met Ctrl+`.
+   Ben je al in Ubuntu in je projectmap, dan is die extra stap niet nodig.
+
+5. Plak dit commando en druk op Enter:
+
+   bash Kyoto_Foreground_Install/install.sh
+
+   De installer controleert of de patch past, maakt een aparte feature-branch
+   en past de code toe. Hij reset geen bestanden en publiceert niets online.
+   Bij GELUKT is de installatie uitgevoerd. Bij GESTOPT: stuur de melding of
+   een screenshot, en ga niet handmatig bestanden overschrijven.
+
+6. Bouw het spel in dezelfde Ubuntu-projectmap:
+
+   make -j4
+
+   Je bestaande buildomgeving moet al werken. Na een geslaagde build staat
+   pokeemerald.gba in de projectmap. Open die ROM in mGBA.
+
+7. Ga terug naar GitHub Desktop. De gewijzigde bronbestanden staan klaar
+   voor de commit. De installatiemap wordt lokaal uitgesloten van de commit.
+   Summary: Foreground cloud weather and Paraglider
+   Klik Commit to feature/... en daarna Publish branch (of Push origin).
+   Zo publiceer je de wijziging met je eigen GitHub-account.
+
+WOLKEN EN GLIDEN OP EEN MAP AANZETTEN
+
+De installatie verandert de bestaande maps niet automatisch.
+- Open de gewenste map in je aangepaste Porymap.
+- Zet het weer op WEATHER_SUNNY_CLOUDS en sla de map op.
+- De drie voorste weather-wolken verschijnen dan. Je gewone achtergrondtiles
+  blijven gewone tiles; er wordt geen onderste wolkenanimatie toegevoegd.
+- Voor gliden: gebruik MB_GLIDE_CLOUD (0xD7) voor de luchttegels en
+  MB_GLIDE_LANDING (0xD8) voor opstijg-/landingsplekken.
+- Geef het Key Item met: giveitem ITEM_PARAGLIDER, 1
+- De speler staat op een landing, kijkt naar een aangrenzende luchttegel en
+  gebruikt de Paraglider via de Bag of als geregistreerd item met SELECT.
+- Bouw na map-/scriptwijzigingen opnieuw met make -j4.
+
+AL EERDER DE VORIGE ZIP GEINSTALLEERD?
+
+Commit die installatie eerst. De installer herkent zowel de ondersteunde
+originele decomp als het vorige Clouds + Glide-pakket en kiest de juiste patch.
+Je hoeft de vorige ZIP dus niet eerst te installeren.
+
+INSTALLATIE VERWIJDEREN UIT DE PROJECTMAP
+
+Na je commit kun je alleen de meegekopieerde map Kyoto_Foreground_Install uit
+je projectmap weghalen. Bewaar de gedownloade ZIP als installatiepakket.
+
+De Engelse developer-handleiding staat in dit pakket en na installatie in
+je repository onder docs/CLOUDS_GLIDE_EN.md.

@@ -1,0 +1,28 @@
+{
+  "id": "MUS_KYOTO_LITTLEROOT",
+  "version": "Louder V2",
+  "sample_rate": 13379,
+  "duration_seconds": 157.213,
+  "sample_count": 2103352,
+  "sample_source": "compatible original WAV (16-bit)",
+  "old_pcm16_rms_dbfs": -18.38,
+  "new_pcm16_rms_dbfs": -13.44,
+  "new_rom_pcm8_rms_dbfs": -13.44,
+  "pcm_rms_change_db": 4.94,
+  "old_peak_dbfs": -0.92,
+  "new_peak_dbfs": -0.72,
+  "new_rom_peak_dbfs": -0.71,
+  "peak_clip_count": 0,
+  "old_midi_volume": 115,
+  "new_midi_volume": 127,
+  "unchanged": [
+    "MUS_KYOTO_LITTLEROOT music ID",
+    "map ID",
+    "same music recording and duration",
+    "tempo",
+    "sample frequency",
+    "song table positions",
+    "global mixer",
+    "existing Route1/title/battle music"
+  ]
+}

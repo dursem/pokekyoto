@@ -1,0 +1,121 @@
+{
+  "menu_validation": {
+    "day_pokedex": {
+      "ui": "CB2_Pokedex",
+      "black_frames": 34,
+      "max_return_step": 28.859427083333316,
+      "returned": true
+    },
+    "day_party": {
+      "ui": "CB2_UpdatePartyMenu",
+      "black_frames": 34,
+      "max_return_step": 28.859427083333316,
+      "returned": true
+    },
+    "day_bag": {
+      "ui": "CB2_BagMenuRun",
+      "black_frames": 33,
+      "max_return_step": 28.859427083333316,
+      "returned": true
+    },
+    "day_card": {
+      "ui": "CB2_TrainerCard",
+      "black_frames": 30,
+      "max_return_step": 28.859427083333316,
+      "returned": true
+    },
+    "day_options": {
+      "ui": "0x8197f61",
+      "black_frames": 33,
+      "max_return_step": 28.859427083333316,
+      "returned": true
+    },
+    "night_pokedex": {
+      "ui": "CB2_Pokedex",
+      "black_frames": 33,
+      "max_return_step": 19.48645833333333,
+      "returned": true
+    },
+    "night_party": {
+      "ui": "CB2_UpdatePartyMenu",
+      "black_frames": 33,
+      "max_return_step": 19.48645833333333,
+      "returned": true
+    },
+    "night_bag": {
+      "ui": "CB2_BagMenuRun",
+      "black_frames": 34,
+      "max_return_step": 19.48645833333333,
+      "returned": true
+    },
+    "night_card": {
+      "ui": "CB2_TrainerCard",
+      "black_frames": 30,
+      "max_return_step": 19.48645833333333,
+      "returned": true
+    },
+    "night_options": {
+      "ui": "0x8197f61",
+      "black_frames": 34,
+      "max_return_step": 19.48645833333333,
+      "returned": true
+    },
+    "cloud_day_pokedex": {
+      "ui": "CB2_Pokedex",
+      "black_frames": 40,
+      "max_return_step": 27.36192708333334,
+      "returned": true
+    },
+    "cloud_day_party": {
+      "ui": "CB2_UpdatePartyMenu",
+      "black_frames": 40,
+      "max_return_step": 27.36192708333334,
+      "returned": true
+    },
+    "cloud_day_bag": {
+      "ui": "CB2_BagMenuRun",
+      "black_frames": 40,
+      "max_return_step": 27.36192708333334,
+      "returned": true
+    },
+    "cloud_day_card": {
+      "ui": "CB2_TrainerCard",
+      "black_frames": 37,
+      "max_return_step": 27.36192708333334,
+      "returned": true
+    },
+    "cloud_day_options": {
+      "ui": "0x8197f61",
+      "black_frames": 40,
+      "max_return_step": 27.36192708333334,
+      "returned": true
+    }
+  },
+  "lighting_validation": {
+    "player_lighting": {
+      "strength": 213,
+      "original_palette": 1,
+      "rendered_palette": 6
+    },
+    "light_ramp_max_step": 12,
+    "palette_released_outside": true,
+    "npc_independent_shared_palette": {
+      "near_npc": 1,
+      "near_strength": 213,
+      "far_npc": 3,
+      "far_strength": 0,
+      "native_palette_unchanged": true
+    },
+    "lit_player_bag_roundtrip": true
+  },
+  "regression_validation": {
+    "cloud_updates_per_600_frames": 549,
+    "approved_cloud_assets_unchanged": true,
+    "lit_field_to_pc_cleanup": true,
+    "day_cancel_save": true,
+    "night_cancel_save": true,
+    "cloud_day_cancel_save": true,
+    "actual_lit_actor_pixels_changed": 94,
+    "test_rom_sha256": "319ff39a0ef8c4fd5c93db58e7f5059ce3caf44b787be2cab150ac916a21376c"
+  }
+}

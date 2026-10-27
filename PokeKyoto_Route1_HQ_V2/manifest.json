@@ -1,0 +1,61 @@
+{
+  "source": "Route 1(1).mp3",
+  "purpose": "Route1_Frlg (MAP_ROUTE1), optional Route101",
+  "sound_symbol": "mus_kyoto_route1",
+  "constant": "MUS_KYOTO_ROUTE1",
+  "method": "Full original orchestra audio stored as looping 8-bit signed PCM mono, not MIDI transcription",
+  "versions": {
+    "compatible": {
+      "rate": 13379,
+      "samples": 1777119,
+      "duration": 132.82898572389567,
+      "rom_bytes": 1777136,
+      "original_mono_peak": 0.9136060476303101,
+      "original_mono_rms": 0.11447030605469918,
+      "gain_db": -0.13,
+      "rms_pcm8_dbfs": -18.952,
+      "source_sha256": "ed568352baa18f357f5b8b68808d0843311bf760aec409a1ca104a2e0a1518ce"
+    },
+    "hq": {
+      "rate": 26758,
+      "samples": 3554238,
+      "duration": 132.82898572389567,
+      "rom_bytes": 3554256,
+      "original_mono_peak": 0.9146038293838501,
+      "original_mono_rms": 0.11451093041241471,
+      "gain_db": -0.14,
+      "rms_pcm8_dbfs": -18.958,
+      "source_sha256": "ed568352baa18f357f5b8b68808d0843311bf760aec409a1ca104a2e0a1518ce"
+    }
+  },
+  "files": {
+    "assets/compatible/kyoto_route1.bin": {
+      "bytes": 1777136,
+      "sha256": "0a4f3180a7667435863d64b45e89630ed261deea5c6157a7c9b74a287f32b2f4"
+    },
+    "assets/compatible/kyoto_route1.wav": {
+      "bytes": 3554350,
+      "sha256": "67511f052df3f1003d713ee02a6fc8f3f74f9cad49f5e8e58f8a541fc82cd174"
+    },
+    "assets/compatible/kyoto_route1_preview.mp3": {
+      "bytes": 3189356,
+      "sha256": "925301e253ca4198b057903519a6f0d2c477f39481f669fd52663c4f73d54d00"
+    },
+    "assets/hq/kyoto_route1.bin": {
+      "bytes": 3554256,
+      "sha256": "4bb43d64e2422f25dfc08ecab75e27d3ccc7cbdd8829b60c45d1385727f069e8"
+    },
+    "assets/hq/kyoto_route1.wav": {
+      "bytes": 7108588,
+      "sha256": "22080cc8170d37e68894c9c7ed3c93fd80bc3d0fbb4095469b661aec1356c898"
+    },
+    "assets/hq/kyoto_route1_preview.mp3": {
+      "bytes": 3189356,
+      "sha256": "1eeaeeda37b3118ece258cd2a6b11e55e0fed198aaa7f363b64122de34bb4b7d"
+    },
+    "assets/mus_kyoto_route1.mid": {
+      "bytes": 188,
+      "sha256": "296a8a23307905ea5e08b6653832bc703025463dc47fd2e94de09a0a9ea89da8"
+    }
+  }
+}

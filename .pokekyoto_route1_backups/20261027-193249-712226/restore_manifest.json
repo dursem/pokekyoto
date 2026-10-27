@@ -1,0 +1,14 @@
+{
+  "restore": [
+    "sound/song_table.inc",
+    "include/constants/songs.h",
+    "sound/songs/midi/midi.cfg",
+    "sound/voice_groups.inc",
+    "sound/direct_sound_data.inc"
+  ],
+  "delete": [
+    "data/kyoto_audio/route1.dpcm",
+    "sound/songs/midi/mus_kyoto_route1.mid",
+    "sound/voicegroups/kyoto_route1.inc"
+  ]
+}

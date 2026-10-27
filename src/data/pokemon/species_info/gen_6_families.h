@@ -3348,7 +3348,7 @@ const struct SpeciesInfo gSpeciesInfoGen6[] =
         .eggGroups = MON_EGG_GROUPS(EGG_GROUP_FAIRY),
         .abilities = { ABILITY_HEALER, ABILITY_NONE, ABILITY_AROMA_VEIL },
         .bodyColor = BODY_COLOR_PINK,
-        .speciesName = _("Spritzee"),
+        .speciesName = _("Jestrick"),
         .cryId = CRY_SPRITZEE,
         .natDexNum = NATIONAL_DEX_SPRITZEE,
         .categoryName = _("Perfume"),
@@ -3356,7 +3356,7 @@ const struct SpeciesInfo gSpeciesInfoGen6[] =
         .weight = 5,
         .description = COMPOUND_STRING(
             "In the past, rather than using perfume,\n"
-            "royal ladies carried a Spritzee that would\n"
+            "royal ladies carried a Jestrick that would\n"
             "waft a fragrance they liked. Its fragrance\n"
             "changes depending on what it has eaten."),
         .pokemonScale = 682,
@@ -3422,7 +3422,7 @@ const struct SpeciesInfo gSpeciesInfoGen6[] =
         .eggGroups = MON_EGG_GROUPS(EGG_GROUP_FAIRY),
         .abilities = { ABILITY_HEALER, ABILITY_NONE, ABILITY_AROMA_VEIL },
         .bodyColor = BODY_COLOR_PINK,
-        .speciesName = _("Aromatisse"),
+        .speciesName = _("Jokequinn"),
         .cryId = CRY_AROMATISSE,
         .natDexNum = NATIONAL_DEX_AROMATISSE,
         .categoryName = _("Fragrance"),

@@ -1,0 +1,17 @@
+{
+  "repository": "https://github.com/dursem/pokekyoto",
+  "commit": "9bb2c30f4c97e5c54c90a2575a2ba80d4fea3a21",
+  "bases": {
+    "from-light-menu.patch": "b514f37db404b679ffca086ae04c7a9d70dfd067",
+    "from-native-icons.patch": "ce185ed566bb406f09afd230804882d0f5a5add0",
+    "from-cloud-icons.patch": "501f32e668f0642e809305b243ffdd89da2a3ab1",
+    "from-lighting.patch": "c7bd43d4ec667fbc71e33b18f95c58fb7e97d8c0",
+    "from-foreground.patch": "b53c80f45086b5e0a651cd1d74da13b8864be055",
+    "from-master.patch": "17149d664f15f4edb50dd050d90818bdeb603ed6"
+  },
+  "source_files": 2208,
+  "original_png_files": 2126,
+  "created_utc": "2026-10-09T11:27:22.408398+00:00",
+  "test_rom_sha256": "ef30929dd47d6df27590f633afff39d70f1919e8f28a340326fb5591a925e7aa",
+  "production_rom_sha256": "9de7d8d3839ee3ba2ce9cea6df90530356688a4479569e2a0b79d4a3ff8d60cb"
+}

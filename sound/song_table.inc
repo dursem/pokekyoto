@@ -617,6 +617,10 @@ gSongTable::
 	song ph_nurse_held, MUSIC_PLAYER_SE2, 2
 	song ph_nurse_solo, MUSIC_PLAYER_SE2, 2
 
+	@ Kyoto Littleroot Town independent BGM (append only)
+	song mus_kyoto_littleroot, MUSIC_PLAYER_BGM, 0
+	@ Kyoto Route 1 soundtrack
+	song mus_kyoto_route1, MUSIC_PLAYER_BGM, 0
 	.align 2
 dummy_song_header:
 	.byte 0, 0, 0, 0

@@ -1,0 +1,17 @@
+{
+  "source": "theme song.mp3",
+  "source_sha256": "02e7460cc2826a257c19aeae2c035fe98db4354cc5214e0b3d1dda8da92eaa71",
+  "duration_s": 82.021,
+  "sample_rate_hz": 13379,
+  "channels": 1,
+  "bit_depth": 8,
+  "format": "PCM signed 8-bit for GBA (unsigned in RIFF WAV)",
+  "sample_count": 1097359,
+  "gba_sample_loop_start": 0,
+  "gba_sample_loop_end": 1097359,
+  "wav_bytes": 1097496,
+  "agb_bin_bytes": 1097376,
+  "raw_mono_peak_before_boost": 0.7137,
+  "linear_boost": 1.219,
+  "notes": "Preserves the original orchestrated recording; only stereo-to-mono, band-limit, 8-bit PCM and gentle level adjustment."
+}

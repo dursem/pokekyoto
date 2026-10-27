@@ -201,3 +201,12 @@
 .include "sound/voicegroups/rg_sevii_45.inc"
 .include "sound/voicegroups/rg_sevii_67.inc"
 .include "sound/voicegroups/drumsets/rg_credits.inc"
+
+@ Pokekyoto title theme
+.include "sound/voicegroups/kyoto_title.inc"
+
+@ Kyoto Littleroot Town full sample
+.include "sound/voicegroups/kyoto_littleroot.inc"
+
+@ PokéKyoto Route 1 orchestra
+.include "sound/voicegroups/kyoto_route1.inc"

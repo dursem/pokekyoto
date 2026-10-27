@@ -113,6 +113,16 @@ EventScript_ResetAllBerries::
 	return
 
 EventScript_ResetAllMapFlags::
+	@ POKEKYOTO_BED_START_NO_TRUCK_V1: The player starts in the bedroom, not in the truck.
+	@ Hide BOTH overworld truck sprites on all brand-new save files.
+	setflag FLAG_HIDE_LITTLEROOT_TOWN_BRENDANS_HOUSE_TRUCK
+	setflag FLAG_HIDE_LITTLEROOT_TOWN_MAYS_HOUSE_TRUCK
+	@ State 4 lets the bedroom's clock/stairs script advance to state 5.
+	@ After setting the clock, normal state 6/7 Mom/Rival scripts still run.
+	setvar VAR_LITTLEROOT_INTRO_STATE, 4
+	checkplayergender
+	call_if_eq VAR_RESULT, MALE, PokeKyoto_BedStartInitMale
+	call_if_eq VAR_RESULT, FEMALE, PokeKyoto_BedStartInitFemale
 	setflag FLAG_HIDE_CONTEST_POKE_BALL
 	setflag FLAG_HIDE_ROUTE_111_VICTORIA_WINSTRATE
 	setflag FLAG_HIDE_ROUTE_111_VIVI_WINSTRATE
@@ -274,6 +284,29 @@ EventScript_ResetAllMapFlags::
 	setflag FLAG_HIDE_SKY_PILLAR_TOP_RAYQUAZA_STILL
 	call EventScript_ResetAllBerries
 	end
+
+@ POKEKYOTO_BED_START_NO_TRUCK_V1_HELPERS_BEGIN
+@ Initialize important gender-specific flags that Emerald previously set inside the truck.
+@ This prevents a missing intro from leaving the rival/parent NPCs in the wrong house.
+PokeKyoto_BedStartInitMale::
+	setrespawn HEAL_LOCATION_LITTLEROOT_TOWN_BRENDANS_HOUSE_2F
+	setflag FLAG_HIDE_LITTLEROOT_TOWN_MAYS_HOUSE_MOM
+	setflag FLAG_HIDE_LITTLEROOT_TOWN_BRENDANS_HOUSE_RIVAL_MOM
+	setflag FLAG_HIDE_LITTLEROOT_TOWN_BRENDANS_HOUSE_RIVAL_SIBLING
+	setflag FLAG_HIDE_LITTLEROOT_TOWN_BRENDANS_HOUSE_2F_POKE_BALL
+	setvar VAR_LITTLEROOT_HOUSES_STATE_BRENDAN, 1
+	return
+
+PokeKyoto_BedStartInitFemale::
+	setrespawn HEAL_LOCATION_LITTLEROOT_TOWN_MAYS_HOUSE_2F
+	setflag FLAG_HIDE_LITTLEROOT_TOWN_BRENDANS_HOUSE_MOM
+	setflag FLAG_HIDE_LITTLEROOT_TOWN_MAYS_HOUSE_RIVAL_MOM
+	setflag FLAG_HIDE_LITTLEROOT_TOWN_MAYS_HOUSE_RIVAL_SIBLING
+	setflag FLAG_HIDE_LITTLEROOT_TOWN_MAYS_HOUSE_2F_POKE_BALL
+	setvar VAR_LITTLEROOT_HOUSES_STATE_MAY, 1
+	return
+@ POKEKYOTO_BED_START_NO_TRUCK_V1_HELPERS_END
+
 
 EventScript_ResetAllMapFlagsFrlg::
 	setflag FLAG_HIDE_OAK_IN_HIS_LAB
