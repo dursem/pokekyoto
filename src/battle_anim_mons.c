@@ -1,6 +1,7 @@
 #include "global.h"
 #include "battle.h"
 #include "battle_anim.h"
+#include "battle_bg.h"
 #include "battle_interface.h"
 #include "bg.h"
 #include "contest.h"
@@ -93,7 +94,9 @@ u8 GetBattlerSpriteCoord(enum BattlerId battler, u8 coordType)
     {
     case BATTLER_COORD_X:
     case BATTLER_COORD_X_2:
-        retVal = sBattlerCoords[GetBattlerCoordsIndex(battler)][GetBattlerPosition(battler)].x;
+        // POKEKYOTO_PLATEAUS_V2_SOURCE: only the horizontal anchor changes.
+        retVal = KyotoBattlePlatformX(battler,
+            sBattlerCoords[GetBattlerCoordsIndex(battler)][GetBattlerPosition(battler)].x);
         break;
     case BATTLER_COORD_Y:
         retVal = sBattlerCoords[GetBattlerCoordsIndex(battler)][GetBattlerPosition(battler)].y;

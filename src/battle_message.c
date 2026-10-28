@@ -3910,7 +3910,19 @@ void BattlePutTextOnWindow(const u8 *text, u8 windowId)
             LoadKyotoBattleMessageUi();
 
         if (windowId == B_WIN_ACTION_NAME && gBattleScripting.windowsType == B_WIN_TYPE_NORMAL)
+        {
+            // POKEKYOTO_PLATEAUS_V2_SOURCE: preserve the frame beside the nickname.
+            // The 11x2-tile window begins at x=8; its first pixel is border index 4.
+            // Keep the existing text origin and the dynamic nickname + " do?".
             FillWindowPixelBuffer(windowId, PIXEL_FILL(1));
+            u8 *pixels = (u8 *)GetWindowAttribute(windowId, WINDOW_TILE_DATA);
+            u32 tileRowStride = GetWindowAttribute(windowId, WINDOW_WIDTH) * 32;
+            for (u32 y = 0; y < 16; ++y)
+            {
+                u32 offset = (y / 8) * tileRowStride + (y % 8) * 4;
+                pixels[offset] = (pixels[offset] & 0xF0) | 4;
+            }
+        }
         else
             FillWindowPixelBuffer(windowId, textInfo[windowId].fillValue);
         copyToVram = TRUE;

@@ -1,0 +1,33 @@
+test_conflicting_npc_definitions_still_stop (__main__.Tests.test_conflicting_npc_definitions_still_stop) ... ok
+test_declaration_parser (__main__.Tests.test_declaration_parser) ... ok
+test_define_and_condition_safety (__main__.Tests.test_define_and_condition_safety) ... ok
+test_domain_reused_gimmick_is_rejected (__main__.Tests.test_domain_reused_gimmick_is_rejected) ... ok
+test_dry_run_with_follower_collision_does_not_modify_sources (__main__.Tests.test_dry_run_with_follower_collision_does_not_modify_sources) ... Installer: kyoto-space-frlg-20261028-v2
+Checking local sources; no source changes have been written.
+ok
+test_follower_headers_remain_identical_after_apply_rollback (__main__.Tests.test_follower_headers_remain_identical_after_apply_rollback) ... ok
+test_generated_declarations_compile_both_game_modes (__main__.Tests.test_generated_declarations_compile_both_game_modes) ... ok
+test_gimmick_guards_execute_and_domain_remains (__main__.Tests.test_gimmick_guards_execute_and_domain_remains) ... ok
+test_mask_preserves_offsets (__main__.Tests.test_mask_preserves_offsets) ... ok
+test_missing_config_does_not_write (__main__.Tests.test_missing_config_does_not_write) ... ok
+test_newer_edits_are_not_overwritten (__main__.Tests.test_newer_edits_are_not_overwritten) ... ok
+test_old_patch_marker_is_still_detected (__main__.Tests.test_old_patch_marker_is_still_detected) ... ok
+test_pidgey_follower_collision_regression (__main__.Tests.test_pidgey_follower_collision_regression) ... ok
+test_plan_apply_rollback (__main__.Tests.test_plan_apply_rollback) ... ok
+test_same_header_duplicates_still_stop (__main__.Tests.test_same_header_duplicates_still_stop) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.263s
+
+OK
+Validated source transformation: 9 files, 20 FRLG NPCs.
+Report/patch: /tmp/tmprwuklcpi/dry-run
+DRY RUN ONLY: no source files changed. Complete ROM compile and mGBA tests are still required.
+
+Regression cross-check with the original distributed V1:
+ORIGINAL V1: Ambiguous object dependency: sPicTable_Pidgey
+V2, SAME REPRESENTATIVE FIXTURE: passed; 20 synthetic FRLG NPCs selected
+NOTE: 20 is the test-fixture NPC count, not a measured full-project NPC count.
+Full PokéKyoto build: NOT performed here.
+mGBA gameplay test: NOT performed here.
+Net ROM savings after optimization: NOT measured.

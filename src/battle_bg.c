@@ -2,6 +2,8 @@
 #include "battle.h"
 #include "battle_anim.h"
 #include "battle_bg.h"
+#include "battle_interface.h"
+#include "contest.h"
 #include "battle_main.h"
 #include "battle_message.h"
 #include "battle_setup.h"
@@ -940,6 +942,30 @@ static u8 GetBattleEnvironmentOverride(void)
         return gBattleEnvironment;
 
     return GetBattleEnvironmentByMapScene(battleScene);
+}
+
+// POKEKYOTO_PLATEAUS_V2_SOURCE: same horizontal anchors as the approved V2 ROM.
+// Use the displayed environment, not just gBattleEnvironment: maps/trainers
+// can override it. Leave all Y offsets, contests and doubles layouts unchanged.
+s16 KyotoBattlePlatformX(u32 battler, s16 defaultX)
+{
+    if (GetBattlerCoordsIndex(battler) != BATTLE_COORDS_SINGLES || IsContest())
+        return defaultX;
+
+    u32 position = GetBattlerPosition(battler);
+    if (position != B_POSITION_PLAYER_LEFT
+     && position != B_POSITION_OPPONENT_LEFT)
+        return defaultX;
+
+    switch (GetBattleEnvironmentOverride())
+    {
+    case BATTLE_ENVIRONMENT_GRASS:
+        return position == B_POSITION_PLAYER_LEFT ? 60 : 178;
+    case BATTLE_ENVIRONMENT_PLAIN:
+        return position == B_POSITION_PLAYER_LEFT ? 64 : 174;
+    default:
+        return defaultX;
+    }
 }
 
 void BattleInitBgsAndWindows(void)

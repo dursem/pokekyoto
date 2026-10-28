@@ -72,6 +72,9 @@ static const struct GMaxMove sGMaxMoveTable[] =
 // Returns whether a battler can Dynamax.
 bool32 CanDynamax(enum BattlerId battler)
 {
+    /* KYOTO_SPACE_ONLY_V3: this built-in gimmick is not used in Kyoto. */
+    return FALSE;
+
     enum Species species = GetBattlerVisualSpecies(battler);
     enum HoldEffect holdEffect = GetBattlerHoldEffectIgnoreNegation(battler);
 
@@ -168,6 +171,9 @@ u32 GetNonDynamaxMaxHP(enum BattlerId battler)
 // Sets flags used for Dynamaxing and checks Gigantamax forms.
 void ActivateDynamax(enum BattlerId battler)
 {
+    /* KYOTO_SPACE_ONLY_V3: this built-in gimmick is not used in Kyoto. */
+    return;
+
     // Set appropriate use flags.
     SetActiveGimmick(battler, GIMMICK_DYNAMAX);
     SetGimmickAsActivated(battler, GIMMICK_DYNAMAX);

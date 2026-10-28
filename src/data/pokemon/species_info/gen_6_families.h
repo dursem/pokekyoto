@@ -3348,7 +3348,7 @@ const struct SpeciesInfo gSpeciesInfoGen6[] =
         .eggGroups = MON_EGG_GROUPS(EGG_GROUP_FAIRY),
         .abilities = { ABILITY_HEALER, ABILITY_NONE, ABILITY_AROMA_VEIL },
         .bodyColor = BODY_COLOR_PINK,
-        .speciesName = _("Jestrick"),
+        .speciesName = _("Spritzee"),
         .cryId = CRY_SPRITZEE,
         .natDexNum = NATIONAL_DEX_SPRITZEE,
         .categoryName = _("Perfume"),
@@ -3356,7 +3356,7 @@ const struct SpeciesInfo gSpeciesInfoGen6[] =
         .weight = 5,
         .description = COMPOUND_STRING(
             "In the past, rather than using perfume,\n"
-            "royal ladies carried a Jestrick that would\n"
+            "royal ladies carried a Spritzee that would\n"
             "waft a fragrance they liked. Its fragrance\n"
             "changes depending on what it has eaten."),
         .pokemonScale = 682,
@@ -3365,7 +3365,7 @@ const struct SpeciesInfo gSpeciesInfoGen6[] =
         .trainerOffset = 0,
         .frontPic = gMonFrontPic_Spritzee,
         .frontPicSize = MON_COORDS_SIZE(48, 48),
-        .frontPicYOffset = 16,
+        .frontPicYOffset = 3,
         .frontAnimFrames = ANIM_FRAMES(
             ANIMCMD_FRAME(1, 15),
             ANIMCMD_FRAME(0, 25),
@@ -3385,7 +3385,7 @@ const struct SpeciesInfo gSpeciesInfoGen6[] =
         .iconSprite = gMonIcon_Spritzee,
         .iconPalIndex = 0,
         .pokemonJumpType = PKMN_JUMP_TYPE_NONE,
-        SHADOW(-1, 13, SHADOW_SIZE_S)
+        SHADOW(-1, 9, SHADOW_SIZE_S)
         FOOTPRINT(Spritzee)
         OVERWORLD(
             sPicTable_Spritzee,
@@ -3422,7 +3422,7 @@ const struct SpeciesInfo gSpeciesInfoGen6[] =
         .eggGroups = MON_EGG_GROUPS(EGG_GROUP_FAIRY),
         .abilities = { ABILITY_HEALER, ABILITY_NONE, ABILITY_AROMA_VEIL },
         .bodyColor = BODY_COLOR_PINK,
-        .speciesName = _("Jokequinn"),
+        .speciesName = _("Aromatisse"),
         .cryId = CRY_AROMATISSE,
         .natDexNum = NATIONAL_DEX_AROMATISSE,
         .categoryName = _("Fragrance"),

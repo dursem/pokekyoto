@@ -1,0 +1,35 @@
+{
+  "status": "Local source transformation package; not installed in GitHub or compiled as a ROM",
+  "github_write_attempt": {
+    "action": "create branch feature/kyoto-space-frlg-20261028",
+    "http_status": 403,
+    "message": "Resource not accessible by integration"
+  },
+  "github_modified": false,
+  "new_rom_built": false,
+  "mgba_tested": false,
+  "reference_commit": "add41daf166fdd251b1bb14e7b1dc22c3ed3b61b",
+  "provided_baseline_rom": {
+    "filename": "pokeemerald(20261027-184644).gba",
+    "sha256": "3262862dcb911b750a644601e67491e466c2191a2523369b280c8e3389a7bb64",
+    "file_size_bytes": 33554432,
+    "trailing_ff_bytes": 865540,
+    "trailing_ff_MiB": 0.8254432678222656,
+    "not_claimed_to_match_latest_github_build": true
+  },
+  "optimized_rom_savings_bytes": null,
+  "automated_test_status": "15 synthetic installer tests passed, including reproduced Pidgey regression and host-C compilation/execution; NOT full game tests",
+  "version": "kyoto-space-frlg-20261028-v2",
+  "pidgey_regression": {
+    "original_v1_reproduced": true,
+    "v2_fixture_passed": true,
+    "full_user_source_tree_dry_run": false
+  },
+  "latest_user_build_screenshot": {
+    "file": "image(20261028-094243).png",
+    "used_bytes": 33448260,
+    "capacity_bytes": 33554432,
+    "free_bytes": 106172,
+    "optimization_applied": false
+  }
+}

@@ -1,0 +1,100 @@
+POKEKYOTO — PLATEAUS EN KADERRAND V2 — ALLEEN BRONPATCH
+=====================================================
+
+Dit pakket zet de goedgekeurde V2-aanpassingen in jouw bestaande broncode,
+zodat een volgende make ze behoudt. Het bevat GEEN complete ROM, geen geheel
+project, geen FRLG-update en geen ruimtebesparingsinstaller.
+
+INHOUD VAN DE CORRECTIE
+- Grasplateau boven: 13 pixels naar rechts; rechterrand op x=238.
+- Landplateau boven: 2 pixels naar links; rechterrand op x=238.
+  Beide laten één schermpixel vrij aan de rechterkant van het 240px beeld.
+- Horizontale ankers in de betreffende single-battle-indeling:
+  gras speler 60, tegenstander 178; land speler 64, tegenstander 174.
+- Trainer-intro en trainer-slides gebruiken dezelfde ankers.
+- Het verticale stukje binnenrand naast de dynamische Pokémonnaam wordt
+  behouden. Naam, " do?" en tekstpositie veranderen niet.
+- Y-posities, soortspecifieke offsets en zweefhoogtes worden NIET aangepast.
+  Dit is dus ook geen aparte wijziging aan de verticale positie van Jestrick.
+
+BEHOUDEN
+Je huidige muziek, OW-sprites, player/Fly/Surf/Glide, gewone maps/tilesets,
+battlemechanieken, Pokémon-instellingen en de geslaagde ruimtebesparing.
+Alleen negen bestanden uit de battle-code en twee battleachtergronden wijzigen.
+
+INSTALLEREN (UBUNTU / WSL)
+1. Bewaar de ZIP in OneDrive > Desktop > 2026.
+2. Open Ubuntu en plak:
+
+cd /home/dave-/PokemonDev/pokekyoto &&
+python3 -m zipfile -e "/mnt/c/Users/dave-/OneDrive/Desktop/2026/PokeKyoto_Plateaus_V2_Patch_Only.zip" . &&
+python3 PokeKyoto_Plateaus_V2_Patch/install.py . --apply &&
+make -j4
+
+Er wordt GEEN geforceerde make -B en GEEN make clean gestart. Er is ook geen
+dubbele nulmeting/vergelijkingsbuild. De installer start zelf geen compiler.
+Je ziet de normale make-uitvoer rechtstreeks. Tijdens bouwen niet aan bronnen
+werken en geen tweede build starten.
+
+NA EEN GESLAAGDE BUILD
+De eigen nieuw gebouwde ROM is:
+/home/dave-/PokemonDev/pokekyoto/pokeemerald.gba
+
+Meet de gebruikte ruimte uit de linker-map, niet uit de opgevulde GBA-grootte:
+python3 PokeKyoto_Plateaus_V2_Patch/install.py . --rom-report
+
+De oude V2-test-ROM was rechtstreeks binair gepatcht. Een bronbuild gebruikt
+je bestaande .smol/.smolTM-compressie en kan daarom een andere bytegrootte
+hebben. Er wordt niet opnieuw een volledig muziekbestand toegevoegd; geen
+ongebruikte V1/V2-binaire kopieën worden in de broncode ingebouwd. De exacte
+resterende ruimte is pas bekend na jouw geslaagde bronbuild.
+
+VEILIGHEID / BACK-UP
+De installer controleert eerst alle doelbestanden en de bestaande palettes.
+Onbekende lokale wijzigingen in de relevante code of battlegraphics worden
+niet blind overschreven: dan volgt STOP en wordt de patch niet toegepast.
+Wijzigingen buiten de gerichte blokken blijven behouden. Een reeds volledig
+toegepaste bronpatch wordt herkend en niet dubbel aangebracht.
+
+Vóór toepassing wordt buiten de repository een back-upmap gemaakt:
+/home/dave-/PokemonDev/pokekyoto-plateaus-v2-backup-...
+
+Die bevat de negen oorspronkelijke bestanden, een echte source_changes.patch
+tegen jouw lokale code, een manifest, en de huidige ROM/linkerbestanden indien
+aanwezig. Lokale back-ups kosten schijfruimte, geen extra ruimte in de game.
+
+Een onderbreking of schrijffout TIJDENS de broninstallatie herstelt de reeds
+aangeraakte bestanden. Een fout bij het DAARNA los uitgevoerde make is geen
+automatische rollback. Gebruik in dat geval het bronherstel hieronder of geef
+de echte eerste compilerfout door. Gebruik geen git reset --hard.
+
+HERSTELLEN
+De installer print de exacte herstelopdracht met het bijbehorende back-uppad:
+python3 PokeKyoto_Plateaus_V2_Patch/install.py . --restore "/volledig/back-uppad"
+make -j4
+
+Bronherstel overschrijft geen nieuwe lokale wijzigingen en vervangt niet
+stilzwijgend jouw huidige GBA. De eerder bewaarde GBA staat in de submap
+build_before van de back-up; gewone .sav-bestanden worden nooit aangepast.
+
+CONTROLES EN BEPERKINGEN
+De vier payloadbestanden zijn vergeleken met de goedgekeurde V2-ROM: alle
+gebruikte tegels en volledige tilemaps komen overeen. De land-PNG heeft alleen
+nulopvulling voor 13 ongebruikte tiles aan het einde van de tilesheet.
+De 36 installatietests slagen. Geïsoleerde C-tests controleren 4.992
+plaatsingsgevallen, 26 slidecompensaties en de 1.408 pixels van het naamvenster.
+De nieuwe helper en randcode compileren afzonderlijk voor ARM7TDMI Thumb.
+
+Dit is NIET hetzelfde als een volledige nieuwe decompbuild of een nieuwe
+mGBA-test van die bronbuild. Die volledige bronbuild is hier niet uitgevoerd.
+De eerder goedgekeurde V2-binaire test-ROM was wel in mGBA getest; het bestaande
+verslag geldt alleen voor die ROM en de daarin geteste gevechten.
+
+Test jouw nieuwe bronbuild met een KOPIE van een gewone save (geen oude
+savestate): gras, land, intro, actie/aanvallenmenu en Bag/Pokémon-terugkeer.
+Trainerintro, trainerslides, doubles en contests verdienen ook controle.
+
+GITHUB
+Dit pakket schrijft/pusht niets naar GitHub en wijzigt geen branch. Commit na
+controle uitsluitend de negen gewijzigde projectbestanden, niet ZIPs of ROMs.
+README_EN.md bevat de technische overdracht voor je ontwikkelaar.

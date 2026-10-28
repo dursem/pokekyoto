@@ -17,6 +17,8 @@ void BattleInitBgsAndWindows(void);
 void InitBattleBgsVideo(void);
 void LoadBattleMenuWindowGfx(void);
 void DrawMainBattleBackground(void);
+// POKEKYOTO_PLATEAUS_V2_SOURCE
+s16 KyotoBattlePlatformX(u32 battler, s16 defaultX);
 void LoadBattleTextboxAndBackground(void);
 void InitLinkBattleVsScreen(u8 taskId);
 void DrawBattleEntryBackground(void);

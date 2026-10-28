@@ -1,0 +1,11 @@
+{
+  "version": "kyoto-space-only-20261028-v3",
+  "frlg_update": false,
+  "music_conversion": false,
+  "unit_integration_tests_passed": 32,
+  "complete_rom_build": "not performed",
+  "mgba_test": "not performed",
+  "rom_savings_bytes": null,
+  "growth_policy": "automatically reject and rollback a larger candidate",
+  "source_reference_commit": "add41daf166fdd251b1bb14e7b1dc22c3ed3b61b"
+}

@@ -1,0 +1,570 @@
+#!/usr/bin/env python3
+"""PokéKyoto space-only installer. No FRLG changes; no music conversion.
+
+Default: inspect sources and write a patch outside the project (no source edits).
+--build-compare: build a baseline, apply backed-up changes, build the candidate,
+and only keep it if __rom_end shows no ROM growth. Roll back on build failure
+or Ctrl+C. Tests shipped with this package are not a complete ROM/mGBA test.
+"""
+from __future__ import annotations
+import argparse
+import collections
+import contextlib
+import datetime as dt
+import difflib
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import selectors
+import shutil
+import signal
+import subprocess
+import sys
+import time
+
+VERSION = 'kyoto-space-only-20261028-v3'
+MARKER = 'KYOTO_SPACE_ONLY_V3'
+OLD_MARKER = 'KYOTO_SPACE_FRLG_V1'
+BASE_COMMIT = 'add41daf166fdd251b1bb14e7b1dc22c3ed3b61b'
+ROM_BASE, ROM_CAPACITY = 0x08000000, 32 * 1024 * 1024
+FORMS = ('P_MEGA_EVOLUTIONS', 'P_GEN_9_MEGA_EVOLUTIONS',
+         'P_ULTRA_BURST_FORMS', 'P_GIGANTAMAX_FORMS', 'P_TERA_FORMS')
+UB_FAMILIES = ('NIHILEGO', 'BUZZWOLE', 'PHEROMOSA', 'XURKITREE',
+               'CELESTEELA', 'KARTANA', 'GUZZLORD', 'POIPOLE',
+               'STAKATAKA', 'BLACEPHALON')
+GIMMICKS = ('MEGA', 'ULTRA_BURST', 'Z_MOVE', 'DYNAMAX', 'TERA')
+CAN_FUNCTIONS = ('CanMegaEvolve', 'CanUltraBurst', 'CanUseZMove',
+                 'CanDynamax', 'CanTerastallize')
+ACTIVATE_FUNCTIONS = ('ActivateMegaEvolution', 'ActivateUltraBurst',
+                      'ActivateZMove', 'ActivateDynamax', 'ActivateTera')
+ARTIFACTS = ('pokeemerald.gba', 'pokeemerald.elf', 'pokeemerald.map')
+
+class PatchError(RuntimeError):
+    pass
+
+def require(ok: bool, message: str) -> None:
+    if not ok:
+        raise PatchError(message)
+
+def digest(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+def mask_c(text: str) -> str:
+    """Mask comments and literals, preserving all character positions."""
+    pattern = r'/\*.*?\*/|//[^\n]*|"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\''
+    return re.sub(pattern, lambda m: ''.join('\n' if c == '\n' else ' ' for c in m[0]),
+                  text, flags=re.S)
+
+def replace_define(text: str, name: str, value: str) -> str:
+    pat = re.compile(r'(?m)^([ \t]*#define[ \t]+' + re.escape(name) + r'[ \t]+)([^\s/]+)')
+    require(len(list(pat.finditer(text))) == 1, f'Expected one definition of {name}')
+    return pat.sub(lambda m: m[1] + value, text, count=1)
+
+
+def source_plan(root: Path) -> tuple[dict[str, bytes], dict[str, bytes], dict]:
+    originals: dict[str, bytes] = {}
+    texts: dict[str, str] = {}
+    def read(path: str) -> str:
+        if path not in texts:
+            f = root / path
+            require(f.is_file() and not f.is_symlink() and root in f.resolve().parents,
+                    f'Missing, symlinked or out-of-project source: {path}')
+            raw = f.read_bytes()
+            originals[path] = raw
+            text = raw.decode('utf-8')
+            require(MARKER not in text and OLD_MARKER not in text, f'Patch marker already present: {path}. Use the existing report/rollback.')
+            texts[path] = text
+        return texts[path]
+
+    require((root / 'Makefile').is_file(), 'This is not a decomp source directory.')
+    require((root / 'sound/direct_sound_samples/kyoto_littleroot.wav').is_file(),
+            'Kyoto Littleroot source missing: refusing to modify a different project.')
+    makefile = (root / 'Makefile').read_text(encoding='utf-8')
+    require('GAME_VERSION ?= EMERALD' in makefile, 'Expected the PokéKyoto Emerald build.')
+    # Reject a previously APPLIED FRLG package; never remove unknown local edits.
+    # Old installer folders/reports are harmless and deliberately not scanned.
+    ow_paths = list((root / 'src/data/object_events').glob('*.h'))
+    ow_paths.append(root / 'src/event_object_movement.c')
+    for path in ow_paths:
+        if path.is_file():
+            require(OLD_MARKER.encode() not in path.read_bytes(),
+                    'An earlier FRLG patch is applied in ' + str(path) +
+                    '. Restore it using its original backup before using this package.')
+    # Refuse known wrong project; never change PokePeach.
+    remote = subprocess.run(['git', '-C', str(root), 'remote', 'get-url', 'origin'],
+                            text=True, capture_output=True, check=False)
+    if remote.returncode == 0:
+        require('pokekyoto' in remote.stdout.lower(), 'origin is not PokéKyoto: ' + remote.stdout.strip())
+
+    path = 'include/config/species_enabled.h'
+    text = read(path)
+    for name in FORMS + tuple('P_FAMILY_' + x for x in UB_FAMILIES):
+        text = replace_define(text, name, 'FALSE')
+    texts[path] = text
+    path = 'include/config/pokemon.h'
+    texts[path] = replace_define(read(path), 'P_MODIFIED_MEGA_CRIES', 'FALSE')
+
+    path = 'src/data/gimmicks.h'
+    text = read(path)
+    masked = mask_c(text)
+    edits = []
+    for name in GIMMICKS:
+        pat = re.compile(r'\[GIMMICK_' + name + r'\]\s*=\s*\{')
+        matches = list(pat.finditer(masked))
+        require(len(matches) == 1, f'Expected one GIMMICK_{name} table entry')
+        m = matches[0]
+        depth, end = 1, m.end()
+        while depth and end < len(masked):
+            depth += (masked[end] == '{') - (masked[end] == '}')
+            end += 1
+        require(depth == 0, f'Unbalanced GIMMICK_{name}')
+        require(re.search(r'\b[A-Za-z_]*[Dd]omain[A-Za-z_]*\b', text[m.start():end]) is None,
+                f'GIMMICK_{name} appears to be repurposed for Domain Expansion; review manually')
+        edits.append((m.start(), end, f'[GIMMICK_{name}] = {{0}} /* {MARKER}: disabled */'))
+    for start, end, new in sorted(edits, reverse=True):
+        text = text[:start] + new + text[end:]
+    texts[path] = text
+
+    # Guard real entry points too, not just the player-selection menu.
+    wanted = {x: 'FALSE' for x in CAN_FUNCTIONS}
+    wanted.update({x: '' for x in ACTIVATE_FUNCTIONS})
+    locations = collections.defaultdict(list)
+    source_files = list((root / 'src').glob('*.c'))
+    for f in source_files:
+        raw = f.read_text(encoding='utf-8')
+        if not any(re.search(r'\b' + name + r'\s*\(', raw) for name in wanted):
+            continue
+        masked = mask_c(raw)
+        for name in wanted:
+            pattern = (r'(?m)^[ \t]*(?:static\s+)?(?:inline\s+)?'
+                       r'(bool32|bool8|void)\s+' + name + r'\s*\([^;{}]*\)\s*\{')
+            for m in re.finditer(pattern, masked):
+                depth, end = 1, m.end()
+                while depth and end < len(masked):
+                    depth += (masked[end] == '{') - (masked[end] == '}')
+                    end += 1
+                require(depth == 0, f'Unbalanced function {name}')
+                require(re.search(r'\b[A-Za-z_]*[Dd]omain[A-Za-z_]*\b', raw[m.start():end]) is None,
+                        f'{name} contains Domain Expansion references; review manually')
+                locations[name].append((f.relative_to(root).as_posix(), m.end(), m[1], digest(raw.encode("utf-8"))))
+    grouped = collections.defaultdict(list)
+    for name, result in wanted.items():
+        require(len(locations[name]) == 1, f'Cannot uniquely locate function body {name}')
+        path, offset, kind, source_hash = locations[name][0]
+        require(digest(read(path).encode("utf-8")) == source_hash,
+                "Source changed while locating function: " + name)
+        require((kind == 'void') == (result == ''), f'Unexpected return type for {name}: {kind}')
+        grouped[path].append((offset, name, result))
+    for path, items in grouped.items():
+        text = read(path)
+        for offset, name, result in sorted(items, reverse=True):
+            guard = f'\n    /* {MARKER}: this built-in gimmick is not used in Kyoto. */\n    return{(" " + result) if result else ""};\n'
+            text = text[:offset] + guard + text[offset:]
+        texts[path] = text
+
+    changed = {p: t.encode('utf-8') for p, t in texts.items()
+               if t.encode('utf-8') != originals[p]}
+    permitted = {'include/config/species_enabled.h', 'include/config/pokemon.h',
+                 'src/data/gimmicks.h'} | set(grouped)
+    require(set(changed) <= permitted, 'Unexpected modified path')
+    # Function definitions may live in general Pokemon code as well as battle
+    # files. Only the named entry points above are touched; never movement/audio.
+    protected_c = {'src/event_object_movement.c', 'src/overworld.c', 'src/glide.c',
+                   'src/sound.c', 'src/m4a.c', 'src/sprite.c'}
+    require(not (set(changed) & protected_c) and
+            not any(p.startswith('src/field_') for p in changed),
+            'An entry point has moved into protected overworld/audio code; review manually')
+    require(bool(changed), 'No source changes found')
+    report = {
+        'version': VERSION, 'reference_commit': BASE_COMMIT,
+        'forms_disabled': list(FORMS),
+        'ultra_beast_families_disabled': list(UB_FAMILIES),
+        'gimmicks_disabled': list(GIMMICKS),
+        'frlg_added': False, 'frlg_npc_count': 0,
+        'music_changed': False, 'object_sprites_changed': False,
+        'files_modified': sorted(changed),
+        'preserved': ['species/object IDs', 'all generation settings', 'regional forms',
+                      'Primal Reversions', 'base Necrozma and its non-Ultra forms',
+                      'existing songs', 'ordinary moves and abilities',
+                      'custom players/Fly/Surf/Glide', 'maps/events', 'other custom gimmicks'],
+        'rom_savings_bytes': None, 'build_status': 'not built', 'mgba_status': 'not tested',
+        'source_changes_applied': False,
+        'scope_note': 'Forms/families disabled by existing compile-time configuration. '
+                      'Built-in gimmick entry points disabled. Shared engine code, items '
+                      'and move tables are not comprehensively removed.'}
+    return {p: originals[p] for p in changed}, changed, report
+
+
+def atomic_write(path: Path, data: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_name(path.name + '.kyoto-temp')
+    require(not temp.exists(), f'Temporary path exists: {temp}')
+    try:
+        temp.write_bytes(data)
+        if path.exists():
+            shutil.copymode(path, temp)
+        os.replace(temp, path)
+    finally:
+        if temp.exists():
+            temp.unlink()
+
+
+def apply_changes(root: Path, before: dict[str, bytes], after: dict[str, bytes], output: Path) -> None:
+    # Check every source hash before writing anything.
+    for path, old in before.items():
+        require((root / path).read_bytes() == old, 'Source changed during planning: ' + path)
+    manifest = {'root': str(root), 'version': VERSION, 'files': {}}
+    for path, old in before.items():
+        f = output / 'originals' / path
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_bytes(old)
+        manifest['files'][path] = {'before': digest(old), 'after': digest(after[path])}
+    (output / 'backup.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+    try:
+        for path, new in after.items():
+            atomic_write(root / path, new)
+    except BaseException:
+        with ignore_interrupt_during_restore():
+            # Inspect ALL targets, including an interrupted final os.replace.
+            rollback(root, output)
+        raise
+
+
+def rollback(root: Path, output: Path) -> None:
+    manifest = json.loads((output / 'backup.json').read_text(encoding='utf-8'))
+    require(Path(manifest['root']).resolve() == root, 'Backup belongs to another source directory')
+    for path, hashes in manifest['files'].items():
+        rel = Path(path)
+        require(not rel.is_absolute() and '..' not in rel.parts,
+                'Unsafe backup path: ' + path)
+        require(not (root / path).is_symlink() and root in (root / path).resolve().parents,
+                'Symlinked or out-of-project restore path: ' + path)
+        require(not (output / 'originals' / path).is_symlink(), 'Symlinked backup: ' + path)
+        current = digest((root / path).read_bytes())
+        require(current in (hashes['before'], hashes['after']), 'Refusing to overwrite newer edits: ' + path)
+        require(digest((output / 'originals' / path).read_bytes()) == hashes['before'], 'Damaged backup: ' + path)
+    for path in manifest['files']:
+        atomic_write(root / path, (output / 'originals' / path).read_bytes())
+
+
+def file_hash(path: Path) -> str:
+    value = hashlib.sha256()
+    with path.open('rb') as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b''):
+            value.update(chunk)
+    return value.hexdigest()
+
+
+def snapshot_artifacts(root: Path, folder: Path) -> dict:
+    folder.mkdir(parents=True, exist_ok=True)
+    manifest = {}
+    for name in ARTIFACTS:
+        src = root / name
+        require(not src.is_symlink(), 'Refusing a symlinked build output: ' + str(src))
+        if src.exists():
+            require(src.is_file(), 'Not a regular build output: ' + str(src))
+            shutil.copy2(src, folder / name)
+            manifest[name] = file_hash(folder / name)
+        else:
+            manifest[name] = None
+    (folder / 'artifacts.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+    return manifest
+
+
+def restore_artifacts(root: Path, folder: Path) -> None:
+    manifest = json.loads((folder / 'artifacts.json').read_text(encoding='utf-8'))
+    require(set(manifest) == set(ARTIFACTS), 'Unexpected artifact manifest')
+    for name, checksum in manifest.items():
+        require(not (root / name).is_symlink(), 'Refusing symlinked output: ' + name)
+        if checksum is not None:
+            require((folder / name).is_file() and file_hash(folder / name) == checksum,
+                    'Damaged build backup: ' + name)
+    for name, checksum in manifest.items():
+        dest = root / name
+        if checksum is None:
+            if dest.exists():
+                dest.unlink()
+        else:
+            # Write a new complete file before replacing the old output.
+            temp = dest.with_name(name + '.kyoto-restore-temp')
+            require(not temp.exists(), 'Temporary restore output already exists: ' + str(temp))
+            try:
+                shutil.copy2(folder / name, temp)
+                os.replace(temp, dest)
+            finally:
+                if temp.exists():
+                    temp.unlink()
+
+
+@contextlib.contextmanager
+def ignore_interrupt_during_restore():
+    # A second Ctrl+C must not interrupt a partially completed rollback.
+    previous = {sig: signal.signal(sig, signal.SIG_IGN)
+                for sig in (signal.SIGINT, signal.SIGTERM)}
+    try:
+        yield
+    finally:
+        for sig, handler in previous.items():
+            signal.signal(sig, handler)
+
+
+def stop_process_group(process: subprocess.Popen) -> None:
+    """Stop only the isolated process group created by this installer."""
+    with ignore_interrupt_during_restore():
+        for sig, seconds in ((signal.SIGINT, 3), (signal.SIGTERM, 3), (signal.SIGKILL, 3)):
+            try:
+                os.killpg(process.pid, sig)
+            except ProcessLookupError:
+                break
+            try:
+                process.wait(timeout=seconds)
+            except subprocess.TimeoutExpired:
+                continue
+            # Reap any descendants still in the group, even if make exited first.
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                break
+            time.sleep(0.1)
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            break
+        process.wait()
+
+
+def run_logged(cmd: list[str], root: Path, log_path: Path, label: str) -> None:
+    print('BUILD ' + label + ': ' + ' '.join(cmd), flush=True)
+    print('Log: ' + str(log_path), flush=True)
+    tail: collections.deque[str] = collections.deque(maxlen=25)
+    pending = b''
+    last_line = 'Compiler gestart; dit is een volledige build.'
+    last_progress = time.monotonic()
+    with log_path.open('wb') as log, selectors.DefaultSelector() as selector:
+        process = subprocess.Popen(cmd, cwd=root, stdin=subprocess.DEVNULL,
+                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                   start_new_session=True)
+        assert process.stdout is not None
+        selector.register(process.stdout, selectors.EVENT_READ)
+        def handle_line(raw: bytes) -> None:
+            nonlocal last_line
+            text = raw.decode('utf-8', errors='replace').rstrip()
+            tail.append(text)
+            if text:
+                last_line = text
+            if any(word in text.lower() for word in ('error:', 'overflow', 'memory region')) or re.search(r'\bROM:', text):
+                print(text, flush=True)
+        try:
+            eof = False
+            while not eof:
+                events = selector.select(timeout=1)
+                for key, _ in events:
+                    chunk = os.read(key.fileobj.fileno(), 65536)
+                    if not chunk:
+                        eof = True
+                        break
+                    log.write(chunk)
+                    log.flush()
+                    pending += chunk
+                    while b'\n' in pending:
+                        line, pending = pending.split(b'\n', 1)
+                        handle_line(line)
+                if time.monotonic() - last_progress >= 15:
+                    print('[' + label + '] Bezig: ' + last_line[-160:], flush=True)
+                    last_progress = time.monotonic()
+            if pending:
+                handle_line(pending)
+            returncode = process.wait()
+        except BaseException:
+            print('\nBuild onderbroken; compilerprocessen worden gestopt.', flush=True)
+            stop_process_group(process)
+            raise
+        finally:
+            process.stdout.close()
+    if returncode:
+        print('\n'.join(tail), file=sys.stderr)
+    require(returncode == 0, label + ' build failed. See ' + str(log_path))
+
+
+def measure_rom(root: Path) -> tuple[int, str]:
+    elf = root / 'pokeemerald.elf'
+    require(elf.is_file(), 'No pokeemerald.elf produced')
+    symbols = subprocess.run(['arm-none-eabi-nm', '-n', str(elf)], check=True,
+                             capture_output=True, text=True).stdout
+    matches = re.findall(r'(?m)^([0-9a-fA-F]+)\s+\S\s+__rom_end\s*$', symbols)
+    require(len(matches) == 1, 'No unique __rom_end symbol; not estimating from padded file size')
+    used = int(matches[0], 16) - ROM_BASE
+    require(0 < used <= ROM_CAPACITY, '__rom_end is outside the 32 MiB ROM area')
+    gba = root / 'pokeemerald.gba'
+    require(gba.is_file() and used <= gba.stat().st_size <= ROM_CAPACITY,
+            'GBA file size disagrees with __rom_end or exceeds the ROM capacity')
+    return used, symbols
+
+
+def build(root: Path, output: Path, label: str, jobs: int, make_args: list[str]) -> int:
+    run_logged(['make', '-B', '-j' + str(jobs), '-O', 'all'] + make_args,
+               root, output / (label + '-build.log'), label)
+    used, symbols = measure_rom(root)
+    snapshot_artifacts(root, output / (label + '-artifacts'))
+    (output / (label + '-symbols.txt')).write_text(symbols, encoding='utf-8')
+    return used
+
+
+def save_report(output: Path, report: dict) -> None:
+    atomic_write(output / 'report.json', json.dumps(report, indent=2, ensure_ascii=False).encode())
+
+
+def compare_builds(root: Path, output: Path, before: dict[str, bytes],
+                   after: dict[str, bytes], report: dict, jobs: int,
+                   make_args: list[str]) -> None:
+    snapshot_artifacts(root, output / 'entry-artifacts')
+    try:
+        baseline = build(root, output, 'before', jobs, make_args)
+    except BaseException:
+        with ignore_interrupt_during_restore():
+            restore_artifacts(root, output / 'entry-artifacts')
+            report['build_status'] = 'baseline failed/interrupted; source untouched; entry ROM restored'
+            save_report(output, report)
+        raise
+    report.update(before_used_bytes=baseline, before_free_bytes=ROM_CAPACITY - baseline)
+    save_report(output, report)
+    print(f'BEFORE: {baseline:,} bytes used; {ROM_CAPACITY - baseline:,} free', flush=True)
+    print('Nu alleen de ruimtebesparing toepassen. GEEN FRLG; muziek/OW-sprites ongewijzigd.', flush=True)
+    apply_changes(root, before, after, output)
+    try:
+        report['source_changes_applied'] = True
+        save_report(output, report)
+        optimized = build(root, output, 'candidate', jobs, make_args)
+        for path, expected in after.items():
+            require((root / path).read_bytes() == expected,
+                    'Source changed during candidate build; manual review required: ' + path)
+        report.update(after_used_bytes=optimized, after_free_bytes=ROM_CAPACITY - optimized,
+                      rom_savings_bytes=baseline - optimized)
+        require(optimized <= baseline,
+                f'Candidate is {optimized - baseline:,} bytes LARGER. Refusing to keep it.')
+        # Only publish this name after the non-growth check passes.
+        shutil.copy2(root / 'pokeemerald.gba', output / 'optimized.gba')
+        report['build_status'] = 'both builds passed; no ROM growth; gameplay not tested'
+        save_report(output, report)
+    except BaseException:
+        with ignore_interrupt_during_restore():
+            rollback(root, output)
+            restore_artifacts(root, output / 'before-artifacts')
+            accepted = output / 'optimized.gba'
+            if accepted.exists():
+                accepted.unlink()
+            report.update(source_changes_applied=False,
+                          build_status='candidate failed/interrupted/rejected; source and baseline ROM restored')
+            save_report(output, report)
+            print('Teruggezet: gewijzigde bronbestanden en oorspronkelijke ROM. Geen FRLG toegevoegd.', flush=True)
+        raise
+    print(f'AFTER:  {optimized:,} bytes used; {ROM_CAPACITY - optimized:,} free', flush=True)
+    print(f'NET SAVING (NO FRLG): {baseline - optimized:,} bytes ({(baseline - optimized)/1048576:.3f} MiB)', flush=True)
+    print(f'FREE AFTER: {ROM_CAPACITY - optimized:,} bytes ({(ROM_CAPACITY - optimized)/1048576:.3f} MiB)', flush=True)
+    print('Nieuwe ROM: ' + str(output / 'optimized.gba'), flush=True)
+    print('Ook de pokeemerald.gba in je project bevat nu deze build.', flush=True)
+    print('Nog niet in mGBA getest. Gebruik een KOPIE van je save.', flush=True)
+
+
+@contextlib.contextmanager
+def project_lock(root: Path):
+    import fcntl  # Ubuntu/WSL only; no third-party packages.
+    path = root.parent / ('.' + root.name + '-space-only.lock')
+    require(not path.is_symlink(), 'Symlinked project lock')
+    with path.open('a') as stream:
+        try:
+            fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            raise PatchError('Another space-only installer is already running for this project')
+        try:
+            yield
+        finally:
+            fcntl.flock(stream, fcntl.LOCK_UN)
+
+
+def no_other_make(root: Path) -> None:
+    # Catch an earlier still-running build, without sending signals to it.
+    for entry in Path('/proc').iterdir():
+        if not entry.name.isdecimal():
+            continue
+        try:
+            cmd = (entry / 'cmdline').read_bytes().split(b'\0')[0].decode(errors='replace')
+            if Path(cmd).name not in ('make', 'gmake'):
+                continue
+            cwd = (entry / 'cwd').resolve(strict=True)
+        except (OSError, RuntimeError):
+            continue
+        require(not (cwd == root or root in cwd.parents),
+                'A make process is already building this project (PID ' + entry.name + '). '
+                'Stop that build before starting this installer.')
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('root', type=Path, help='PokéKyoto source folder')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--build-compare', action='store_true')
+    mode.add_argument('--rollback', type=Path, help='Restore source from a V3 backup folder')
+    parser.add_argument('--output', type=Path, help='New report/backup folder OUTSIDE project')
+    parser.add_argument('--jobs', type=int, default=2)
+    parser.add_argument('--make-arg', action='append', default=[], help='Identical build override for both builds')
+    args = parser.parse_args(argv)
+    root = args.root.expanduser().resolve()
+    try:
+        require(os.name == 'posix' and Path('/proc').is_dir(), 'Run this in Ubuntu/WSL, not Windows Python')
+        require(root.is_dir(), 'Project folder not found: ' + str(root))
+        require(args.jobs >= 1, '--jobs must be positive')
+        for arg in args.make_arg:
+            require(re.match(r'^(O_LEVEL|LTO|UNUSED_ERROR|DEPRECATED_ERROR|KEEP_TEMPS)=[A-Za-z0-9_-]+$', arg) is not None,
+                    'Unsupported make override: ' + arg)
+        with project_lock(root):
+            no_other_make(root)
+            if args.rollback:
+                backup = args.rollback.expanduser().resolve()
+                manifest = json.loads((backup / 'backup.json').read_text(encoding='utf-8'))
+                require(manifest.get('version') == VERSION, 'Not a V3 space-only backup; use its original installer')
+                rollback(root, backup)
+                print('Bronbestanden hersteld. Bouw opnieuw voordat je deze ROM gebruikt; save ongewijzigd.')
+                return 0
+            print('Installer: ' + VERSION, flush=True)
+            print('ALLEEN RUIMTEBESPARING. GEEN FRLG. Muziek en bestaande OW-sprites blijven gelijk.', flush=True)
+            print('Broncontrole; er zijn nog geen bronbestanden aangepast.', flush=True)
+            before, after, report = source_plan(root)
+            stamp = dt.datetime.now().strftime('%Y%m%d-%H%M%S-%f')
+            output = (args.output or root.parent / ('kyoto-space-only-result-' + stamp)).expanduser().resolve()
+            require(not output.exists(), 'Output folder already exists: ' + str(output))
+            require(output != root and root not in output.parents, 'Output must be outside the project')
+            output.mkdir(parents=True)
+            patch = ''.join(''.join(difflib.unified_diff(before[p].decode().splitlines(True),
+                          after[p].decode().splitlines(True), fromfile='a/' + p, tofile='b/' + p))
+                          for p in sorted(after))
+            (output / 'changes.patch').write_text(patch, encoding='utf-8')
+            save_report(output, report)
+            print(f'Gecontroleerd: {len(after)} bronbestanden; FRLG toegevoegd: NEE.', flush=True)
+            print('Rapport/back-up: ' + str(output), flush=True)
+            if not args.build_compare:
+                print('Alleen controle: broncode en ROM zijn niet gewijzigd. Gebruik --build-compare om toe te passen.')
+                return 0
+            for exe in ('make', 'arm-none-eabi-gcc', 'arm-none-eabi-nm'):
+                require(shutil.which(exe) is not None, 'Missing build tool: ' + exe)
+            print('Twee volledige builds: eerst je huidige versie, daarna alleen de besparingen.', flush=True)
+            print('Start intussen geen tweede make en bewerk geen bronbestanden.', flush=True)
+            compare_builds(root, output, before, after, report, args.jobs, args.make_arg)
+            print('Broncode terugzetten: python3 ' + str(Path(__file__).resolve()) + ' ' + str(root) + ' --rollback ' + str(output))
+            return 0
+    except KeyboardInterrupt:
+        print('\nGestopt met Ctrl+C. Bekijk de herstelmelding hierboven; rapport/log blijft bewaard.', file=sys.stderr)
+        return 130
+    except (PatchError, OSError, UnicodeError, subprocess.SubprocessError, ValueError) as exc:
+        print('STOP: ' + str(exc), file=sys.stderr)
+        return 1
+
+
+if __name__ == '__main__':
+    def terminate(signum, frame):
+        raise KeyboardInterrupt
+    signal.signal(signal.SIGTERM, terminate)
+    raise SystemExit(main())

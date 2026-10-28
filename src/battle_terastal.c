@@ -19,6 +19,9 @@
 // Sets flags and variables upon a battler's Terastallization.
 void ActivateTera(enum BattlerId battler)
 {
+    /* KYOTO_SPACE_ONLY_V3: this built-in gimmick is not used in Kyoto. */
+    return;
+
     // Set appropriate flags.
     SetActiveGimmick(battler, GIMMICK_TERA);
     SetGimmickAsActivated(battler, GIMMICK_TERA);
@@ -68,6 +71,9 @@ bool32 IsTeraOrbCharged(void)
 // Returns whether a battler can Terastallize.
 bool32 CanTerastallize(enum BattlerId battler)
 {
+    /* KYOTO_SPACE_ONLY_V3: this built-in gimmick is not used in Kyoto. */
+    return FALSE;
+
     enum HoldEffect holdEffect = GetBattlerHoldEffectIgnoreNegation(battler);
 
     if (gBattleMons[battler].volatiles.transformed && GetBaseSpecies(gBattleMons[battler].species) == SPECIES_TERAPAGOS)

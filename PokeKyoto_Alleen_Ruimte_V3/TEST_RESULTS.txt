@@ -1,0 +1,37 @@
+test_already_applied_frlg_rejected_without_changes (__main__.Tests.test_already_applied_frlg_rejected_without_changes) ... ok
+test_apply_and_rollback_bit_exact (__main__.Tests.test_apply_and_rollback_bit_exact) ... ok
+test_apply_rejects_changed_source (__main__.Tests.test_apply_rejects_changed_source) ... ok
+test_baseline_failure_restores_entry_rom (__main__.Tests.test_baseline_failure_restores_entry_rom) ... ok
+test_baseline_interrupt_restores_entry_rom_no_source_changes (__main__.Tests.test_baseline_interrupt_restores_entry_rom_no_source_changes) ... ok
+test_build_log_stream_is_real_and_nonzero_exit_errors (__main__.Tests.test_build_log_stream_is_real_and_nonzero_exit_errors) ... ok
+test_build_subprocess_is_stopped_on_interrupt (__main__.Tests.test_build_subprocess_is_stopped_on_interrupt) ... ok
+test_candidate_compile_failure_rolls_back (__main__.Tests.test_candidate_compile_failure_rolls_back) ... ok
+test_candidate_interrupt_rolls_back (__main__.Tests.test_candidate_interrupt_rolls_back) ... ok
+test_custom_domain_entry_preserved (__main__.Tests.test_custom_domain_entry_preserved) ... ok
+test_disabled_forms_ubs_mega_cries (__main__.Tests.test_disabled_forms_ubs_mega_cries) ... ok
+test_domain_reused_function_refused (__main__.Tests.test_domain_reused_function_refused) ... ok
+test_domain_reused_gimmick_table_refused (__main__.Tests.test_domain_reused_gimmick_table_refused) ... ok
+test_dry_run_no_source_change (__main__.Tests.test_dry_run_no_source_change) ... ok
+test_duplicate_definition_rejected (__main__.Tests.test_duplicate_definition_rejected) ... ok
+test_equal_size_is_not_growth (__main__.Tests.test_equal_size_is_not_growth) ... ok
+test_generations_regular_cries_and_fakemon_kept (__main__.Tests.test_generations_regular_cries_and_fakemon_kept) ... ok
+test_generic_pokemon_source_entry_points_supported (__main__.Tests.test_generic_pokemon_source_entry_points_supported) ... ok
+test_gimmick_entrypoints_disabled_but_domain_runs (__main__.Tests.test_gimmick_entrypoints_disabled_but_domain_runs) ... ok
+test_invalid_linker_symbol_is_rejected (__main__.Tests.test_invalid_linker_symbol_is_rejected) ... ok
+test_larger_build_rolled_back (__main__.Tests.test_larger_build_rolled_back) ... ok
+test_measure_uses_linker_symbol_not_padded_size (__main__.Tests.test_measure_uses_linker_symbol_not_padded_size) ... ok
+test_missing_define_rejects_without_writes (__main__.Tests.test_missing_define_rejects_without_writes) ... ok
+test_no_overworld_or_music_or_id_edits (__main__.Tests.test_no_overworld_or_music_or_id_edits) ... ok
+test_no_unmeasured_apply_option (__main__.Tests.test_no_unmeasured_apply_option) ... ok
+test_old_installer_folder_is_not_an_applied_frlg_patch (__main__.Tests.test_old_installer_folder_is_not_an_applied_frlg_patch) ... ok
+test_partial_apply_interrupt_restores_all_files (__main__.Tests.test_partial_apply_interrupt_restores_all_files) ... ok
+test_pidgey_collision_does_not_matter (__main__.Tests.test_pidgey_collision_does_not_matter) ... ok
+test_protected_overworld_entrypoint_refused (__main__.Tests.test_protected_overworld_entrypoint_refused) ... ok
+test_rollback_preserves_newer_user_edits (__main__.Tests.test_rollback_preserves_newer_user_edits) ... ok
+test_smaller_build_accepted (__main__.Tests.test_smaller_build_accepted) ... ok
+test_unrelated_files_and_save_unchanged_after_apply (__main__.Tests.test_unrelated_files_and_save_unchanged_after_apply) ... ok
+
+----------------------------------------------------------------------
+Ran 32 tests in 3.617s
+
+OK

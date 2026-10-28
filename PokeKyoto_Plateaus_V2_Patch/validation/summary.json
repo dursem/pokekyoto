@@ -1,0 +1,24 @@
+{
+  "version": "pokekyoto-plateaus-v2-source-20261028",
+  "approved_v2_rom_sha256": "a9a17b7691e45063fb867e3eb783d16c0cc00d3e64882a75b500bb22232e12b8",
+  "reference_commit": "add41daf166fdd251b1bb14e7b1dc22c3ed3b61b",
+  "installer_tests_passed": 36,
+  "anchor_cases": 4992,
+  "slide_cases": 26,
+  "border_pixels": 1408,
+  "isolated_arm_thumb_compile": true,
+  "v2_used_graphics_equal": true,
+  "source_full_build_performed": false,
+  "source_build_mgba_test_performed": false,
+  "frlg_added": false,
+  "feature_config_changed": false,
+  "music_changed": false,
+  "ow_sprites_changed": false,
+  "vertical_species_offsets_changed": false,
+  "payload_sha256": {
+    "graphics/battle_environment/kyoto_grass/map.bin": "6618481eb889f10c6b417bebe6e2a2c4f665ca50d304ca3970b131e12f76b515",
+    "graphics/battle_environment/kyoto_grass/tiles.png": "4075f6c359dec7af5f5ff06e0e10bbfaf16927338e74393af4e54f54c61317d4",
+    "graphics/battle_environment/kyoto_land/map.bin": "1ba6de6e9a64e785c8d3de04758e4346f38ca7cc4f537085dc482227c320eb95",
+    "graphics/battle_environment/kyoto_land/tiles.png": "2db45a8a06d767ed6322a48a3b8cfe8ecc7a6f09d49e586c9fd5018d86cabed2"
+  }
+}

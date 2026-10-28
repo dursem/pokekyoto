@@ -1,0 +1,3 @@
+PASS: 4992 horizontal-anchor cases; 26 trainer-slide compensations; 1408 name-window pixels; non-Kyoto guards.
+PASS: isolated helper and name-window repair compile for ARM7TDMI Thumb.
+Scope: isolated logic with stubbed game queries, not the full ROM or a gameplay test.

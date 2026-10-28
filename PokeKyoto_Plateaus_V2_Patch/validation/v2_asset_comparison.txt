@@ -1,0 +1,22 @@
+{
+  "approved_v2_sha256": "a9a17b7691e45063fb867e3eb783d16c0cc00d3e64882a75b500bb22232e12b8",
+  "checks": [
+    {
+      "environment": "grass",
+      "referenced_tile_bytes_equal": true,
+      "map_bytes_equal": true,
+      "rom_tile_bytes": 3584,
+      "source_tile_bytes": 3584,
+      "unreferenced_zero_padding_bytes": 0
+    },
+    {
+      "environment": "land",
+      "referenced_tile_bytes_equal": true,
+      "map_bytes_equal": true,
+      "rom_tile_bytes": 3168,
+      "source_tile_bytes": 3584,
+      "unreferenced_zero_padding_bytes": 416
+    }
+  ]
+}
+PASS: all referenced pixels and complete tilemaps match the approved V2.

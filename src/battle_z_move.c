@@ -112,6 +112,9 @@ bool32 IsZMove(enum Move move)
 
 bool32 CanUseZMove(enum BattlerId battler)
 {
+    /* KYOTO_SPACE_ONLY_V3: this built-in gimmick is not used in Kyoto. */
+    return FALSE;
+
     enum HoldEffect holdEffect = GetBattlerHoldEffectIgnoreNegation(battler);
     enum BattlerPosition position = GetBattlerPosition(battler);
 
@@ -161,6 +164,9 @@ enum Move GetUsableZMove(enum BattlerId battler, enum Move move)
 
 void ActivateZMove(enum BattlerId battler)
 {
+    /* KYOTO_SPACE_ONLY_V3: this built-in gimmick is not used in Kyoto. */
+    return;
+
     SetActiveGimmick(battler, GIMMICK_Z_MOVE);
 }
 

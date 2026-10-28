@@ -8730,6 +8730,9 @@ bool32 DoesSpeciesUseHoldItemToChangeForm(enum Species species, enum Item heldIt
 
 bool32 CanMegaEvolve(enum BattlerId battler)
 {
+    /* KYOTO_SPACE_ONLY_V3: this built-in gimmick is not used in Kyoto. */
+    return FALSE;
+
     enum HoldEffect holdEffect = GetBattlerHoldEffectIgnoreNegation(battler);
     enum BattlerPosition position = GetBattlerPosition(battler);
 
@@ -8771,6 +8774,9 @@ bool32 CanMegaEvolve(enum BattlerId battler)
 
 bool32 CanUltraBurst(enum BattlerId battler)
 {
+    /* KYOTO_SPACE_ONLY_V3: this built-in gimmick is not used in Kyoto. */
+    return FALSE;
+
     enum HoldEffect holdEffect = GetBattlerHoldEffectIgnoreNegation(battler);
     enum BattlerPosition position = GetBattlerPosition(battler);
 
@@ -8804,6 +8810,9 @@ bool32 CanUltraBurst(enum BattlerId battler)
 
 void ActivateMegaEvolution(enum BattlerId battler)
 {
+    /* KYOTO_SPACE_ONLY_V3: this built-in gimmick is not used in Kyoto. */
+    return;
+
     enum Ability ability = GetBattlerAbility(battler);
     gLastUsedItem = gBattleMons[battler].item;
     SetActiveGimmick(battler, GIMMICK_MEGA);
@@ -8822,6 +8831,9 @@ void ActivateMegaEvolution(enum BattlerId battler)
 
 void ActivateUltraBurst(enum BattlerId battler)
 {
+    /* KYOTO_SPACE_ONLY_V3: this built-in gimmick is not used in Kyoto. */
+    return;
+
     enum Ability ability = GetBattlerAbility(battler);
     gLastUsedItem = gBattleMons[battler].item;
     SetActiveGimmick(battler, GIMMICK_ULTRA_BURST);

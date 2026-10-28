@@ -1,0 +1,41 @@
+test_all_five_idempotent (test_install.CodeTests.test_all_five_idempotent) ... ok
+test_all_five_sources_transform (test_install.CodeTests.test_all_five_sources_transform) ... ok
+test_ambiguous_function_rejected (test_install.CodeTests.test_ambiguous_function_rejected) ... ok
+test_changed_name_origin_rejected (test_install.CodeTests.test_changed_name_origin_rejected) ... ok
+test_changed_name_width_rejected (test_install.CodeTests.test_changed_name_width_rejected) ... ok
+test_comment_braces_ignored (test_install.CodeTests.test_comment_braces_ignored) ... ok
+test_existing_include_not_duplicated (test_install.CodeTests.test_existing_include_not_duplicated) ... ok
+test_helper_includes_interface_declaration (test_install.CodeTests.test_helper_includes_interface_declaration) ... ok
+test_name_text_origin_preserved (test_install.CodeTests.test_name_text_origin_preserved) ... ok
+test_only_x_lookup_changes (test_install.CodeTests.test_only_x_lookup_changes) ... ok
+test_trainer_slide_preserves_other_calls_and_y (test_install.CodeTests.test_trainer_slide_preserves_other_calls_and_y) ... ok
+test_unexpected_slide_compensation_rejected (test_install.CodeTests.test_unexpected_slide_compensation_rejected) ... ok
+test_unknown_existing_helper_rejected (test_install.CodeTests.test_unknown_existing_helper_rejected) ... ok
+test_unknown_fill_refused (test_install.CodeTests.test_unknown_fill_refused) ... ok
+test_unrelated_local_work_preserved (test_install.CodeTests.test_unrelated_local_work_preserved) ... ok
+test_no_forced_build_or_rom_addresses_in_installer (test_install.PayloadTests.test_no_forced_build_or_rom_addresses_in_installer) ... ok
+test_payload_hashes (test_install.PayloadTests.test_payload_hashes) ... ok
+test_apply_backup_and_restore_roundtrip (test_install.TransactionTests.test_apply_backup_and_restore_roundtrip) ... ok
+test_apply_twice_no_second_backup (test_install.TransactionTests.test_apply_twice_no_second_backup) ... ok
+test_backup_corruption_prevents_restore (test_install.TransactionTests.test_backup_corruption_prevents_restore) ... ok
+test_backup_path_traversal_prevented (test_install.TransactionTests.test_backup_path_traversal_prevented) ... ok
+test_busy_build_rejected (test_install.TransactionTests.test_busy_build_rejected) ... ok
+test_changed_asset_stops_before_any_write (test_install.TransactionTests.test_changed_asset_stops_before_any_write) ... ok
+test_changed_palette_rejected (test_install.TransactionTests.test_changed_palette_rejected) ... ok
+test_changed_pipeline_rejected (test_install.TransactionTests.test_changed_pipeline_rejected) ... ok
+test_check_has_no_writes (test_install.TransactionTests.test_check_has_no_writes) ... ok
+test_crlf_preserved (test_install.TransactionTests.test_crlf_preserved) ... ok
+test_exact_nine_file_scope (test_install.TransactionTests.test_exact_nine_file_scope) ... ok
+test_generated_diff_git_apply_check (test_install.TransactionTests.test_generated_diff_git_apply_check) ... ok
+test_keyboardinterrupt_rolls_back (test_install.TransactionTests.test_keyboardinterrupt_rolls_back) ... ok
+test_preserve_optimization_and_audio (test_install.TransactionTests.test_preserve_optimization_and_audio) ... ok
+test_restore_refuses_new_user_work (test_install.TransactionTests.test_restore_refuses_new_user_work) ... ok
+test_rom_measurement (test_install.TransactionTests.test_rom_measurement) ... ok
+test_snapshot_change_prevents_apply (test_install.TransactionTests.test_snapshot_change_prevents_apply) ... ok
+test_symlink_source_rejected (test_install.TransactionTests.test_symlink_source_rejected) ... ok
+test_write_failure_rolls_back (test_install.TransactionTests.test_write_failure_rolls_back) ... ok
+
+----------------------------------------------------------------------
+Ran 36 tests in 0.436s
+
+OK

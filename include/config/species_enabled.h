@@ -20,13 +20,13 @@
 #define P_NEW_EVOS_IN_REGIONAL_DEX       TRUE
 
 // Battle gimmick specific Forms.
-#define P_MEGA_EVOLUTIONS                TRUE
+#define P_MEGA_EVOLUTIONS                FALSE
 #define P_PRIMAL_REVERSIONS              TRUE // Groudon and Kyogre only.
-#define P_ULTRA_BURST_FORMS              TRUE // Ultra Necrozma only.
-#define P_GIGANTAMAX_FORMS               TRUE
-#define P_TERA_FORMS                     TRUE
+#define P_ULTRA_BURST_FORMS              FALSE // Ultra Necrozma only.
+#define P_GIGANTAMAX_FORMS               FALSE
+#define P_TERA_FORMS                     FALSE
 
-#define P_GEN_9_MEGA_EVOLUTIONS          P_MEGA_EVOLUTIONS // Mega Evolutions introduced in Z-A and its DLC
+#define P_GEN_9_MEGA_EVOLUTIONS          FALSE // Mega Evolutions introduced in Z-A and its DLC
 
 // Fusion forms
 #define P_FUSION_FORMS                   TRUE
@@ -464,19 +464,19 @@
 #define P_FAMILY_TAPU_BULU               P_GEN_7_POKEMON
 #define P_FAMILY_TAPU_FINI               P_GEN_7_POKEMON
 #define P_FAMILY_COSMOG                  P_GEN_7_POKEMON
-#define P_FAMILY_NIHILEGO                P_GEN_7_POKEMON
-#define P_FAMILY_BUZZWOLE                P_GEN_7_POKEMON
-#define P_FAMILY_PHEROMOSA               P_GEN_7_POKEMON
-#define P_FAMILY_XURKITREE               P_GEN_7_POKEMON
-#define P_FAMILY_CELESTEELA              P_GEN_7_POKEMON
-#define P_FAMILY_KARTANA                 P_GEN_7_POKEMON
-#define P_FAMILY_GUZZLORD                P_GEN_7_POKEMON
+#define P_FAMILY_NIHILEGO                FALSE
+#define P_FAMILY_BUZZWOLE                FALSE
+#define P_FAMILY_PHEROMOSA               FALSE
+#define P_FAMILY_XURKITREE               FALSE
+#define P_FAMILY_CELESTEELA              FALSE
+#define P_FAMILY_KARTANA                 FALSE
+#define P_FAMILY_GUZZLORD                FALSE
 #define P_FAMILY_NECROZMA                P_GEN_7_POKEMON
 #define P_FAMILY_MAGEARNA                P_GEN_7_POKEMON
 #define P_FAMILY_MARSHADOW               P_GEN_7_POKEMON
-#define P_FAMILY_POIPOLE                 P_GEN_7_POKEMON
-#define P_FAMILY_STAKATAKA               P_GEN_7_POKEMON
-#define P_FAMILY_BLACEPHALON             P_GEN_7_POKEMON
+#define P_FAMILY_POIPOLE                 FALSE
+#define P_FAMILY_STAKATAKA               FALSE
+#define P_FAMILY_BLACEPHALON             FALSE
 #define P_FAMILY_ZERAORA                 P_GEN_7_POKEMON
 #define P_FAMILY_MELTAN                  P_GEN_7_POKEMON
 
