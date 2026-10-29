@@ -11,6 +11,7 @@ bool8 TryToWaterBerryTree(void);
 void ClearBerryTrees(void);
 void BerryTreeTimeUpdate(s32 minutes);
 void PlantBerryTree(u8 id, enum BerryId berry, u8 stage, bool8 allowGrowth);
+void InitLittlerootBerryTrees(void);
 void RemoveBerryTree(u8 id);
 u8 GetBerryTypeByBerryTreeId(u8 id);
 u8 GetStageByBerryTreeId(u8 id);

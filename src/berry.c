@@ -9,12 +9,14 @@
 #include "item_menu.h"
 #include "main.h"
 #include "random.h"
+#include "script.h"
 #include "script_pokemon_util.h"
 #include "sprite.h"
 #include "string_util.h"
 #include "text.h"
 #include "constants/event_object_movement.h"
 #include "constants/items.h"
+#include "constants/flags.h"
 
 static u8 BerryTreeGetNumStagesWatered(struct BerryTree *tree);
 static u8 GetNumStagesWateredByBerryTreeId(u8 id);
@@ -2604,6 +2606,28 @@ void PlantBerryTree(u8 id, enum BerryId berry, u8 stage, bool8 allowGrowth)
         tree->stopGrowth = TRUE;
 
     SetTreeMutations(id, berry);
+}
+
+// Also runs for existing saves. Do not refill harvested trees on later visits
+// or replace a tree the player already planted before installing this fix.
+void InitLittlerootBerryTrees(void)
+{
+    u32 id;
+
+    Script_RequestEffects(SCREFF_V1 | SCREFF_SAVE);
+    if (FlagGet(FLAG_LITTLEROOT_BERRIES_INITIALIZED))
+        return;
+
+    for (id = BERRY_TREE_LITTLEROOT_NORTH_ORAN; id <= BERRY_TREE_LITTLEROOT_SOUTH_PECHA; id++)
+    {
+        struct BerryTree *tree = GetBerryTreeInfo(id);
+        enum BerryId berry = (id == BERRY_TREE_LITTLEROOT_NORTH_ORAN || id == BERRY_TREE_LITTLEROOT_SOUTH_ORAN)
+                          ? BERRY_ID_ORAN : BERRY_ID_PECHA;
+
+        if (tree->berry == BERRY_ID_NONE && tree->stage == BERRY_STAGE_NO_BERRY)
+            PlantBerryTree(id, berry, BERRY_STAGE_BERRIES, FALSE);
+    }
+    FlagSet(FLAG_LITTLEROOT_BERRIES_INITIALIZED);
 }
 
 void RemoveBerryTree(u8 id)
