@@ -4671,6 +4671,16 @@ static u8 CreateMonSprite(struct Pokemon *unused)
     else
         gSprites[spriteId].hFlip = FALSE;
 
+    // PokeKyoto: Jestrick and Jokequin face into the Summary screen.
+    {
+        enum Species displaySpecies =
+            BXPY_SummaryScreen_TransformSpeciesId(sMonSummaryScreen->mode, summary->species2);
+
+        if (displaySpecies == SPECIES_SPRITZEE
+         || displaySpecies == SPECIES_AROMATISSE)
+            gSprites[spriteId].hFlip = !gSprites[spriteId].hFlip;
+    }
+
     return spriteId;
 }
 
