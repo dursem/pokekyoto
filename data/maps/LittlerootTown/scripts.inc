@@ -1,8 +1,14 @@
 LittlerootTown_MapScripts::
+	map_script MAP_SCRIPT_ON_LOAD, LittlerootTown_OnLoad
 	map_script MAP_SCRIPT_ON_TRANSITION, LittlerootTown_OnTransition
 	map_script MAP_SCRIPT_ON_FRAME_TABLE, LittlerootTown_OnFrame
 	map_script MAP_SCRIPT_ON_WARP_INTO_MAP_TABLE, LittlerootTown_OnWarp
 	.byte 0
+
+LittlerootTown_OnLoad:
+	@ Also initialize existing saves resumed inside Littleroot.
+	callnative InitLittlerootBerryTrees, requests_effects=1
+	end
 
 	@ State descriptions for VAR_LITTLEROOT_TOWN_STATE
 	@ 1: Met Rival
