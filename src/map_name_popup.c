@@ -34,6 +34,7 @@ enum MapPopUp_Themes
     MAPPOPUP_THEME_BRICK,
     MAPPOPUP_THEME_UNDERWATER,
     MAPPOPUP_THEME_STONE2,
+    MAPPOPUP_THEME_KYOTO_TOWN,
 };
 
 enum MapPopUp_Themes_BW
@@ -59,6 +60,7 @@ static const u8 sMapPopUp_Table[][960] =
     [MAPPOPUP_THEME_BRICK]      = INCGFX_U8("graphics/map_popup/brick.png", ".4bpp"),
     [MAPPOPUP_THEME_UNDERWATER] = INCGFX_U8("graphics/map_popup/underwater.png", ".4bpp"),
     [MAPPOPUP_THEME_STONE2]     = INCGFX_U8("graphics/map_popup/stone2.png", ".4bpp"),
+    [MAPPOPUP_THEME_KYOTO_TOWN] = INCGFX_U8("graphics/map_popup/kyoto_town.png", ".4bpp"),
 };
 
 static const u8 sMapPopUp_OutlineTable[][960] =
@@ -69,6 +71,7 @@ static const u8 sMapPopUp_OutlineTable[][960] =
     [MAPPOPUP_THEME_BRICK]      = INCGFX_U8("graphics/map_popup/brick_outline.png", ".4bpp"),
     [MAPPOPUP_THEME_UNDERWATER] = INCGFX_U8("graphics/map_popup/underwater_outline.png", ".4bpp"),
     [MAPPOPUP_THEME_STONE2]     = INCGFX_U8("graphics/map_popup/stone2_outline.png", ".4bpp"),
+    [MAPPOPUP_THEME_KYOTO_TOWN] = INCGFX_U8("graphics/map_popup/kyoto_town_outline.png", ".4bpp"),
 };
 
 static const u16 sMapPopUp_PaletteTable[][16] =
@@ -79,6 +82,7 @@ static const u16 sMapPopUp_PaletteTable[][16] =
     [MAPPOPUP_THEME_BRICK]      = INCGFX_U16("graphics/map_popup/brick_outline.png", ".gbapal"),
     [MAPPOPUP_THEME_UNDERWATER] = INCGFX_U16("graphics/map_popup/underwater_outline.png", ".gbapal"),
     [MAPPOPUP_THEME_STONE2]     = INCGFX_U16("graphics/map_popup/stone2_outline.png", ".gbapal"),
+    [MAPPOPUP_THEME_KYOTO_TOWN] = INCGFX_U16("graphics/map_popup/kyoto_town_outline.png", ".gbapal"),
 };
 
 static const u16 sMapPopUp_Palette_Underwater[16] = INCGFX_U16("graphics/map_popup/underwater.pal", ".gbapal");
@@ -86,24 +90,24 @@ static const u16 sMapPopUp_Palette_Underwater[16] = INCGFX_U16("graphics/map_pop
 // -1 in the size excludes MAPSEC_NONE.
 // The MAPSEC values for Kanto (between MAPSEC_DYNAMIC and MAPSEC_AQUA_HIDEOUT) are also excluded,
 // and this is then handled by subtracting KANTO_MAPSEC_COUNT here and in LoadMapNamePopUpWindowBg.
-static const u8 sMapSectionToThemeId[MAPSEC_COUNT - KANTO_MAPSEC_COUNT - 1] =
+static const u8 UNUSED sMapSectionToThemeId[MAPSEC_COUNT - KANTO_MAPSEC_COUNT - 1] =
 {
-    [MAPSEC_LITTLEROOT_TOWN] = MAPPOPUP_THEME_WOOD,
-    [MAPSEC_OLDALE_TOWN] = MAPPOPUP_THEME_WOOD,
-    [MAPSEC_DEWFORD_TOWN] = MAPPOPUP_THEME_WOOD,
-    [MAPSEC_LAVARIDGE_TOWN] = MAPPOPUP_THEME_WOOD,
-    [MAPSEC_FALLARBOR_TOWN] = MAPPOPUP_THEME_WOOD,
-    [MAPSEC_VERDANTURF_TOWN] = MAPPOPUP_THEME_WOOD,
-    [MAPSEC_PACIFIDLOG_TOWN] = MAPPOPUP_THEME_WOOD,
-    [MAPSEC_PETALBURG_CITY] = MAPPOPUP_THEME_BRICK,
-    [MAPSEC_SLATEPORT_CITY] = MAPPOPUP_THEME_MARBLE,
-    [MAPSEC_MAUVILLE_CITY] = MAPPOPUP_THEME_MARBLE,
-    [MAPSEC_RUSTBORO_CITY] = MAPPOPUP_THEME_MARBLE,
-    [MAPSEC_FORTREE_CITY] = MAPPOPUP_THEME_BRICK,
-    [MAPSEC_LILYCOVE_CITY] = MAPPOPUP_THEME_MARBLE,
-    [MAPSEC_MOSSDEEP_CITY] = MAPPOPUP_THEME_BRICK,
-    [MAPSEC_SOOTOPOLIS_CITY] = MAPPOPUP_THEME_MARBLE,
-    [MAPSEC_EVER_GRANDE_CITY] = MAPPOPUP_THEME_BRICK,
+    [MAPSEC_LITTLEROOT_TOWN] = MAPPOPUP_THEME_KYOTO_TOWN,
+    [MAPSEC_OLDALE_TOWN] = MAPPOPUP_THEME_KYOTO_TOWN,
+    [MAPSEC_DEWFORD_TOWN] = MAPPOPUP_THEME_KYOTO_TOWN,
+    [MAPSEC_LAVARIDGE_TOWN] = MAPPOPUP_THEME_KYOTO_TOWN,
+    [MAPSEC_FALLARBOR_TOWN] = MAPPOPUP_THEME_KYOTO_TOWN,
+    [MAPSEC_VERDANTURF_TOWN] = MAPPOPUP_THEME_KYOTO_TOWN,
+    [MAPSEC_PACIFIDLOG_TOWN] = MAPPOPUP_THEME_KYOTO_TOWN,
+    [MAPSEC_PETALBURG_CITY] = MAPPOPUP_THEME_KYOTO_TOWN,
+    [MAPSEC_SLATEPORT_CITY] = MAPPOPUP_THEME_KYOTO_TOWN,
+    [MAPSEC_MAUVILLE_CITY] = MAPPOPUP_THEME_KYOTO_TOWN,
+    [MAPSEC_RUSTBORO_CITY] = MAPPOPUP_THEME_KYOTO_TOWN,
+    [MAPSEC_FORTREE_CITY] = MAPPOPUP_THEME_KYOTO_TOWN,
+    [MAPSEC_LILYCOVE_CITY] = MAPPOPUP_THEME_KYOTO_TOWN,
+    [MAPSEC_MOSSDEEP_CITY] = MAPPOPUP_THEME_KYOTO_TOWN,
+    [MAPSEC_SOOTOPOLIS_CITY] = MAPPOPUP_THEME_KYOTO_TOWN,
+    [MAPSEC_EVER_GRANDE_CITY] = MAPPOPUP_THEME_KYOTO_TOWN,
     [MAPSEC_ROUTE_101] = MAPPOPUP_THEME_WOOD,
     [MAPSEC_ROUTE_102] = MAPPOPUP_THEME_WOOD,
     [MAPSEC_ROUTE_103] = MAPPOPUP_THEME_WOOD,
@@ -709,11 +713,11 @@ static void LoadMapNamePopUpWindowBg(void)
     }
     else
     {
-        popUpThemeId = sMapSectionToThemeId[regionMapSectionId];
+        popUpThemeId = MAPPOPUP_THEME_KYOTO_TOWN; // Shared popup for all Gen-3 map sections
         LoadBgTiles(GetWindowAttribute(popupWindowId, WINDOW_BG), sMapPopUp_OutlineTable[popUpThemeId], 0x400, 0x21D);
         CallWindowFunction(popupWindowId, DrawMapNamePopUpFrame);
         PutWindowTilemap(popupWindowId);
-        if (gMapHeader.weather == WEATHER_UNDERWATER_BUBBLES)
+        if (gMapHeader.weather == WEATHER_UNDERWATER_BUBBLES && popUpThemeId != MAPPOPUP_THEME_KYOTO_TOWN)
             LoadPalette(&sMapPopUp_Palette_Underwater, BG_PLTT_ID(14), sizeof(sMapPopUp_Palette_Underwater));
         else
             LoadPalette(sMapPopUp_PaletteTable[popUpThemeId], BG_PLTT_ID(14), sizeof(sMapPopUp_PaletteTable[0]));
