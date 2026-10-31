@@ -21,12 +21,17 @@ Route101_EventScript_StartBirchRescue::
 	playbgm MUS_HELP, TRUE
 	msgbox Route101_Text_HelpMe, MSGBOX_DEFAULT
 	closemessage
-	setobjectxy LOCALID_ROUTE101_BIRCH, 0, 15
-	setobjectxy LOCALID_ROUTE101_ZIGZAGOON, 0, 16
+	@ Keep the chase in the clearing beside the bag on Kyoto's enlarged map.
+	setobjectxy LOCALID_ROUTE101_BIRCH, 7, 40
+	setobjectxy LOCALID_ROUTE101_ZIGZAGOON, 7, 41
 	applymovement LOCALID_PLAYER, Route101_Movement_EnterScene
 	applymovement LOCALID_ROUTE101_BIRCH, Route101_Movement_BirchRunAway1
 	applymovement LOCALID_ROUTE101_ZIGZAGOON, Route101_Movement_ZigzagoonChase1
-	waitmovement 0
+	@ The player's entrance is longer than the two NPC movements.
+	waitmovement LOCALID_PLAYER
+	getplayerxy VAR_0x8004, VAR_0x8005
+	call_if_eq VAR_0x8004, 13, Route101_EventScript_CenterPlayerFromMiddle
+	call_if_eq VAR_0x8004, 14, Route101_EventScript_CenterPlayerFromRight
 	applymovement LOCALID_ROUTE101_ZIGZAGOON, Route101_Movement_ZigzagoonChaseInCircles
 	applymovement LOCALID_ROUTE101_BIRCH, Route101_Movement_BirchRunInCircles
 	waitmovement 0
@@ -40,6 +45,38 @@ Route101_EventScript_StartBirchRescue::
 	setvar VAR_ROUTE101_STATE, 2
 	releaseall
 	end
+
+Route101_EventScript_CenterPlayerFromMiddle:
+	applymovement LOCALID_PLAYER, Route101_Movement_CenterPlayerFromMiddle
+	waitmovement 0
+	return
+
+Route101_EventScript_CenterPlayerFromRight:
+	applymovement LOCALID_PLAYER, Route101_Movement_CenterPlayerFromRight
+	waitmovement 0
+	return
+
+Route101_Movement_CenterPlayerFromMiddle:
+	walk_fast_left
+	step_end
+
+Route101_Movement_CenterPlayerFromRight:
+	walk_fast_left
+	walk_fast_left
+	step_end
+
+Route101_EventScript_PreventExitEast::
+	lockall
+	msgbox Route101_Text_DontLeaveMe, MSGBOX_DEFAULT
+	closemessage
+	applymovement LOCALID_PLAYER, Route101_Movement_PreventExitEast
+	waitmovement 0
+	releaseall
+	end
+
+Route101_Movement_PreventExitEast:
+	walk_left
+	step_end
 
 Route101_EventScript_PreventExitSouth::
 	lockall
@@ -115,11 +152,6 @@ Route101_Movement_ZigzagoonChaseInCircles:
 
 Route101_Movement_ZigzagoonChase1:
 	walk_fast_up
-	walk_fast_right
-	walk_fast_right
-	walk_fast_right
-	walk_fast_right
-	walk_fast_up
 	step_end
 
 @ Leftover data? This command is unused.
@@ -133,6 +165,7 @@ Route101_Movement_ZigzagoonFaceBirch:
 	step_end
 
 Route101_Movement_EnterScene:
+	walk_fast_up
 	walk_fast_up
 	walk_fast_up
 	walk_fast_up
@@ -174,11 +207,6 @@ Route101_Movement_BirchRunInCircles:
 	step_end
 
 Route101_Movement_BirchRunAway1:
-	walk_fast_right
-	walk_fast_right
-	walk_fast_right
-	walk_fast_right
-	walk_fast_up
 	walk_fast_up
 	step_end
 
@@ -222,7 +250,8 @@ Route101_EventScript_BirchsBag::
 	setflag FLAG_RESCUED_BIRCH
 	fadescreen FADE_TO_BLACK
 	removeobject LOCALID_ROUTE101_ZIGZAGOON
-	setobjectxy LOCALID_PLAYER, 6, 13
+	setobjectxy LOCALID_PLAYER, 9, 39
+	setobjectxy LOCALID_ROUTE101_BIRCH, 7, 39
 	applymovement LOCALID_PLAYER, Common_Movement_WalkInPlaceFasterLeft
 	waitmovement 0
 	special ChooseStarter
