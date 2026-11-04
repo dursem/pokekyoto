@@ -20,6 +20,8 @@ import json
 import os
 import re
 import sys
+import subprocess
+import tempfile
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
@@ -310,6 +312,7 @@ def c_identifier(symbol):
 class TilesetData:
     def __init__(self, symbol, info):
         self.symbol = symbol
+        self.aliases = {}
         self.info = info
         self.dir = os.path.dirname(info['metatiles'])
         self.isSecondary = info['isSecondary']
@@ -353,6 +356,42 @@ def virtual_tile_to_local(tile):
     if tile < MAX_TILES_IN_PRIMARY + MAX_TILES_IN_SECONDARY:
         return False, tile - MAX_TILES_IN_SECONDARY
     raise ValueError('invalid virtual tile ID %d' % tile)
+
+
+def local_tile_ids(secondary, length):
+    # Invert the engine's interleaved virtual tile banks.
+    # Within each sheet the banks occur in ascending local-index order.
+    ids = [tile for tile in range(MAX_TILES_IN_PRIMARY + MAX_TILES_IN_SECONDARY)
+           if virtual_tile_to_local(tile)[0] == secondary]
+    return ids[:length]
+
+
+def static_aliases(sheet, protected):
+    # Only these two sheets need packing. Their editable tiles and metatiles stay intact.
+    if sheet.symbol not in ('gTileset_General', 'gTileset_Petalburg') or not sheet.numTiles:
+        return {}
+    if sheet.numTiles > (MAX_TILES_IN_SECONDARY if sheet.isSecondary else MAX_TILES_IN_PRIMARY):
+        return {}  # analyse already checks the size.
+    with tempfile.TemporaryDirectory() as tmp:
+        out = os.path.join(tmp, 'tiles.4bpp')
+        converter = path('tools', 'gbagfx', 'gbagfx' + ('.exe' if os.name == 'nt' else ''))
+        if not os.path.isfile(converter):
+            raise ValueError("Build the map graphics converter first: make -C tools/gbagfx")
+        subprocess.run([converter, path(sheet.dir, 'tiles.png'), out], check=True)
+        with open(out, 'rb') as f:
+            pixels = f.read()
+    if len(pixels) != sheet.numTiles * TILE_SIZE_4BPP:
+        raise ValueError('%s: unexpected converted tile count' % sheet.symbol)
+    first = {}
+    aliases = {}
+    for local, tile in enumerate(local_tile_ids(sheet.isSecondary, sheet.numTiles)):
+        if tile in protected:
+            continue
+        graphic = pixels[local * TILE_SIZE_4BPP:(local + 1) * TILE_SIZE_4BPP]
+        dest = first.setdefault(graphic, tile)
+        if tile >= LEGACY_TILES_IN_PRIMARY and dest != tile:
+            aliases[tile] = dest
+    return aliases
 
 
 def load_maps():
@@ -412,6 +451,10 @@ def stitched_grid(layout, layouts_by_id, maps_by_layout, maps):
 def pool_tiles_by_metatile(primary, secondary):
     """For each metatile id of a pair, the set of virtual tiles that live in the tile cache pool."""
     cache = {}
+    aliases = {}
+    if primary.extended or secondary.extended:
+        aliases.update(primary.aliases)
+        aliases.update(secondary.aliases)
 
     def lookup(metatile):
         if metatile not in cache:
@@ -421,7 +464,8 @@ def pool_tiles_by_metatile(primary, secondary):
             else:
                 local = metatile - MAX_METATILES_IN_PRIMARY
                 tiles = secondary.virtual_tiles(local) if local < secondary.numMetatiles else primary.virtual_tiles(0)
-            cache[metatile] = frozenset(t for t in tiles if t >= LEGACY_TILES_IN_PRIMARY)
+            canonical = (aliases.get(t, t) for t in tiles)
+            cache[metatile] = frozenset(t for t in canonical if t >= LEGACY_TILES_IN_PRIMARY)
         return cache[metatile]
     return lookup
 
@@ -516,6 +560,13 @@ def analyse(report, verbose=False):
             streamed_layouts.append((layout, primary, secondary))
 
     anims = tileset_animation_slots()
+    # Never share a tile which may later be overwritten (or use it as an alias target).
+    protected = set(range(LEGACY_TILES_IN_PRIMARY + TILE_CACHE_POOL_SLOTS, LEGACY_TILES_TOTAL))
+    for slots in anims.values():
+        protected.update(slots)
+    for symbol in {s for pair in streamed_pairs for s in pair}:
+        sheet = tilesets[symbol]
+        sheet.aliases = static_aliases(sheet, protected)
     for layout, primary, secondary in streamed_layouts:
         padding = 0
         for metatile_owner, count in ((primary, primary.numMetatiles), (secondary, secondary.numMetatiles)):
@@ -766,6 +817,15 @@ def cmd_gen(args):
         ts = tilesets[symbol]
         if ts.extPath:
             out.append('static const u8 sMetatileTileExt_%s[] = INCBIN_U8("%s");' % (c_identifier(symbol), ts.extPath))
+    for symbol in sorted(raw_tilesets):
+        ts = tilesets[symbol]
+        if not ts.aliases:
+            continue
+        ids = local_tile_ids(ts.isSecondary, ts.numTiles)
+        out.append('static const u16 sTileAliases_%s[] = {' % c_identifier(symbol))
+        for start in range(0, len(ids), 16):
+            out.append('    ' + ', '.join(str(ts.aliases.get(t, t)) for t in ids[start:start+16]) + ',')
+        out.append('};')
     out += ['', 'const struct TilesetCapacityInfo gTilesetCapacityInfo[] =', '{']
     for symbol in sorted(tilesets):
         ts = tilesets[symbol]
@@ -773,6 +833,7 @@ def cmd_gen(args):
         out += ['    {',
                 '        .tileset = &%s,' % symbol,
                 '        .rawTiles = %s,' % raw_names.get(symbol, 'NULL'),
+                '        .tileAliases = %s,' % ('sTileAliases_' + name if ts.aliases else 'NULL'),
                 '        .tileExt = %s,' % ('sMetatileTileExt_' + name if ts.extPath else 'NULL'),
                 '        .numTiles = %d,' % ts.numTiles,
                 '        .numMetatiles = %d,' % ts.numMetatiles,

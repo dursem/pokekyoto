@@ -56,6 +56,7 @@ struct TilesetCapacityInfo
     const struct Tileset *tileset;
     const u32 *rawTiles;
     const u8 *tileExt;
+    const u16 *tileAliases;  // Local tile index to canonical virtual tile, or NULL for an identity mapping.
     u16 numTiles;
     u16 numMetatiles;
     bool8 streamed;

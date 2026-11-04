@@ -135,37 +135,54 @@ static bool32 IsSlotFree(u32 index)
         && !IsReleasePending(index);
 }
 
-static const u32 *GetTileSource(u32 tile)
+static inline const struct TilesetCapacityInfo *GetTileOwner(u32 tile, u32 *local)
 {
-    const struct TilesetCapacityInfo *info;
-    u32 local;
-
     if (tile < NUM_TILES_IN_PRIMARY)
     {
-        info = sTileCache.primary;
-        local = tile;
+        *local = tile;
+        return sTileCache.primary;
     }
     else if (tile < NUM_TILES_TOTAL)
     {
-        info = sTileCache.secondary;
-        local = tile - NUM_TILES_IN_PRIMARY;
+        *local = tile - NUM_TILES_IN_PRIMARY;
+        return sTileCache.secondary;
     }
     else if (tile < NUM_TILES_TOTAL + NUM_TILES_IN_PRIMARY)
     {
-        info = sTileCache.primary;
-        local = tile - NUM_TILES_IN_PRIMARY;
+        *local = tile - NUM_TILES_IN_PRIMARY;
+        return sTileCache.primary;
     }
     else if (tile < VIRTUAL_PRIMARY_EXTRA_START)
     {
-        info = sTileCache.secondary;
-        local = tile - NUM_TILES_TOTAL;
+        *local = tile - NUM_TILES_TOTAL;
+        return sTileCache.secondary;
     }
     else
     {
         // Primary 1024-2047 goes last, so all old secondary references stay valid.
-        info = sTileCache.primary;
-        local = tile - NUM_TILES_IN_SECONDARY_EXTENDED;
+        *local = tile - NUM_TILES_IN_SECONDARY_EXTENDED;
+        return sTileCache.primary;
     }
+}
+
+// Both rendering paths must resolve to the same owner; the original tile word retains its palette and flips.
+static inline u32 CanonicalTile(u32 tile)
+{
+    const struct TilesetCapacityInfo *info;
+    u32 local;
+
+    if (tile < NUM_TILES_IN_PRIMARY || tile >= NUM_VIRTUAL_TILES)
+        return tile;
+    info = GetTileOwner(tile, &local);
+    if (info != NULL && info->tileAliases != NULL && local < info->numTiles)
+        return info->tileAliases[local];
+    return tile;
+}
+
+static const u32 *GetTileSource(u32 tile)
+{
+    u32 local;
+    const struct TilesetCapacityInfo *info = GetTileOwner(tile, &local);
 
     if (info == NULL || info->rawTiles == NULL)
         return NULL;
@@ -301,6 +318,7 @@ static u32 AcquireTile(u32 tile)
     u32 slot, index;
     const u32 *src;
 
+    tile = CanonicalTile(tile);
     if (tile < NUM_TILES_IN_PRIMARY)
         return tile;
     if (tile >= NUM_VIRTUAL_TILES)
@@ -397,9 +415,9 @@ u16 TileCache_Resolve(u16 tile, u32 ext)
     if (!sTileCache.active)
         return tile;
 
-    virtualTile = GetVirtualTile(tile, ext);
+    virtualTile = CanonicalTile(GetVirtualTile(tile, ext));
     if (virtualTile < NUM_TILES_IN_PRIMARY)
-        return tile;
+        return (tile & ~TILEMAP_TILE_NUM_MASK) | virtualTile;
 
     slot = virtualTile < NUM_VIRTUAL_TILES ? sTileCache.virtualToSlot[virtualTile - NUM_TILES_IN_PRIMARY] : SLOT_NONE;
     return (tile & ~TILEMAP_TILE_NUM_MASK) | slot;
