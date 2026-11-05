@@ -1,6 +1,9 @@
 // A priority-1 glow illuminates lamp caps on BG1. Transparent cutouts preserve
 // the visible pixels of actors underneath it, without changing actor priority.
 #include "global.h"
+#include "fieldmap.h"
+#include "overworld.h"
+#include "constants/maps.h"
 #include "bg.h"
 #include "field_camera.h"
 #include "gpu_regs.h"
@@ -156,6 +159,37 @@ static ARM_FUNC __attribute__((section(".iwram.code"), noinline)) bool32 CutActo
     return cut;
 }
 
+// Only the north-east crossing lamp in Littleroot has an arm in front of it.
+// Light coordinates include MAP_OFFSET, just as SpawnLightSprite stores them.
+// The arm occupies the left 8 px of metatile 0x377 on BG1. Cut its actual
+// opaque pixels out of this glow; all other lamps retain their original mask.
+static bool32 CutRailwayArm(const struct Sprite *sprite, u8 *pixels, s32 lx, s32 ly)
+{
+    bool32 cut = FALSE;
+    if (gSaveBlock1Ptr->location.mapGroup != MAP_GROUP(MAP_LITTLEROOT_TOWN)
+     || gSaveBlock1Ptr->location.mapNum != MAP_NUM(MAP_LITTLEROOT_TOWN)
+     || sprite->data[6] != 55 + MAP_OFFSET
+     || sprite->data[7] != 37 + MAP_OFFSET
+     || MapGridGetMetatileIdAt(55 + MAP_OFFSET, 37 + MAP_OFFSET) != 0x377)
+        return FALSE;
+    for (s32 dy = 0; dy < 32; dy++)
+        for (s32 dx = 8; dx < 16; dx++)
+        {
+            u32 offset = ((dy / 8) * 4 + dx / 8) * 32 + (dy & 7) * 4 + (dx & 7) / 2;
+            u32 shift = (dx & 1) * 4;
+            s32 x = lx + dx, y = ly + dy;
+            if (x < 0 || x >= DISPLAY_WIDTH || y < 0 || y >= DISPLAY_HEIGHT
+             || !((pixels[offset] >> shift) & 15))
+                continue;
+            if (sMaskBgs[0].map && BehindMap(x, y, 1))
+            {
+                pixels[offset] &= ~(15 << shift);
+                cut = TRUE;
+            }
+        }
+    return cut;
+}
+
 void KyotoLamp_Prepare(const struct Sprite *sprite, u32 index)
 {
     struct OamData *lamp = NULL;
@@ -182,6 +216,7 @@ void KyotoLamp_Prepare(const struct Sprite *sprite, u32 index)
         return;
     }
     CpuCopy32(gFieldEffectObjectPic_BallLight, pixels, MASK_BYTES);
+    cut = CutRailwayArm(sprite, pixels, lx, ly);
     for (u32 i = 0; i < 128; i++)
     {
         const struct OamData *actor = &gMain.oamBuffer[i];

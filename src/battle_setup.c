@@ -762,6 +762,11 @@ enum BattleEnvironments BattleSetup_GetEnvironmentId(void)
     u16 tileBehavior;
     s16 x, y;
 
+    // Birch's scripted Zigzagoon encounter happens in the grass, even when
+    // the moved starter event places the player on a path or clearing tile.
+    if (!IS_FRLG && (gBattleTypeFlags & BATTLE_TYPE_FIRST_BATTLE))
+        return BATTLE_ENVIRONMENT_GRASS;
+
     if (ShouldUseFishingEnvironmentInBattle())
         GetXYCoordsOneStepInFrontOfPlayer(&x, &y);
     else

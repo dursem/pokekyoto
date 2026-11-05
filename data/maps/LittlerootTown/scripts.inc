@@ -6,8 +6,10 @@ LittlerootTown_MapScripts::
 	.byte 0
 
 LittlerootTown_OnLoad:
+	call_if_unset FLAG_RESCUED_BIRCH, LittlerootTown_EventScript_SetTwinPos
 	@ Also initialize existing saves resumed inside Littleroot.
 	callnative InitLittlerootBerryTrees, requests_effects=1
+	call LittlerootTown_EventScript_UpdateRailwayBarrier
 	end
 
 	@ State descriptions for VAR_LITTLEROOT_TOWN_STATE
@@ -82,14 +84,11 @@ LittlerootTown_EventScript_MoveMomToMaysDoor::
 	return
 
 LittlerootTown_EventScript_SetTwinPos::
-	goto_if_eq VAR_LITTLEROOT_TOWN_STATE, 0, LittlerootTown_EventScript_SetTwinGuardingRoutePos
-	setobjectxyperm LOCALID_LITTLEROOT_TWIN, 15, 1
-	setobjectmovementtype LOCALID_LITTLEROOT_TWIN, MOVEMENT_TYPE_FACE_UP
-	return
-
-LittlerootTown_EventScript_SetTwinGuardingRoutePos::
-	setobjectxyperm LOCALID_LITTLEROOT_TWIN, 13, 1
-	setobjectmovementtype LOCALID_LITTLEROOT_TWIN, MOVEMENT_TYPE_FACE_DOWN
+	@ Before rescuing Birch, stand on the east side of the paved approach.
+	@ Update both the map template and an already active saved object.
+	setobjectxyperm LOCALID_LITTLEROOT_TWIN, 14, 3
+	setobjectxy LOCALID_LITTLEROOT_TWIN, 14, 3
+	setobjectmovementtype LOCALID_LITTLEROOT_TWIN, MOVEMENT_TYPE_FACE_LEFT
 	return
 
 LittlerootTown_EventScript_SetMomStandingInFrontOfDoorPos::
@@ -1021,3 +1020,37 @@ LittlerootTown_Text_BirchSomethingToShowYouAtLab:
 	.string "I have something to show you.\n"
 	.string "Let's go to my LAB.$"
 
+
+
+@ Railway crossing, using the General/Petalburg metatiles.
+@ Route 101 state 3 is saved AFTER ChooseStarter's first battle returns.
+@ FLAG_RESCUED_BIRCH is set before the battle, so must not unlock the gate.
+@ ON_LOAD also runs after LoadSavedMapView when continuing a saved game.
+LittlerootTown_EventScript_UpdateRailwayBarrier:
+	goto_if_ge VAR_ROUTE101_STATE, 3, LittlerootTown_EventScript_OpenRailwayBarrier
+
+	@ Lowered arm; both lamps stay at y=37. Block the four path tiles.
+	setmetatile 55, 36, 0x164, TRUE
+	setmetatile 55, 37, 0x1C6, TRUE
+	setmetatile 55, 38, 0x020, TRUE
+	setmetatile 50, 39, 0x353, TRUE
+	setmetatile 51, 39, 0x345, TRUE
+	setmetatile 52, 39, 0x354, TRUE
+	setmetatile 53, 39, 0x354, TRUE
+	setmetatile 54, 39, 0x34D, TRUE
+	setmetatile 55, 39, 0x355, TRUE
+	return
+
+LittlerootTown_EventScript_OpenRailwayBarrier:
+	@ Raised arm and corrected lamp from commit 67a78f3.
+	@ Keep the posts blocked; restore all four path tiles to passable.
+	setmetatile 55, 36, 0x367, TRUE
+	setmetatile 55, 37, 0x377, TRUE
+	setmetatile 55, 38, 0x36F, TRUE
+	setmetatile 50, 39, 0x387, TRUE
+	setmetatile 51, 39, 0x1A5, FALSE
+	setmetatile 52, 39, 0x1A6, FALSE
+	setmetatile 53, 39, 0x1A6, FALSE
+	setmetatile 54, 39, 0x1A7, FALSE
+	setmetatile 55, 39, 0x37F, TRUE
+	return

@@ -213,6 +213,7 @@ TEST("Petal weather: Sakura matches the tree through time, screen fades and bank
 
 static void MenuCallbackForPetalTest(void) { }
 
+
 TEST("Petal weather: absent tree and non-field callbacks cannot contaminate palettes")
 {
     struct PetalFixture fixture;
@@ -277,6 +278,49 @@ static bool32 AppearanceEqual(const struct PetalAppearance *a, const struct Peta
         && a->tile == b->tile;
 }
 
+TEST("Petal weather: fresh Sakura enters from the top even while the camera moves")
+{
+    struct PetalFixture fixture;
+    struct PetalAppearance appearance[KYOTO_SAKURA_PETAL_COUNT] = {0};
+    s16 cameraX = gSpriteCoordOffsetX;
+    s16 cameraY = gSpriteCoordOffsetY;
+    bool32 startsAbove = TRUE, startsHidden = TRUE, entersAtTop = TRUE;
+    u32 visible = 0;
+
+    BeginPetalFixture(&fixture, TRUE);
+    u32 count = CapturePetalAppearance(appearance);
+    for (u32 i = 0; i < count; i++)
+    {
+        startsAbove &= appearance[i].y <= -16;
+        startsHidden &= gSprites[appearance[i].spriteId].invisible;
+    }
+    for (u32 frame = 0; frame < 120; frame++)
+    {
+        gSpriteCoordOffsetY += 4;
+        AnimateSprites();
+    }
+    count = CapturePetalAppearance(appearance);
+    for (u32 i = 0; i < count; i++)
+    {
+        const struct Sprite *sprite = &gSprites[appearance[i].spriteId];
+        if (!sprite->invisible)
+        {
+            visible++;
+            entersAtTop &= sprite->y > -8 && sprite->y <= 8;
+        }
+    }
+    EndPetalFixture(&fixture);
+    gSpriteCoordOffsetX = cameraX;
+    gSpriteCoordOffsetY = cameraY;
+
+    EXPECT_EQ(count, KYOTO_SAKURA_PETAL_COUNT);
+    EXPECT(startsAbove);
+    EXPECT(startsHidden);
+    EXPECT_GT(visible, 0);
+    EXPECT_LT(visible, count);
+    EXPECT(entersAtTop);
+}
+
 static bool32 AppearanceSetContains(const struct PetalAppearance *haystack, u32 haystackCount,
                                     const struct PetalAppearance *needles, u32 needleCount)
 {
@@ -298,6 +342,36 @@ static bool32 AppearanceSetContains(const struct PetalAppearance *haystack, u32 
             return FALSE;
     }
     return TRUE;
+}
+
+TEST("Petal weather: a menu preserves Sakura still entering above the screen")
+{
+    struct PetalFixture fixture;
+    struct PetalAppearance before[KYOTO_SAKURA_PETAL_COUNT] = {0};
+    struct PetalAppearance after[KYOTO_SAKURA_PETAL_COUNT] = {0};
+    bool32 same = TRUE;
+    u32 beforeCount, afterCount;
+
+    BeginPetalFixture(&fixture, TRUE);
+    for (u32 frame = 0; frame < 120; frame++)
+        AnimateSprites();
+    beforeCount = CapturePetalAppearance(before);
+    SetMainCallback2(MenuCallbackForPetalTest);
+    DestroyTask(gWeatherPtr->taskId);
+    StartWeather();
+    ResumePausedWeather();
+    SetMainCallback2(CB2_Overworld);
+    Sakura_InitAll();
+    afterCount = CapturePetalAppearance(after);
+    same = AppearanceSetContains(after, afterCount, before, beforeCount);
+    for (u32 i = 0; i < afterCount; i++)
+        if (after[i].y <= -8)
+            same &= gSprites[after[i].spriteId].invisible;
+    EndPetalFixture(&fixture);
+
+    EXPECT_EQ(beforeCount, KYOTO_SAKURA_PETAL_COUNT);
+    EXPECT_EQ(afterCount, beforeCount);
+    EXPECT(same);
 }
 
 TEST("Petal weather: menu recreation and weather cleanup preserve unrelated sprites")
@@ -474,6 +548,9 @@ TEST("Petal weather: surviving particles accelerate only after entering the dest
     u8 id = MAX_SPRITES;
 
     BeginPetalFixture(&fixture, TRUE);
+    // Fresh Sakura now enters from above; let the population reach the field.
+    for (u32 frame = 0; frame < 800; frame++)
+        AnimateSprites();
     SetNextWeather(WEATHER_SUNNY);
 
     // Start the outgoing drain while still on the source map. Pick a petal far

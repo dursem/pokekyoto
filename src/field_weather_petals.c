@@ -16,6 +16,10 @@
 #define PETALS_TILE_TAG 0x1210
 #define PETALS_FRAME_TILES 4
 #define PETALS_MAX_COUNT KYOTO_SAKURA_PETAL_COUNT
+#define SAKURA_ENTRY_Y (-16)
+#define SAKURA_ENTRY_SPACING 8
+#define SAKURA_HALF_HEIGHT 8
+#define SAKURA_ENTERING (1 << 14) // Stored with the phase speed for menu snapshots.
 #define AUTUMN_Q 64
 #define AUTUMN_HALF_WIDTH 8
 #define AUTUMN_ENTRY_X (-12)
@@ -406,6 +410,9 @@ static void Sakura_Draw(struct Sprite *sprite)
     sprite->y = sprite->data[1] >> 7;
     sprite->x2 = (gSineTable[phase] * (sprite->data[5] & 15)) >> 8;
     sprite->y2 = 0;
+    // Deeply negative OBJ coordinates wrap in hardware, so hide waiting petals.
+    sprite->invisible = (sprite->data[4] & SAKURA_ENTERING)
+                     && sprite->y <= -SAKURA_HALF_HEIGHT;
     LockPose(sprite, pose);
 }
 
@@ -413,7 +420,10 @@ static void Sakura_Update(struct Sprite *sprite)
 {
     s16 cameraX = gSpriteCoordOffsetX;
     s16 cameraY = gSpriteCoordOffsetY;
-    s32 x = sprite->data[0] + (s16)(cameraX - sprite->data[6]);
+    bool8 entering = (sprite->data[4] & SAKURA_ENTERING) != 0;
+    s16 dx = entering ? 0 : (s16)(cameraX - sprite->data[6]);
+    s16 dy = entering ? 0 : (s16)(cameraY - sprite->data[7]);
+    s32 x = sprite->data[0] + dx;
     s32 fall = sprite->data[3];
     s32 y;
     u16 seed = (u16)sprite->data[5] >> 4;
@@ -421,7 +431,8 @@ static void Sakura_Update(struct Sprite *sprite)
     UpdateDrainMapState();
     if (sDraining)
         fall = ScaleDrainMotion(fall);
-    y = sprite->data[1] + (s16)(cameraY - sprite->data[7]) * 128 + fall;
+    // Entry is relative to the screen's top edge, even while the player walks.
+    y = sprite->data[1] + dy * 128 + fall;
 
     if (sDraining)
     {
@@ -442,7 +453,7 @@ static void Sakura_Update(struct Sprite *sprite)
             x = ((u32)PetalRandom(&seed) * 240) >> 16;
             sprite->data[5] = (s16)(((seed & 0xFFF) << 4) | (sprite->data[5] & 15));
         }
-        if (y < -16 * 128)
+        if (!entering && y < -16 * 128)
             y += 192 * 128;
         if (x < -24)
             x += 288;
@@ -452,7 +463,9 @@ static void Sakura_Update(struct Sprite *sprite)
 
     sprite->data[0] = x;
     sprite->data[1] = y;
-    sprite->data[2] = (u16)(sprite->data[2] + sprite->data[4]);
+    sprite->data[2] = (u16)(sprite->data[2] + (sprite->data[4] & ~SAKURA_ENTERING));
+    if (entering && y >= SAKURA_HALF_HEIGHT * 128)
+        sprite->data[4] &= ~SAKURA_ENTERING;
     sprite->data[6] = cameraX;
     sprite->data[7] = cameraY;
     Sakura_Draw(sprite);
@@ -544,13 +557,11 @@ static void InitFreshParticle(struct Sprite *sprite, u32 index, u16 *seed, bool8
     if (sMode == PETAL_MODE_SAKURA)
     {
         sprite->data[0] = ((u32)PetalRandom(seed) * 240) >> 16;
-        if (offscreen)
-            sprite->data[1] = -16 * 128;
-        else
-            sprite->data[1] = (s16)((((u32)PetalRandom(seed) * 192) >> 16) - 16) * 128;
+        // A fresh map starts empty; stagger the population above the screen.
+        sprite->data[1] = (SAKURA_ENTRY_Y - (s32)index * SAKURA_ENTRY_SPACING) * 128;
         sprite->data[2] = PetalRandom(seed);
         sprite->data[3] = 18 + (PetalRandom(seed) & 7);
-        sprite->data[4] = 256 + (PetalRandom(seed) & 127);
+        sprite->data[4] = SAKURA_ENTERING | (256 + (PetalRandom(seed) & 127));
         sprite->data[5] = (s16)(((PetalRandom(seed) & 0xFFF) << 4) | (9 + (index & 3)));
     }
     else

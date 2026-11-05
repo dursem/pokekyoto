@@ -339,6 +339,10 @@ static const struct MapPaletteNightLight sNightLights[] =
     {&gTileset_General,   0, 15, RGB2GBA(255, 197, 74)}, // #FFC54A
     {&gTileset_Petalburg, 8, 12, RGB2GBA(255, 197, 74)}, // #FFC54A
     {&gTileset_Petalburg, 8, 13, RGB2GBA(255, 226, 95)}, // #FFE25F
+    // Palette 14 copies Petalburg 10 for the upper garage facade and ticket screen.
+    // The lower glass balustrade stays on palette 10 and does not emit light.
+    {&gTileset_Petalburg, 14, 10, RGB2GBA(255, 197, 74)}, // #FFC54A
+    {&gTileset_Petalburg, 14, 12, RGB2GBA(255, 226, 95)}, // #FFE25F
 };
 #endif
 
