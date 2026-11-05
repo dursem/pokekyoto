@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_aurora.h"
 #include "map_palette.h"
 #include "constants/songs.h"
 #include "constants/weather.h"
@@ -145,6 +146,7 @@ static const struct WeatherCallbacks sWeatherFuncs[] =
     [WEATHER_DOWNPOUR]           = {Sakura_InitVars,        Sakura_Main,        Sakura_InitAll,        Sakura_Finish},
     [WEATHER_UNDERWATER_BUBBLES] = {Bubbles_InitVars,       Bubbles_Main,       Bubbles_InitAll,       Bubbles_Finish},
     [WEATHER_AUTUMN_WIND]        = {AutumnWind_InitVars,    AutumnWind_Main,    AutumnWind_InitAll,    AutumnWind_Finish},
+    [WEATHER_NORTHERN_LIGHTS]    = {Sunny_InitVars,         Sunny_Main,         Sunny_InitAll,         KyotoAurora_Finish},
 };
 
 void (*const gWeatherPalStateFuncs[])(void) =
@@ -1242,6 +1244,7 @@ static const u8 sWeatherNames[WEATHER_COUNT][24] = {
     [WEATHER_FOG]                = _("FOG"),
     [WEATHER_DYNAMIC]            = _("DYNAMIC"),
     [WEATHER_AUTUMN_WIND]        = _("AUTUMN WIND"),
+    [WEATHER_NORTHERN_LIGHTS]    = _("NORTHERN LIGHTS"),
 };
 
 static const u8 sDebugText_WeatherNotDefined[] = _("NOT DEFINED!!!");

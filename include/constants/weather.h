@@ -24,15 +24,19 @@ enum OverworldWeather
     WEATHER_FOG, // Aggregate of WEATHER_FOG_HORIZONTAL and WEATHER_FOG_DIAGONAL
     WEATHER_DYNAMIC,
     WEATHER_AUTUMN_WIND, // Append new weather without renumbering existing maps.
+    WEATHER_NORTHERN_LIGHTS,
     WEATHER_COUNT,
 };
 
 // Descriptive script alias; existing Downpour map headers continue to work.
 #define WEATHER_SAKURA_PETALS WEATHER_DOWNPOUR
+// Older Peach Leaves map scripts now select the existing Autumn Wind slot.
+#define WEATHER_PEACH_LEAVES WEATHER_AUTUMN_WIND
 
 // These are used in maps' coord_weather_event entries.
 // They are not a one-to-one mapping with the engine's
 // internal weather constants above.
+#define COORD_EVENT_WEATHER_NORTHERN_LIGHTS     24
 #define COORD_EVENT_WEATHER_SUNNY_CLOUDS        1
 #define COORD_EVENT_WEATHER_SUNNY               2
 #define COORD_EVENT_WEATHER_RAIN                3
@@ -48,6 +52,7 @@ enum OverworldWeather
 #define COORD_EVENT_WEATHER_ROUTE123_CYCLE      21
 #define COORD_EVENT_WEATHER_SAKURA_PETALS       22
 #define COORD_EVENT_WEATHER_AUTUMN_WIND         23
+#define COORD_EVENT_WEATHER_PEACH_LEAVES        COORD_EVENT_WEATHER_AUTUMN_WIND
 
 // These are the "abnormal weather events" that are used
 // to find Kyogre and Groudon.

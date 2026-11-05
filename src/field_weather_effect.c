@@ -2411,6 +2411,9 @@ void SetSavedWeather(enum OverworldWeather weather)
 
 u8 GetSavedWeather(void)
 {
+    // A save made with the standalone Peach Leaves patch can still contain ID 21.
+    if (gSaveBlock1Ptr->weather == 21 && gSaveBlock1Ptr->weather >= WEATHER_COUNT)
+        return WEATHER_AUTUMN_WIND;
     return gSaveBlock1Ptr->weather;
 }
 
@@ -2582,6 +2585,7 @@ static enum OverworldWeather TranslateWeatherNum(enum OverworldWeather weather)
     case WEATHER_ROUTE123_CYCLE:     return sWeatherCycleRoute123[gSaveBlock1Ptr->weatherCycleStage];
     case WEATHER_DYNAMIC:            return GetDynamicWeather();
     case WEATHER_AUTUMN_WIND:        return WEATHER_AUTUMN_WIND;
+    case WEATHER_NORTHERN_LIGHTS:    return WEATHER_NORTHERN_LIGHTS;
     }
 
     return WEATHER_NONE;

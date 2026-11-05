@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_aurora.h"
 #include "battle_pyramid.h"
 #include "bg.h"
 #include "event_data.h"
@@ -472,6 +473,11 @@ static void Task_MapNamePopUpWindow(u8 taskId)
     }
     if (OW_POPUP_GENERATION != GEN_5)
         SetGpuReg(REG_OFFSET_BG0VOFS, task->tYOffset);
+}
+
+bool32 KyotoAurora_MapPopupActive(void)
+{
+    return FuncIsActiveTask(Task_MapNamePopUpWindow);
 }
 
 void HideMapNamePopUpWindow(void)

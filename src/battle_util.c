@@ -11463,6 +11463,7 @@ u32 GetWeatherFromOverworldWeather(u32 owWeather)
     case WEATHER_DROUGHT:               return B_WEATHER_SUN_NORMAL;
     case WEATHER_DOWNPOUR:              return B_WEATHER_NONE;
     case WEATHER_AUTUMN_WIND:           return B_WEATHER_NONE;
+    case WEATHER_NORTHERN_LIGHTS:       return B_WEATHER_NONE;
     case WEATHER_UNDERWATER_BUBBLES:    return B_WEATHER_NONE;
     case WEATHER_ABNORMAL:              return B_WEATHER_NONE;
     case WEATHER_ROUTE119_CYCLE:        return B_WEATHER_NONE;
@@ -11491,6 +11492,7 @@ enum BattleTerrain GetBattleTerrainFromOverworldWeather(u32 owWeather)
     case WEATHER_DROUGHT:               return B_TERRAIN_NONE;
     case WEATHER_DOWNPOUR:              return B_TERRAIN_NONE;
     case WEATHER_AUTUMN_WIND:           return B_TERRAIN_NONE;
+    case WEATHER_NORTHERN_LIGHTS:       return B_TERRAIN_NONE;
     case WEATHER_UNDERWATER_BUBBLES:    return B_TERRAIN_NONE;
     case WEATHER_ABNORMAL:              return B_TERRAIN_NONE;
     case WEATHER_ROUTE119_CYCLE:        return B_TERRAIN_NONE;

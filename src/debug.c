@@ -184,7 +184,7 @@ enum DebugMenuTypes
 #define DEBUG_MENU_HEIGHT_EXTRA 4
 
 #define DEBUG_MENU_WIDTH_WEATHER 15
-#define DEBUG_MENU_HEIGHT_WEATHER 3
+#define DEBUG_MENU_HEIGHT_WEATHER 4
 
 #define DEBUG_MENU_WIDTH_SOUND 20
 #define DEBUG_MENU_HEIGHT_SOUND 6
@@ -986,17 +986,27 @@ static void Debug_ShowMenu(DebugFunc HandleInput, const struct DebugMenuOption *
     CopyWindowToVram(windowId, COPYWIN_FULL);
 }
 
-static void Debug_CreateInputDisplayWindow(u8 taskId)
+static void Debug_CreateInputWindow(u8 taskId, const struct WindowTemplate *window)
 {
     u8 windowId;
 
     ClearStdWindowAndFrame(gTasks[taskId].tWindowId, TRUE);
     RemoveWindow(gTasks[taskId].tWindowId);
     LoadMessageBoxAndBorderGfx();
-    windowId = AddWindow(&sDebugMenuWindowTemplateExtra);
+    windowId = AddWindow(window);
     DrawStdWindowFrame(windowId, FALSE);
     CopyWindowToVram(windowId, COPYWIN_FULL);
     gTasks[taskId].tSubWindowId = windowId;
+}
+
+static void Debug_CreateInputDisplayWindow(u8 taskId)
+{
+    Debug_CreateInputWindow(taskId, &sDebugMenuWindowTemplateExtra);
+}
+
+static void Debug_CreateWeatherDisplayWindow(u8 taskId)
+{
+    Debug_CreateInputWindow(taskId, &sDebugMenuWindowTemplateWeather);
 }
 
 static void DestroyDebugIcon(u8 taskId)
@@ -1959,7 +1969,7 @@ static const struct DebugSelectionStep sWeatherSelectionStep = {
 };
 
 static const struct DebugSelection sSetWeatherSelection = {
-    .onInit = Debug_CreateInputDisplayWindow,
+    .onInit = Debug_CreateWeatherDisplayWindow,
     .onCancel = DebugSelectionStep_ReturnToUtilMenu,
     .onComplete = DebugSelection_SetWeather_OnComplete,
     .steps = {&sWeatherSelectionStep},

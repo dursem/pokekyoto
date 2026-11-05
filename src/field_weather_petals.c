@@ -12,11 +12,15 @@
 
 // Both effects use fixed 16x16 cells, with four contiguous 8x8 tiles per pose.
 // Sakura retains the approved small three-color artwork and nine tilt poses.
-// Autumn Wind retains the original gold/red leaf artwork and eight poses each.
+// Autumn Wind uses the two Peach leaf shapes, with eight poses per shape.
 #define PETALS_TILE_TAG 0x1210
 #define PETALS_FRAME_TILES 4
 #define PETALS_MAX_COUNT KYOTO_SAKURA_PETAL_COUNT
 #define AUTUMN_Q 64
+#define AUTUMN_HALF_WIDTH 8
+#define AUTUMN_ENTRY_X (-12)
+#define AUTUMN_ENTRY_SPACING 32
+#define tAutumnEntering data[4]
 #define AUTUMN_LEFT (-24)
 #define AUTUMN_RIGHT 264
 #define AUTUMN_TOP (-24)
@@ -55,7 +59,7 @@ static EWRAM_DATA u16 sTileStart = 0;
 static EWRAM_DATA u16 sGustPhase = 0;
 static EWRAM_DATA bool8 sPaletteOwned = FALSE;
 static EWRAM_DATA bool8 sTilesOwned = FALSE;
-static EWRAM_DATA bool8 sCopiedTreeColors = FALSE;
+static EWRAM_DATA u8 sCopiedRampMask = 0;
 static EWRAM_DATA bool8 sDraining = FALSE;
 static EWRAM_DATA bool8 sFastDrain = FALSE;
 static EWRAM_DATA bool8 sDrainMapValid = FALSE;
@@ -69,12 +73,10 @@ static void Sakura_Draw(struct Sprite *sprite);
 static void AutumnWind_Draw(struct Sprite *sprite);
 
 static const u8 ALIGNED(4) sSakuraTiles[] = INCBIN_U8("graphics/weather/sakura_petals.4bpp");
-static const u8 ALIGNED(4) sAutumnTiles[] = INCBIN_U8("graphics/weather/autumn_wind/leaves.4bpp");
-static const u16 sAutumnPalette[] = INCBIN_U16("graphics/weather/autumn_wind/leaves.gbapal");
+static const u8 ALIGNED(4) sAutumnTiles[] = INCBIN_U8("graphics/weather/autumn_wind/tree_leaves.4bpp");
 
 STATIC_ASSERT(sizeof(sSakuraTiles) == 9 * 128, SakuraNeedsNinePacked16x16Frames);
 STATIC_ASSERT(sizeof(sAutumnTiles) == 16 * 128, AutumnNeedsSixteenPacked16x16Frames);
-STATIC_ASSERT(sizeof(sAutumnPalette) == 16 * sizeof(u16), AutumnNeedsOne4bppPalette);
 STATIC_ASSERT(KYOTO_AUTUMN_LEAF_COUNT <= PETALS_MAX_COUNT, AutumnSnapshotCapacity);
 static const struct SpriteSheet sSheets[] =
 {
@@ -288,11 +290,43 @@ void Petals_Reset(void)
     DestroyParticles();
 }
 
+// Each ramp maps colors in the OBJ palette to shades used by a General tree canopy.
+struct CanopyRamp
+{
+    u8 mapPalette;
+    u8 firstObjColor;
+    u8 count;
+    u8 mapColors[4];
+};
+
+static const struct CanopyRamp sSakuraRamp[] =
+{
+    {KYOTO_SAKURA_TREE_PALETTE, 1, 3, {KYOTO_SAKURA_TREE_LIGHT, KYOTO_SAKURA_TREE_MIDDLE, KYOTO_SAKURA_TREE_DARK}},
+};
+
+static const struct CanopyRamp sAutumnRamps[] =
+{
+    {2, 1, 3, {4, 6, 8}},       // red_leaf: green canopy, light to dark
+    {3, 4, 4, {9, 10, 11, 12}}, // gold_leaf: pink canopy, light to dark
+};
+
+static const struct CanopyRamp *GetCanopyRamps(u32 *count)
+{
+    if (sMode == PETAL_MODE_SAKURA)
+    {
+        *count = ARRAY_COUNT(sSakuraRamp);
+        return sSakuraRamp;
+    }
+    *count = ARRAY_COUNT(sAutumnRamps);
+    return sAutumnRamps;
+}
+
 static bool8 LoadGraphics(void)
 {
     u16 palette[16] = {0};
     struct SpritePalette spritePalette = {palette, KYOTO_PETALS_PALETTE_TAG};
-    u32 i;
+    u32 i, j, count;
+    const struct CanopyRamp *ramps = GetCanopyRamps(&count);
 
     sTileStart = LoadSpriteSheet(&sSheets[sMode]);
     // LoadSpriteSheet returns zero both for tile zero and allocation failure.
@@ -301,19 +335,9 @@ static bool8 LoadGraphics(void)
         return FALSE;
     }
     sTilesOwned = TRUE;
-    if (sMode == PETAL_MODE_SAKURA)
-    {
-        // Use the authored tree colors as the unfaded OBJ source. The live
-        // palette copy below follows day/night and ordinary screen fades.
-        palette[1] = gTileset_General.palettes[KYOTO_SAKURA_TREE_PALETTE][KYOTO_SAKURA_TREE_LIGHT];
-        palette[2] = gTileset_General.palettes[KYOTO_SAKURA_TREE_PALETTE][KYOTO_SAKURA_TREE_MIDDLE];
-        palette[3] = gTileset_General.palettes[KYOTO_SAKURA_TREE_PALETTE][KYOTO_SAKURA_TREE_DARK];
-    }
-    else
-    {
-        for (i = 0; i < 16; i++)
-            palette[i] = sAutumnPalette[i];
-    }
+    for (i = 0; i < count; i++)
+        for (j = 0; j < ramps[i].count; j++)
+            palette[ramps[i].firstObjColor + j] = gTileset_General.palettes[ramps[i].mapPalette][ramps[i].mapColors[j]];
 
     sPaletteIndex = LoadSpritePalette(&spritePalette);
     if (sPaletteIndex >= 16)
@@ -322,49 +346,45 @@ static bool8 LoadGraphics(void)
         return FALSE;
     }
     sPaletteOwned = TRUE;
-    sCopiedTreeColors = FALSE;
+    sCopiedRampMask = 0;
     UpdateSpritePaletteWithWeather(sPaletteIndex, FALSE);
     return TRUE;
 }
 
 void Petals_BeforePaletteTransfer(void)
 {
-    u32 bank, offset;
-    if (!sLiveCount || gMain.callback2 != CB2_Overworld)
+    u32 banks[ARRAY_COUNT(sAutumnRamps)];
+    u32 i, j, count, mask = 0;
+    const struct CanopyRamp *ramps;
+    if (!sLiveCount || !sPaletteOwned || gMain.callback2 != CB2_Overworld
+     || sPaletteIndex >= 16 || IndexOfSpritePaletteTag(KYOTO_PETALS_PALETTE_TAG) != sPaletteIndex)
         return;
 
-
-    if (!sPaletteOwned || sMode != PETAL_MODE_SAKURA
-     || gMapHeader.mapLayout == NULL
-     || gMapHeader.mapLayout->primaryTileset != &gTileset_General
-     || sPaletteIndex >= 16
-     || IndexOfSpritePaletteTag(KYOTO_PETALS_PALETTE_TAG) != sPaletteIndex)
-        return;
-
-    bank = MapPalettesGetPhysicalBank(KYOTO_SAKURA_TREE_PALETTE);
-    if (bank == MAP_PALETTE_NONE)
+    ramps = GetCanopyRamps(&count);
+    for (i = 0; i < count; i++)
     {
-        // Once the tree bank leaves the screen, return to the normal OBJ
-        // result. Only refresh when idle so native screen fades remain in
-        // control of the palette pipeline.
-        if (sCopiedTreeColors && !gPaletteFade.active
-         && gWeatherPtr->palProcessingState != WEATHER_PAL_STATE_SCREEN_FADING_IN
-         && gWeatherPtr->palProcessingState != WEATHER_PAL_STATE_SCREEN_FADING_OUT)
-        {
-            UpdateSpritePaletteWithWeather(sPaletteIndex, FALSE);
-            sCopiedTreeColors = FALSE;
-        }
-        return;
+        banks[i] = MAP_PALETTE_NONE;
+        if (gMapHeader.mapLayout != NULL && gMapHeader.mapLayout->primaryTileset == &gTileset_General)
+            banks[i] = MapPalettesGetPhysicalBank(ramps[i].mapPalette);
+        if (banks[i] != MAP_PALETTE_NONE)
+            mask |= 1u << i;
     }
 
-    // Read the logical tree palette's CURRENT bank after every palette effect.
-    // This follows remapping, morning/evening interpolation and screen fades
-    // exactly, without reserving an additional BG bank or double-tinting.
-    offset = OBJ_PLTT_ID(sPaletteIndex);
-    gPlttBufferFaded[offset + 1] = gPlttBufferFaded[BG_PLTT_ID(bank) + KYOTO_SAKURA_TREE_LIGHT];
-    gPlttBufferFaded[offset + 2] = gPlttBufferFaded[BG_PLTT_ID(bank) + KYOTO_SAKURA_TREE_MIDDLE];
-    gPlttBufferFaded[offset + 3] = gPlttBufferFaded[BG_PLTT_ID(bank) + KYOTO_SAKURA_TREE_DARK];
-    sCopiedTreeColors = TRUE;
+    // Once a tree bank leaves the screen, restore the ordinary tinted OBJ colors.
+    // During a fade the engine owns this transition; restore after the fade ends.
+    if ((sCopiedRampMask & ~mask) && !gPaletteFade.active
+     && gWeatherPtr->palProcessingState != WEATHER_PAL_STATE_SCREEN_FADING_IN
+     && gWeatherPtr->palProcessingState != WEATHER_PAL_STATE_SCREEN_FADING_OUT)
+    {
+        UpdateSpritePaletteWithWeather(sPaletteIndex, FALSE);
+        sCopiedRampMask = 0;
+    }
+    for (i = 0; i < count; i++)
+        if (banks[i] != MAP_PALETTE_NONE)
+            for (j = 0; j < ramps[i].count; j++)
+                gPlttBufferFaded[OBJ_PLTT_ID(sPaletteIndex) + ramps[i].firstObjColor + j]
+                    = gPlttBufferFaded[BG_PLTT_ID(banks[i]) + ramps[i].mapColors[j]];
+    sCopiedRampMask |= mask;
 }
 
 static void LockPose(struct Sprite *sprite, u32 pose)
@@ -440,11 +460,11 @@ static void Sakura_Update(struct Sprite *sprite)
 
 static s16 WrapAutumn(s32 position, s16 low, s16 high)
 {
-    // Preserve overshoot to avoid a small pause at the wrapping boundary.
+    // Peach restarts a leaf exactly on the opposite boundary.
     if (position > high * AUTUMN_Q)
-        position -= (high - low) * AUTUMN_Q;
+        return low * AUTUMN_Q;
     if (position < low * AUTUMN_Q)
-        position += (high - low) * AUTUMN_Q;
+        return high * AUTUMN_Q;
     return position;
 }
 
@@ -455,6 +475,7 @@ static void AutumnWind_Draw(struct Sprite *sprite)
     sprite->y = sprite->data[1] >> 6;
     sprite->x2 = 0;
     sprite->y2 = gSineTable[sprite->data[3] & 255] >> 4;
+    sprite->invisible = sprite->tAutumnEntering && sprite->x <= -AUTUMN_HALF_WIDTH;
     LockPose(sprite, frame);
 }
 
@@ -463,7 +484,6 @@ static void AutumnWind_Update(struct Sprite *sprite)
     s16 dx = (s16)(gSpriteCoordOffsetX - sprite->data[6]);
     s16 dy = (s16)(gSpriteCoordOffsetY - sprite->data[7]);
     s16 wave;
-    s16 gust = (gSineTable[(sGustPhase >> 8) & 255] + 256) >> 5;
     s32 motionX;
     s32 motionY;
     s32 x;
@@ -474,7 +494,18 @@ static void AutumnWind_Update(struct Sprite *sprite)
     sprite->data[3] = (sprite->data[3] + 1) & 511;
     wave = gSineTable[sprite->data[3] & 255];
     UpdateDrainMapState();
-    motionX = -47 - gust + (wave >> 4);
+    // While entering, move relative to the screen's left edge even if the player runs.
+    if (sprite->tAutumnEntering)
+    {
+        dx = 0;
+        dy = 0;
+        if (sDraining && sprite->data[0] <= -AUTUMN_HALF_WIDTH * AUTUMN_Q)
+        {
+            RemoveParticleSprite(sprite);
+            return;
+        }
+    }
+    motionX = 55 + (wave >> 4);
     motionY = -5;
     if (sDraining)
     {
@@ -499,9 +530,12 @@ static void AutumnWind_Update(struct Sprite *sprite)
     }
     else
     {
-        sprite->data[0] = WrapAutumn(x, AUTUMN_LEFT, AUTUMN_RIGHT);
+        // Starts can lie beyond the usual wrap boundary. Let them travel in from there.
+        sprite->data[0] = sprite->tAutumnEntering ? x : WrapAutumn(x, AUTUMN_LEFT, AUTUMN_RIGHT);
         sprite->data[1] = WrapAutumn(y, AUTUMN_TOP, AUTUMN_BOTTOM);
     }
+    if (sprite->tAutumnEntering && x >= AUTUMN_HALF_WIDTH * AUTUMN_Q)
+        sprite->tAutumnEntering = FALSE;
     AutumnWind_Draw(sprite);
 }
 
@@ -521,7 +555,8 @@ static void InitFreshParticle(struct Sprite *sprite, u32 index, u16 *seed, bool8
     }
     else
     {
-        sprite->data[0] = (offscreen ? AUTUMN_RIGHT : (((index * 47) & 255) - 8)) * AUTUMN_Q;
+        sprite->data[0] = (AUTUMN_ENTRY_X - (s32)index * AUTUMN_ENTRY_SPACING) * AUTUMN_Q;
+        sprite->tAutumnEntering = TRUE;
         if (offscreen)
             sprite->data[1] = (16 + (PetalRandom(seed) & 127)) * AUTUMN_Q;
         else

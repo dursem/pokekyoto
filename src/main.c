@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_aurora.h"
 #include "field_weather_petals.h"
 #include "field_weather.h"
 #include "kyoto_lighting.h"
@@ -408,6 +409,7 @@ static void VBlankIntr(void)
         ProcessDma3Requests();
         KyotoCloud_VBlank();
         KyotoLamp_VBlank();
+        KyotoAurora_VBlank();
     }
 
     gPcmDmaCounter = gSoundInfo.pcmDmaCounter;
