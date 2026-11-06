@@ -20495,35 +20495,35 @@ const u32 gObjectEventPic_Substitute[] = INCGFX_COMP("graphics/pokemon/question_
 #endif //P_FAMILY_HONEDGE
 
 #if P_FAMILY_SPRITZEE
-    const u32 gMonFrontPic_Spritzee[] = INCGFX_U32("graphics/pokemon/spritzee/anim_front.png", ".4bpp.smol");
-    const u16 gMonPalette_Spritzee[] = INCGFX_U16("graphics/pokemon/spritzee/normal.pal", ".gbapal");
-    const u32 gMonBackPic_Spritzee[] = INCGFX_U32("graphics/pokemon/spritzee/back.png", ".4bpp.smol");
-    const u16 gMonShinyPalette_Spritzee[] = INCGFX_U16("graphics/pokemon/spritzee/shiny.pal", ".gbapal");
-    const u8 gMonIcon_Spritzee[] = INCGFX_U8("graphics/pokemon/spritzee/icon.png", ".4bpp");
+    const u32 gMonFrontPic_Spritzee[] = INCGFX_U32("graphics/pokemon/jestrick/anim_front.png", ".4bpp.smol");
+    const u16 gMonPalette_Spritzee[] = INCGFX_U16("graphics/pokemon/jestrick/normal.pal", ".gbapal");
+    const u32 gMonBackPic_Spritzee[] = INCGFX_U32("graphics/pokemon/jestrick/back.png", ".4bpp.smol");
+    const u16 gMonShinyPalette_Spritzee[] = INCGFX_U16("graphics/pokemon/jestrick/shiny.pal", ".gbapal");
+    const u8 gMonIcon_Spritzee[] = INCGFX_U8("graphics/pokemon/jestrick/icon.png", ".4bpp");
 #if P_FOOTPRINTS
-    const u8 gMonFootprint_Spritzee[] = INCGFX_U8("graphics/pokemon/spritzee/footprint.png", ".1bpp");
+    const u8 gMonFootprint_Spritzee[] = INCGFX_U8("graphics/pokemon/jestrick/footprint.png", ".1bpp");
 #endif //P_FOOTPRINTS
 #if OW_POKEMON_OBJECT_EVENTS
-    const u32 gObjectEventPic_Spritzee[] = INCGFX_COMP("graphics/pokemon/spritzee/overworld.png", ".4bpp", "-mwidth 4 -mheight 4");
+    const u32 gObjectEventPic_Spritzee[] = INCGFX_COMP("graphics/pokemon/jestrick/overworld.png", ".4bpp", "-mwidth 4 -mheight 4");
 #if OW_PKMN_OBJECTS_SHARE_PALETTES == FALSE
-    const u16 gOverworldPalette_Spritzee[] = INCGFX_U16("graphics/pokemon/spritzee/overworld_normal.pal", ".gbapal");
-    const u16 gShinyOverworldPalette_Spritzee[] = INCGFX_U16("graphics/pokemon/spritzee/overworld_shiny.pal", ".gbapal");
+    const u16 gOverworldPalette_Spritzee[] = INCGFX_U16("graphics/pokemon/jestrick/overworld_normal.pal", ".gbapal");
+    const u16 gShinyOverworldPalette_Spritzee[] = INCGFX_U16("graphics/pokemon/jestrick/overworld_shiny.pal", ".gbapal");
 #endif //OW_PKMN_OBJECTS_SHARE_PALETTES
 #endif //OW_POKEMON_OBJECT_EVENTS
 
-    const u32 gMonFrontPic_Aromatisse[] = INCGFX_U32("graphics/pokemon/aromatisse/anim_front.png", ".4bpp.smol");
-    const u16 gMonPalette_Aromatisse[] = INCGFX_U16("graphics/pokemon/aromatisse/normal.pal", ".gbapal");
-    const u32 gMonBackPic_Aromatisse[] = INCGFX_U32("graphics/pokemon/aromatisse/back.png", ".4bpp.smol");
-    const u16 gMonShinyPalette_Aromatisse[] = INCGFX_U16("graphics/pokemon/aromatisse/shiny.pal", ".gbapal");
+    const u32 gMonFrontPic_Aromatisse[] = INCGFX_U32("graphics/pokemon/jokequinn/anim_front.png", ".4bpp.smol");
+    const u16 gMonPalette_Aromatisse[] = INCGFX_U16("graphics/pokemon/jokequinn/normal.pal", ".gbapal");
+    const u32 gMonBackPic_Aromatisse[] = INCGFX_U32("graphics/pokemon/jokequinn/back.png", ".4bpp.smol");
+    const u16 gMonShinyPalette_Aromatisse[] = INCGFX_U16("graphics/pokemon/jokequinn/shiny.pal", ".gbapal");
     const u8 gMonIcon_Aromatisse[] = INCGFX_U8("graphics/pokemon/aromatisse/icon.png", ".4bpp");
 #if P_FOOTPRINTS
-    const u8 gMonFootprint_Aromatisse[] = INCGFX_U8("graphics/pokemon/aromatisse/footprint.png", ".1bpp");
+    const u8 gMonFootprint_Aromatisse[] = INCGFX_U8("graphics/pokemon/jokequinn/footprint.png", ".1bpp");
 #endif //P_FOOTPRINTS
 #if OW_POKEMON_OBJECT_EVENTS
-    const u32 gObjectEventPic_Aromatisse[] = INCGFX_COMP("graphics/pokemon/aromatisse/overworld.png", ".4bpp", "-mwidth 4 -mheight 4");
+    const u32 gObjectEventPic_Aromatisse[] = INCGFX_COMP("graphics/pokemon/jokequinn/overworld.png", ".4bpp", "-mwidth 4 -mheight 4");
 #if OW_PKMN_OBJECTS_SHARE_PALETTES == FALSE
-    const u16 gOverworldPalette_Aromatisse[] = INCGFX_U16("graphics/pokemon/aromatisse/overworld_normal.pal", ".gbapal");
-    const u16 gShinyOverworldPalette_Aromatisse[] = INCGFX_U16("graphics/pokemon/aromatisse/overworld_shiny.pal", ".gbapal");
+    const u16 gOverworldPalette_Aromatisse[] = INCGFX_U16("graphics/pokemon/jokequinn/overworld_normal.pal", ".gbapal");
+    const u16 gShinyOverworldPalette_Aromatisse[] = INCGFX_U16("graphics/pokemon/jokequinn/overworld_shiny.pal", ".gbapal");
 #endif //OW_PKMN_OBJECTS_SHARE_PALETTES
 #endif //OW_POKEMON_OBJECT_EVENTS
 #endif //P_FAMILY_SPRITZEE

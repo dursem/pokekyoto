@@ -1,4 +1,5 @@
 #include "global.h"
+#include "field_move.h"
 #include "glide.h"
 #include "main.h"
 #include "bike.h"
@@ -1621,19 +1622,9 @@ enum Gender GetPlayerAvatarGenderByGraphicsId(u16 gfxId)
 
 bool8 PartyHasMonWithSurf(void)
 {
-    u8 i;
-
-    if (!TestPlayerAvatarFlags(PLAYER_AVATAR_FLAG_SURFING))
-    {
-        for (i = 0; i < PARTY_SIZE; i++)
-        {
-            if (GetMonData(&gParties[B_TRAINER_PLAYER][i], MON_DATA_SPECIES) == SPECIES_NONE)
-                break;
-            if (MonKnowsMove(&gParties[B_TRAINER_PLAYER][i], MOVE_SURF))
-                return TRUE;
-        }
-    }
-    return FALSE;
+    return !TestPlayerAvatarFlags(PLAYER_AVATAR_FLAG_SURFING)
+        && IsFieldMoveUnlocked(FIELD_MOVE_SURF)
+        && FieldMove_FindPartyUser(FIELD_MOVE_SURF) != PARTY_SIZE;
 }
 
 bool8 IsPlayerSurfingNorth(void)

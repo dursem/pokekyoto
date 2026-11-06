@@ -2,6 +2,9 @@
 #include "event_data.h"
 #include "field_move.h"
 #include "fldeff.h"
+#include "item.h"
+#include "pokemon.h"
+#include "constants/items.h"
 #include "fldeff_misc.h"
 #include "party_menu.h"
 #include "strings.h"
@@ -191,3 +194,61 @@ const struct FieldMoveInfo gFieldMoveInfo[FIELD_MOVES_COUNT] =
         .hideIfLocked = TRUE,
     },
 };
+
+// These HMs remain usable as ordinary attacks. Field use does not teach a move.
+static const struct
+{
+    enum Item item;
+    u16 receivedFlag;
+} sFieldHms[] =
+{
+    [FIELD_MOVE_CUT]        = {ITEM_HM01, FLAG_RECEIVED_HM_CUT},
+    [FIELD_MOVE_FLASH]      = {ITEM_HM05, FLAG_RECEIVED_HM_FLASH},
+    [FIELD_MOVE_ROCK_SMASH] = {ITEM_HM06, FLAG_RECEIVED_HM_ROCK_SMASH},
+    [FIELD_MOVE_STRENGTH]   = {ITEM_HM04, FLAG_RECEIVED_HM_STRENGTH},
+    [FIELD_MOVE_SURF]       = {ITEM_HM03, FLAG_RECEIVED_HM_SURF},
+    [FIELD_MOVE_FLY]        = {ITEM_HM02, FLAG_RECEIVED_HM_FLY},
+    [FIELD_MOVE_DIVE]       = {ITEM_HM08, FLAG_RECEIVED_HM_DIVE},
+    [FIELD_MOVE_WATERFALL]  = {ITEM_HM07, 0},
+};
+
+bool32 FieldMove_IsHM(enum FieldMove fieldMove)
+{
+    return (u32)fieldMove < ARRAY_COUNT(sFieldHms);
+}
+
+bool32 FieldMove_HasHM(enum FieldMove fieldMove)
+{
+    if (!FieldMove_IsHM(fieldMove))
+        return FALSE;
+    // Inventory also covers custom item-giver scripts and imported FRLG maps.
+    return CheckBagHasItem(sFieldHms[fieldMove].item, 1)
+        || CheckPCHasItem(sFieldHms[fieldMove].item, 1)
+        || (!IS_FRLG && sFieldHms[fieldMove].receivedFlag != 0
+            && FlagGet(sFieldHms[fieldMove].receivedFlag));
+}
+
+bool32 FieldMove_CanUseMon(struct Pokemon *mon, enum FieldMove fieldMove)
+{
+    enum Species species;
+    enum Move move;
+    if ((u32)fieldMove >= FIELD_MOVES_COUNT)
+        return FALSE;
+    species = GetMonData(mon, MON_DATA_SPECIES);
+    if (species == SPECIES_NONE || GetMonData(mon, MON_DATA_IS_EGG))
+        return FALSE;
+    move = FieldMove_GetMoveId(fieldMove);
+    if (!FieldMove_IsHM(fieldMove))
+        return MonKnowsMove(mon, move);
+    return FieldMove_HasHM(fieldMove)
+        && (MonKnowsMove(mon, move) || CanLearnTeachableMove(species, move));
+}
+
+u8 FieldMove_FindPartyUser(enum FieldMove fieldMove)
+{
+    u8 i;
+    for (i = 0; i < PARTY_SIZE; i++)
+        if (FieldMove_CanUseMon(&gParties[B_TRAINER_PLAYER][i], fieldMove))
+            return i;
+    return PARTY_SIZE;
+}

@@ -1,4 +1,5 @@
 #include "global.h"
+#include "frlg_pc.h"
 #include "malloc.h"
 #include "battle_main.h"
 #include "contest.h"
@@ -217,7 +218,17 @@ u8 MailboxMenu_AddWindow(u8 windowIdx)
 {
     if (sMailboxWindowIds[windowIdx] == WINDOW_NONE)
     {
-        if (windowIdx == MAILBOXWIN_OPTIONS)
+        if (IsFrlgPlayerPC())
+        {
+            struct WindowTemplate template = sWindowTemplates_MailboxMenu[windowIdx];
+            template.width = windowIdx == MAILBOXWIN_OPTIONS ? 15 : 10;
+            if (windowIdx != MAILBOXWIN_TITLE)
+                template.baseBlock = 0x1C;
+            if (windowIdx == MAILBOXWIN_LIST)
+                template.tilemapLeft = 19;
+            sMailboxWindowIds[windowIdx] = AddWindow(&template);
+        }
+        else if (windowIdx == MAILBOXWIN_OPTIONS)
         {
             struct WindowTemplate template = sWindowTemplates_MailboxMenu[windowIdx];
             template.width = GetMaxWidthInMenuTable(&gMailboxMailOptions[0], 4);
@@ -254,10 +265,15 @@ static void MailboxMenu_ItemPrintFunc(u8 windowId, u32 itemId, u8 y)
         return;
 
     StringCopy(buffer, gSaveBlock1Ptr->mail[PARTY_SIZE + itemId].playerName);
-    ConvertInternationalPlayerName(buffer);
-    length = StringLength(buffer);
-    if (length < PLAYER_NAME_LENGTH - 1)
-        ConvertInternationalString(buffer, LANGUAGE_JAPANESE);
+    if (IsFrlgPlayerPC())
+        FrlgPcFormatPlayerName(buffer);
+    else
+    {
+        ConvertInternationalPlayerName(buffer);
+        length = StringLength(buffer);
+        if (length < PLAYER_NAME_LENGTH - 1)
+            ConvertInternationalString(buffer, LANGUAGE_JAPANESE);
+    }
     AddTextPrinterParameterized4(windowId, FONT_NORMAL, 8, y, 0, 0, sPlayerNameTextColors, TEXT_SKIP_DRAW, buffer);
 }
 
@@ -280,7 +296,7 @@ u8 MailboxMenu_CreateList(struct PlayerPCItemPageStruct *page)
     gMultiuseListMenuTemplate.item_X = 8;
     gMultiuseListMenuTemplate.cursor_X = 0;
     gMultiuseListMenuTemplate.maxShowed = 8;
-    gMultiuseListMenuTemplate.upText_Y = 9;
+    gMultiuseListMenuTemplate.upText_Y = IsFrlgPlayerPC() ? 1 : 9;
     gMultiuseListMenuTemplate.cursorPal = 2;
     gMultiuseListMenuTemplate.fillValue = 1;
     gMultiuseListMenuTemplate.cursorShadowPal = 3;
@@ -289,7 +305,7 @@ u8 MailboxMenu_CreateList(struct PlayerPCItemPageStruct *page)
     gMultiuseListMenuTemplate.fontId = FONT_NORMAL;
     gMultiuseListMenuTemplate.cursorKind = CURSOR_BLACK_ARROW;
     gMultiuseListMenuTemplate.lettersSpacing = 0;
-    gMultiuseListMenuTemplate.itemVerticalPadding = 0;
+    gMultiuseListMenuTemplate.itemVerticalPadding = IsFrlgPlayerPC() ? 2 : 0;
     gMultiuseListMenuTemplate.scrollMultiple = LIST_NO_MULTIPLE_SCROLL;
     return ListMenuInit(&gMultiuseListMenuTemplate, page->itemsAbove, page->cursorPos);
 }
@@ -302,7 +318,7 @@ static void MailboxMenu_MoveCursorFunc(s32 itemIndex, bool8 onInit, struct ListM
 
 void MailboxMenu_AddScrollArrows(struct PlayerPCItemPageStruct *page)
 {
-    page->scrollIndicatorTaskId = AddScrollIndicatorArrowPairParameterized(2, 0xC8, 12, 0x94, page->count - page->pageItems + 1, 0x6E, 0x6E, &page->itemsAbove);
+    page->scrollIndicatorTaskId = AddScrollIndicatorArrowPairParameterized(2, IsFrlgPlayerPC() ? 194 : 200, 12, 148, page->count - page->pageItems + 1, 0x6E, 0x6E, &page->itemsAbove);
 }
 
 void MailboxMenu_Free(void)

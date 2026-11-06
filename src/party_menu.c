@@ -1,4 +1,6 @@
 #include "global.h"
+#include "list_menu.h"
+#include "frlg_pc.h"
 #include "kyoto_icons.h"
 #include "malloc.h"
 #include "battle.h"
@@ -111,6 +113,7 @@ enum {
     MENU_CATALOG_MOWER,
     MENU_CHANGE_FORM,
     MENU_CHANGE_ABILITY,
+    MENU_FIELD_ACTIONS,
     MENU_FIELD_MOVES
 };
 
@@ -427,6 +430,7 @@ static void GiveItemToSelectedMon(u8);
 static void Task_UpdateHeldItemSpriteAndClosePartyMenu(u8);
 static void CB2_ReturnToPartyOrBagMenuFromWritingMail(void);
 static bool8 ReturnGiveItemToBagOrPC(enum Item);
+static void RemoveItemToGiveFromBagOrPC(enum Item);
 static void Task_DisplayGaveMailFromBagMessage(u8);
 static void Task_HandleSwitchItemsFromBagYesNoInput(u8);
 static void Task_ValidateChosenHalfParty(u8);
@@ -475,6 +479,11 @@ static void CursorCb_Trade1(u8);
 static void CursorCb_Trade2(u8);
 static void CursorCb_Toss(u8);
 static void CursorCb_FieldMove(u8);
+static void CursorCb_FieldActions(u8);
+static void Task_FieldActionsInput(u8);
+static void UseSelectedFieldMove(u8 taskId, enum FieldMove fieldMove);
+static EWRAM_DATA struct ListMenuItem sFieldActionItems[FIELD_MOVES_COUNT + 1] = {};
+static EWRAM_DATA u16 sFieldActionScroll = 0;
 static void CursorCb_CatalogBulb(u8);
 static void CursorCb_CatalogOven(u8);
 static void CursorCb_CatalogWashing(u8);
@@ -2950,24 +2959,18 @@ static void SetPartyMonSelectionActions(struct Pokemon *mons, u8 slotId, u8 acti
 
 static void SetPartyMonFieldSelectionActions(struct Pokemon *mons, u8 slotId)
 {
-    u8 i, j;
+    u8 j;
 
     sPartyMenuInternal->numActions = 0;
     AppendToList(sPartyMenuInternal->actions, &sPartyMenuInternal->numActions, MENU_SUMMARY);
 
-    // Add field moves to action list
-    for (i = 0; i < MAX_MON_MOVES; i++)
+    // A submenu prevents action-array overflow for broad HM compatibility.
+    for (j = 0; j < FIELD_MOVES_COUNT; j++)
     {
-        for (j = 0; j != FIELD_MOVES_COUNT; j++)
+        if (FieldMove_IsVisible(j) && FieldMove_CanUseMon(&mons[slotId], j))
         {
-            if (!FieldMove_IsVisible(j))
-                continue;
-
-            if (GetMonData(&mons[slotId], i + MON_DATA_MOVE1) == FieldMove_GetMoveId(j))
-            {
-                AppendToList(sPartyMenuInternal->actions, &sPartyMenuInternal->numActions, j + MENU_FIELD_MOVES);
-                break;
-            }
+            AppendToList(sPartyMenuInternal->actions, &sPartyMenuInternal->numActions, MENU_FIELD_ACTIONS);
+            break;
         }
     }
 
@@ -4085,7 +4088,11 @@ static void Task_HandleSpinTradeYesNoInput(u8 taskId)
 
 static void CursorCb_FieldMove(u8 taskId)
 {
-    u8 fieldMove = sPartyMenuInternal->actions[Menu_GetCursorPos()] - MENU_FIELD_MOVES;
+    UseSelectedFieldMove(taskId, sPartyMenuInternal->actions[Menu_GetCursorPos()] - MENU_FIELD_MOVES);
+}
+
+static void UseSelectedFieldMove(u8 taskId, enum FieldMove fieldMove)
+{
     const struct MapHeader *mapHeader;
 
     PlaySE(SE_SELECT);
@@ -7112,7 +7119,7 @@ static void GiveItemOrMailToSelectedMon(u8 taskId)
 {
     if (ItemIsMail(gPartyMenu.bagItem))
     {
-        RemoveBagItem(gPartyMenu.bagItem, 1);
+        RemoveItemToGiveFromBagOrPC(gPartyMenu.bagItem);
         sPartyMenuInternal->exitCallback = CB2_WriteMailToGiveMonFromBag;
         Task_ClosePartyMenu(taskId);
     }
@@ -7131,7 +7138,7 @@ static void GiveItemToSelectedMon(u8 taskId)
         item = gPartyMenu.bagItem;
         DisplayGaveHeldItemMessage(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId], item, FALSE, 1);
         GiveItemToMon(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId], item);
-        RemoveBagItem(item, 1);
+        RemoveItemToGiveFromBagOrPC(item);
         gTasks[taskId].func = Task_UpdateHeldItemSpriteAndClosePartyMenu;
     }
 }
@@ -7170,7 +7177,7 @@ static void CB2_ReturnToPartyOrBagMenuFromWritingMail(void)
     {
         TakeMailFromMon(mon);
         SetMonData(mon, MON_DATA_HELD_ITEM, &sPartyMenuItemId);
-        RemoveBagItem(sPartyMenuItemId, 1);
+        RemoveItemToGiveFromBagOrPC(sPartyMenuItemId);
         ReturnGiveItemToBagOrPC(item);
         SetMainCallback2(gPartyMenu.exitCallback);
     }
@@ -7210,11 +7217,14 @@ static void Task_HandleSwitchItemsFromBagYesNoInput(u8 taskId)
     {
     case 0: // Yes, switch items
         item = gPartyMenu.bagItem;
-        RemoveBagItem(item, 1);
-        if (AddBagItem(sPartyMenuItemId, 1) == FALSE)
+        RemoveItemToGiveFromBagOrPC(item);
+        if (ReturnGiveItemToBagOrPC(sPartyMenuItemId) == FALSE)
         {
             ReturnGiveItemToBagOrPC(item);
-            BufferBagFullCantTakeItemMessage();
+            if (gPartyMenu.action == PARTY_ACTION_GIVE_PC_ITEM)
+                StringCopy(gStringVar4, COMPOUND_STRING("There is no room in the PC\nfor the held item."));
+            else
+                BufferBagFullCantTakeItemMessage();
             DisplayPartyMenuMessage(gStringVar4, FALSE);
             gTasks[taskId].func = Task_UpdateHeldItemSpriteAndClosePartyMenu;
         }
@@ -8623,3 +8633,79 @@ s8 Test_UpdatePartySelectionSingleLayout(s8 slotId, s8 movementDir, bool8 choose
     return slotId;
 }
 #endif
+
+static void CursorCb_FieldActions(u8 taskId)
+{
+    struct WindowTemplate window;
+    struct ListMenuTemplate list = {0};
+    u32 move, count = 0;
+    PlaySE(SE_SELECT);
+    PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[0]);
+    for (move = 0; move < FIELD_MOVES_COUNT; move++)
+    {
+        if (FieldMove_IsVisible(move)
+            && FieldMove_CanUseMon(&gParties[B_TRAINER_PLAYER][gPartyMenu.slotId], move))
+        {
+            sFieldActionItems[count].name = GetMoveName(FieldMove_GetMoveId(move));
+            sFieldActionItems[count++].id = move;
+        }
+    }
+    sFieldActionItems[count].name = gText_Cancel2;
+    sFieldActionItems[count++].id = LIST_CANCEL;
+    SetWindowTemplateFields(&window, 2, 17, 3, 12, 16, 14, 0x2E9);
+    sPartyMenuInternal->windowId[0] = AddWindow(&window);
+    DrawStdFrameWithCustomTileAndPalette(sPartyMenuInternal->windowId[0], FALSE, 0x4F, 13);
+    list.items = sFieldActionItems;
+    list.totalItems = count;
+    list.maxShowed = min(count, 7);
+    list.windowId = sPartyMenuInternal->windowId[0];
+    list.item_X = 8;
+    list.upText_Y = 1;
+    list.cursorPal = TEXT_COLOR_DARK_GRAY;
+    list.fillValue = TEXT_COLOR_WHITE;
+    list.cursorShadowPal = TEXT_COLOR_LIGHT_GRAY;
+    list.fontId = FONT_NORMAL;
+    list.itemVerticalPadding = 2;
+    list.moveCursorFunc = ListMenuDefaultCursorMoveFunc;
+    sFieldActionScroll = 0;
+    gTasks[taskId].data[14] = ListMenuInit(&list, 0, 0);
+    gTasks[taskId].data[15] = AddScrollIndicatorArrowPairParameterized(SCROLL_ARROW_UP,
+        184, 20, 154, count > 7 ? count - 7 : 0, 0x7100, 0x7100, &sFieldActionScroll);
+    ScheduleBgCopyTilemapToVram(2);
+    gTasks[taskId].func = Task_FieldActionsInput;
+}
+
+static void Task_FieldActionsInput(u8 taskId)
+{
+    u16 row;
+    s32 input = ListMenu_ProcessInput(gTasks[taskId].data[14]);
+    ListMenuGetScrollAndRow(gTasks[taskId].data[14], &sFieldActionScroll, &row);
+    if (input == LIST_NOTHING_CHOSEN)
+        return;
+    DestroyListMenuTask(gTasks[taskId].data[14], NULL, NULL);
+    RemoveScrollIndicatorArrowPair(gTasks[taskId].data[15]);
+    if (input == LIST_CANCEL)
+    {
+        PlaySE(SE_SELECT);
+        PartyMenuRemoveWindow(&sPartyMenuInternal->windowId[0]);
+        DisplaySelectionWindow(SELECTWINDOW_ACTIONS);
+        gTasks[taskId].func = Task_HandleSelectionMenuInput;
+    }
+    else
+        UseSelectedFieldMove(taskId, input);
+}
+
+void ChooseMonToGiveItemFromPC(u16 item, MainCallback callback)
+{
+    InitPartyMenu(PARTY_MENU_TYPE_FIELD, PARTY_LAYOUT_SINGLE, PARTY_ACTION_GIVE_PC_ITEM, FALSE,
+        PARTY_MSG_GIVE_TO_WHICH_MON, Task_HandleChooseMonInput, callback);
+    gPartyMenu.bagItem = item;
+}
+
+static void RemoveItemToGiveFromBagOrPC(enum Item item)
+{
+    if (gPartyMenu.action == PARTY_ACTION_GIVE_PC_ITEM)
+        FrlgPcTakeGivenItem(item);
+    else
+        RemoveBagItem(item, 1);
+}

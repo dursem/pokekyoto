@@ -2,6 +2,7 @@
 #define GUARD_FIELD_MOVE_H
 
 #include "global.h"
+#include "pokemon.h"
 #include "constants/field_move.h"
 
 struct FieldMoveUnlock
@@ -30,6 +31,10 @@ struct FieldMoveInfo
 };
 
 extern const struct FieldMoveInfo gFieldMoveInfo[];
+bool32 FieldMove_IsHM(enum FieldMove fieldMove);
+bool32 FieldMove_HasHM(enum FieldMove fieldMove);
+bool32 FieldMove_CanUseMon(struct Pokemon *mon, enum FieldMove fieldMove);
+u8 FieldMove_FindPartyUser(enum FieldMove fieldMove);
 extern const struct FieldMoveUnlock gFieldMoveUnlocks[];
 
 static inline bool32 SetUpFieldMove(enum FieldMove fieldMove)

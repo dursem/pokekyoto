@@ -1,4 +1,5 @@
 #include "global.h"
+#include "frlg_pc.h"
 #include "constants/songs.h"
 #include "bg.h"
 #include "decoration.h"
@@ -168,6 +169,10 @@ static EWRAM_DATA u8 sTopMenuNumOptions = 0;
 EWRAM_DATA struct PlayerPCItemPageStruct gPlayerPCItemPageInfo = {};
 static EWRAM_DATA struct ItemStorageMenu *sItemStorageMenu = NULL;
 
+static EWRAM_DATA bool8 sUsingFrlgPc = FALSE;
+static void Task_FrlgPcWithdraw(u8);
+static void CB2_FrlgPcExitWithdraw(void);
+static void FrlgPcReshowAfterWithdraw(void);
 static const u8 sText_WithdrawItem[] = _("WITHDRAW ITEM");
 static const u8 sText_DepositItem[] = _("DEPOSIT ITEM");
 static const u8 sText_TossItem[] = _("TOSS ITEM");
@@ -217,6 +222,13 @@ static const struct MenuAction sItemStorage_MenuActions[] =
     [MENU_DEPOSIT]  = { sText_DepositItem,  {ItemStorage_Deposit} },
     [MENU_TOSS]     = { sText_TossItem,     {ItemStorage_Toss} },
     [MENU_EXIT]     = { gText_Cancel,       {ItemStorage_Exit} }
+};
+
+static const struct MenuAction sFrlgItemStorageActions[] =
+{
+    {sText_WithdrawItem, {ItemStorage_Withdraw}},
+    {sText_DepositItem, {ItemStorage_Deposit}},
+    {gText_Cancel2, {ItemStorage_Exit}},
 };
 
 static const u16 sNewGamePCItems[][2] =
@@ -370,6 +382,7 @@ void NewGameInitPCItems(void)
 
 void BedroomPC(void)
 {
+    sUsingFrlgPc = TRUE;
     sTopMenuOptionOrder = sBedroomPC_OptionOrder;
     sTopMenuNumOptions = NUM_BEDROOM_PC_OPTIONS;
     DisplayItemMessageOnField(CreateTask(TaskDummy, 0), gText_WhatWouldYouLike, InitPlayerPCMenu);
@@ -377,6 +390,7 @@ void BedroomPC(void)
 
 void PlayerPC(void)
 {
+    sUsingFrlgPc = FALSE;
     sTopMenuOptionOrder = sPlayerPC_OptionOrder;
     sTopMenuNumOptions = NUM_PLAYER_PC_OPTIONS;
     DisplayItemMessageOnField(CreateTask(TaskDummy, 0), gText_WhatWouldYouLike, InitPlayerPCMenu);
@@ -394,16 +408,19 @@ static void InitPlayerPCMenu(u8 taskId)
     struct WindowTemplate windowTemplate;
     data = gTasks[taskId].data;
 
-    if (sTopMenuNumOptions == NUM_PLAYER_PC_OPTIONS)
-        windowTemplate = sWindowTemplates_MainMenus[WIN_MAIN_MENU];
-    else // Bedroom PC
-        windowTemplate = sWindowTemplates_MainMenus[WIN_MAIN_MENU_BEDROOM];
+    windowTemplate = sWindowTemplates_MainMenus[sTopMenuNumOptions == NUM_BEDROOM_PC_OPTIONS
+        ? WIN_MAIN_MENU_BEDROOM : WIN_MAIN_MENU];
 
     windowTemplate.width = GetMaxWidthInSubsetOfMenuTable(sPlayerPCMenuActions, sTopMenuOptionOrder, sTopMenuNumOptions);
+    if (sUsingFrlgPc)
+    {
+        windowTemplate.width = 13;
+    }
     tWindowId = AddWindow(&windowTemplate);
     SetStandardWindowBorderStyle(tWindowId, FALSE);
-    PrintMenuActionTextsInUpperLeftCorner(tWindowId, sTopMenuNumOptions, sPlayerPCMenuActions, sTopMenuOptionOrder);
-    InitMenuInUpperLeftCornerNormal(tWindowId, sTopMenuNumOptions, 0);
+    PrintMenuActionTexts(tWindowId, FONT_NORMAL, 8, sUsingFrlgPc ? 2 : 1, 0, 16,
+        sTopMenuNumOptions, sPlayerPCMenuActions, sTopMenuOptionOrder);
+    InitMenuNormal(tWindowId, FONT_NORMAL, 0, sUsingFrlgPc ? 2 : 1, 16, sTopMenuNumOptions, 0);
     ScheduleBgCopyTilemapToVram(0);
     gTasks[taskId].func = PlayerPCProcessMenuInput;
 }
@@ -502,6 +519,7 @@ static void PlayerPC_TurnOff(u8 taskId)
     {
         ScriptContext_Enable();
     }
+    sUsingFrlgPc = FALSE;
     DestroyTask(taskId);
 }
 
@@ -513,12 +531,20 @@ static void InitItemStorageMenu(u8 taskId, u8 var)
     data = gTasks[taskId].data;
     windowTemplate = sWindowTemplates_MainMenus[WIN_ITEM_STORAGE_MENU];
     windowTemplate.width = GetMaxWidthInMenuTable(sItemStorage_MenuActions, ARRAY_COUNT(sItemStorage_MenuActions));
+    if (sUsingFrlgPc)
+    {
+        windowTemplate.width = 14;
+        windowTemplate.height = 6;
+    }
     tWindowId = AddWindow(&windowTemplate);
     SetStandardWindowBorderStyle(tWindowId, FALSE);
-    PrintMenuTable(tWindowId, ARRAY_COUNT(sItemStorage_MenuActions), sItemStorage_MenuActions);
-    InitMenuInUpperLeftCornerNormal(tWindowId, ARRAY_COUNT(sItemStorage_MenuActions), var);
+    PrintMenuActionTextsAtPos(tWindowId, FONT_NORMAL, 8, sUsingFrlgPc ? 2 : 1, 16,
+        sUsingFrlgPc ? ARRAY_COUNT(sFrlgItemStorageActions) : ARRAY_COUNT(sItemStorage_MenuActions),
+        sUsingFrlgPc ? sFrlgItemStorageActions : sItemStorage_MenuActions);
+    InitMenuNormal(tWindowId, FONT_NORMAL, 0, sUsingFrlgPc ? 2 : 1, 16,
+        sUsingFrlgPc ? ARRAY_COUNT(sFrlgItemStorageActions) : ARRAY_COUNT(sItemStorage_MenuActions), var);
     ScheduleBgCopyTilemapToVram(0);
-    ItemStorageMenuPrint(sItemStorage_OptionDescriptions[var]);
+    ItemStorageMenuPrint(sItemStorage_OptionDescriptions[sUsingFrlgPc && var == 2 ? MENU_EXIT : var]);
 }
 
 static void ItemStorageMenuPrint(const u8 *textPtr)
@@ -539,7 +565,7 @@ static void ItemStorageMenuProcessInput(u8 taskId)
     {
     case MENU_NOTHING_CHOSEN:
         if (oldPos != newPos)
-            ItemStorageMenuPrint(sItemStorage_OptionDescriptions[newPos]);
+            ItemStorageMenuPrint(sItemStorage_OptionDescriptions[sUsingFrlgPc && newPos == 2 ? MENU_EXIT : newPos]);
         break;
     case MENU_B_PRESSED:
         PlaySE(SE_SELECT);
@@ -547,7 +573,7 @@ static void ItemStorageMenuProcessInput(u8 taskId)
         break;
     default:
         PlaySE(SE_SELECT);
-        sItemStorage_MenuActions[inputOptionId].func.void_u8(taskId);
+        (sUsingFrlgPc ? sFrlgItemStorageActions : sItemStorage_MenuActions)[inputOptionId].func.void_u8(taskId);
         break;
     }
 }
@@ -595,7 +621,14 @@ static void ItemStorage_Withdraw(u8 taskId)
     tUsedSlots = CountUsedPCItemSlots();
     if (tUsedSlots != 0)
     {
-        ItemStorage_Enter(taskId, FALSE);
+        if (sUsingFrlgPc)
+        {
+            ItemStorage_EraseMainMenu(taskId);
+            FadeScreen(FADE_TO_BLACK, 0);
+            gTasks[taskId].func = Task_FrlgPcWithdraw;
+        }
+        else
+            ItemStorage_Enter(taskId, FALSE);
     }
     else
     {
@@ -696,7 +729,7 @@ static void Mailbox_DrawMailboxMenu(u8 taskId)
 {
     u8 windowId = MailboxMenu_AddWindow(MAILBOXWIN_TITLE);
     MailboxMenu_AddWindow(MAILBOXWIN_LIST);
-    AddTextPrinterParameterized(windowId, FONT_NORMAL, sText_Mailbox, GetStringCenterAlignXOffset(FONT_NORMAL, sText_Mailbox, 0x40), 1, 0, NULL);
+    AddTextPrinterParameterized(windowId, FONT_NORMAL, sText_Mailbox, GetStringCenterAlignXOffset(FONT_NORMAL, sText_Mailbox, sUsingFrlgPc ? 80 : 64), sUsingFrlgPc ? 2 : 1, 0, NULL);
     ScheduleBgCopyTilemapToVram(0);
     gTasks[taskId].tListTaskId = MailboxMenu_CreateList(&gPlayerPCItemPageInfo);
     MailboxMenu_AddScrollArrows(&gPlayerPCItemPageInfo);
@@ -794,7 +827,10 @@ static void Mailbox_FadeAndReadMail(u8 taskId)
     {
         MailboxMenu_Free();
         CleanupOverworldWindowsAndTilemaps();
-        ReadMail(&gSaveBlock1Ptr->mail[gPlayerPCItemPageInfo.itemsAbove + PARTY_SIZE + gPlayerPCItemPageInfo.cursorPos], Mailbox_ReturnToFieldFromReadMail, TRUE);
+        if (sUsingFrlgPc)
+            ReadFrlgPcMail(&gSaveBlock1Ptr->mail[gPlayerPCItemPageInfo.itemsAbove + PARTY_SIZE + gPlayerPCItemPageInfo.cursorPos], Mailbox_ReturnToFieldFromReadMail, TRUE);
+        else
+            ReadMail(&gSaveBlock1Ptr->mail[gPlayerPCItemPageInfo.itemsAbove + PARTY_SIZE + gPlayerPCItemPageInfo.cursorPos], Mailbox_ReturnToFieldFromReadMail, TRUE);
         DestroyTask(taskId);
     }
 }
@@ -1470,4 +1506,40 @@ static void ItemStorage_ReturnToListInput(u8 taskId)
 {
     ItemStorage_AddScrollIndicator();
     gTasks[taskId].func = ItemStorage_ProcessInput;
+}
+
+
+void PrepareBedroomPC(void)
+{
+    sUsingFrlgPc = TRUE;
+}
+
+bool8 IsFrlgPlayerPC(void)
+{
+    return sUsingFrlgPc;
+}
+
+static void Task_FrlgPcWithdraw(u8 taskId)
+{
+    if (!gPaletteFade.active)
+    {
+        CleanupOverworldWindowsAndTilemaps();
+        ItemPc_SetInitializedFlag(FALSE);
+        ItemPc_Init(0, CB2_FrlgPcExitWithdraw);
+        DestroyTask(taskId);
+    }
+}
+
+static void CB2_FrlgPcExitWithdraw(void)
+{
+    gFieldCallback = FrlgPcReshowAfterWithdraw;
+    SetMainCallback2(CB2_ReturnToField);
+}
+
+static void FrlgPcReshowAfterWithdraw(void)
+{
+    LoadMessageBoxAndBorderGfx();
+    DrawDialogueFrame(0, TRUE);
+    InitItemStorageMenu(CreateTask(ItemStorage_HandleReturnToProcessInput, 0), 0);
+    FadeInFromBlack();
 }

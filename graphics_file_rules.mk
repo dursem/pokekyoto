@@ -314,3 +314,11 @@ $(PKNAVOPTIONSGFXDIR)/options.4bpp: $(PKNAVOPTIONSGFXDIR)/hoenn_map.4bpp \
                                     $(PKNAVOPTIONSGFXDIR)/tough.4bpp \
                                     $(PKNAVOPTIONSGFXDIR)/cancel.4bpp
 	@cat $^ >$@
+
+# Banked backgrounds for the optional bedroom PC interface.
+graphics/frlg_pc/storage.4bpp graphics/frlg_pc/bag_bg.4bpp: %.4bpp: %.png tools/pack_frlg_pc_tiles.py
+	$(GFX) $< $(@:.4bpp=.8bpp)
+	python3 tools/pack_frlg_pc_tiles.py $(@:.4bpp=.8bpp) $@
+
+graphics/frlg_pc/storage.gbapal graphics/frlg_pc/bag_bg.gbapal: %.gbapal: %.png
+	$(GFX) $< $@ -num_colors 48
