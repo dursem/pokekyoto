@@ -54,6 +54,26 @@ struct TimeBlendSettings
     u16 altWeight;
 };
 
+// The software fade most recently written to a physical palette bank.
+// Display-only lighting can reapply it after tinting without changing either
+// animation palette buffer. Fast fade amounts count component steps (0..32).
+enum PaletteDisplayFadeKind
+{
+    PALETTE_DISPLAY_FADE_NONE,
+    PALETTE_DISPLAY_FADE_NORMAL,
+    PALETTE_DISPLAY_FADE_FAST_IN_WHITE,
+    PALETTE_DISPLAY_FADE_FAST_OUT_WHITE,
+    PALETTE_DISPLAY_FADE_FAST_IN_BLACK,
+    PALETTE_DISPLAY_FADE_FAST_OUT_BLACK,
+};
+
+struct PaletteDisplayFade
+{
+    u16 color;
+    u8 amount;
+    u8 kind;
+};
+
 struct PaletteFadeControl
 {
     u32 multipurpose1; // This field needs to exist or errors will occur
@@ -93,6 +113,7 @@ void LoadPaletteFast(const void *src, u32 offset, u32 size);
 void FillPalette(u32 value, u32 offset, u32 size);
 void TransferPlttBuffer(void);
 void ReapplyMapPaletteFade(u32 bank);
+bool32 GetPaletteFadeForDisplay(u32 palette, struct PaletteDisplayFade *fade);
 u32 UpdatePaletteFade(void);
 void ResetPaletteFade(void);
 bool32 BeginNormalPaletteFade(u32 selectedPalettes, s8 delay, u8 startY, u8 targetY, u32 blendColor);

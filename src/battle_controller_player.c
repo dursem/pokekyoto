@@ -2169,9 +2169,7 @@ void HandleChooseMoveAfterDma3(enum BattlerId battler)
 {
     if (!IsDma3ManagerBusyWithBgCopy())
     {
-        // POKEKYOTO_MOVE_UI_V62: swap the graphics at the instant BG0 switches pages.
-        if (UseKyotoActionUi())
-            LoadKyotoBattleMoveTiles();
+        // The shared UI atlas is already resident; only switch the page.
         gBattle_BG0_X = 0;
         gBattle_BG0_Y = DISPLAY_HEIGHT * 2;
         gBattlerControllerFuncs[battler] = HandleInputChooseMove;

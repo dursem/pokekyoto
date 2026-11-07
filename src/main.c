@@ -26,6 +26,7 @@
 #include "agb_flash.h"
 #include "sound.h"
 #include "battle.h"
+#include "battle_time.h"
 #include "battle_controllers.h"
 #include "text.h"
 #include "intro.h"
@@ -218,6 +219,7 @@ static void CallCallbacks(void)
         gMain.callback2();
 
     PrepareFieldEffects();
+    BattleTimePreparePalettes();
     MapPalettesEndFrame();
 }
 

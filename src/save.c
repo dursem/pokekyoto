@@ -892,6 +892,14 @@ u8 LoadGameSave(u8 saveType)
     case SAVE_NORMAL:
     default:
         status = TryLoadSaveSlot(FULL_SAVE_SLOT, gRamSaveSectorLocations);
+#if FNPC_ENABLE_NPC_FOLLOWERS
+        // Old saves have unused flash bytes here, not valid follower state.
+        if (gSaveblock3.npcFollowerSaveMagic != NPC_FOLLOWER_SAVE_MAGIC)
+        {
+            memset(&gSaveblock3.NPCfollower, 0, sizeof(gSaveblock3.NPCfollower));
+            gSaveblock3.npcFollowerSaveMagic = NPC_FOLLOWER_SAVE_MAGIC;
+        }
+#endif
         CopyPartyAndObjectsFromSave();
         gSaveFileStatus = status;
         gGameContinueCallback = NULL;
@@ -1083,5 +1091,8 @@ static void CopyToSaveBlock3(u32 sectorId, struct SaveSector *sector)
 static void CopyFromSaveBlock3(u32 sectorId, struct SaveSector *sector)
 {
     u32 size = SaveBlock3Size(sectorId);
+#if FNPC_ENABLE_NPC_FOLLOWERS
+    gSaveblock3.npcFollowerSaveMagic = NPC_FOLLOWER_SAVE_MAGIC;
+#endif
     memcpy(sector->saveBlock3Chunk, (u8 *)&gSaveblock3 + (sectorId * SAVE_BLOCK_3_CHUNK_SIZE), size);
 }

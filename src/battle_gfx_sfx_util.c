@@ -1,10 +1,12 @@
 #include "global.h"
+#include "kyoto_battle_slide.h"
 #include "battle.h"
 #include "battle_controllers.h"
 #include "battle_ai_main.h"
 #include "battle_anim.h"
 #include "constants/battle_anim.h"
 #include "battle_interface.h"
+#include "battle_time.h"
 #include "main.h"
 #include "menu.h"
 #include "dma3.h"
@@ -428,6 +430,23 @@ static void UNUSED UnusedDoBattleSpriteAffineAnim(struct Sprite *sprite, bool8 p
 }
 
 #define sSpeedX data[0]
+
+void SpriteCB_KyotoTrainerIntroSlide(struct Sprite *sprite)
+{
+    if (!(gIntroSlideFlags & 1))
+    {
+        s32 start = sprite->sSpeedX < 0 ? DISPLAY_WIDTH : -DISPLAY_WIDTH;
+        sprite->x2 = KyotoIntroSlideOffset(start, ++sprite->data[1]);
+        if (sprite->data[1] >= KYOTO_INTRO_SLIDE_FRAMES)
+        {
+            sprite->data[1] = 0;
+            if (sprite->y2 != 0)
+                sprite->callback = SpriteCB_TrainerSlideVertical;
+            else
+                sprite->callback = SpriteCallbackDummy;
+        }
+    }
+}
 
 void SpriteCB_TrainerSlideIn(struct Sprite *sprite)
 {
@@ -1131,6 +1150,21 @@ void SetBattlerSpriteAffineMode(u8 affineMode)
 #define SPRITE_SIDE_LEFT    0
 #define SPRITE_SIDE_RIGHT   1
 
+static void SetEnemyShadowPrivatePalette(struct Sprite *sprite)
+{
+    u32 paletteNum = IndexOfSpritePaletteTag(BATTLE_TIME_SHADOW_PAL_TAG);
+
+    // Shadows originally share index 6 with the healthbox artwork. Give only
+    // battle shadows a private copy so ambient lighting cannot darken the UI.
+    // The original template remains usable by the Pokemon sprite visualizer.
+    if (paletteNum == 0xFF)
+        paletteNum = LoadSpritePaletteWithTag(gBattleInterface_BallStatusBarPal, BATTLE_TIME_SHADOW_PAL_TAG);
+
+    // If all palette slots are occupied, retain the original shared palette.
+    if (paletteNum != 0xFF)
+        sprite->oam.paletteNum = paletteNum;
+}
+
 void CreateEnemyShadowSprite(enum BattlerId battler)
 {
     if (B_ENEMY_MON_SHADOW_STYLE >= GEN_4 && P_GBA_STYLE_SPECIES_GFX == FALSE)
@@ -1145,6 +1179,7 @@ void CreateEnemyShadowSprite(enum BattlerId battler)
         if (gBattleSpritesDataPtr->healthBoxesData[battler].shadowSpriteIdPrimary < MAX_SPRITES)
         {
             struct Sprite *sprite = &gSprites[gBattleSpritesDataPtr->healthBoxesData[battler].shadowSpriteIdPrimary];
+            SetEnemyShadowPrivatePalette(sprite);
             sprite->tBattlerId = battler;
             sprite->tSpriteSide = SPRITE_SIDE_LEFT;
             sprite->tBaseTileNum = sprite->oam.tileNum;
@@ -1159,6 +1194,7 @@ void CreateEnemyShadowSprite(enum BattlerId battler)
         if (gBattleSpritesDataPtr->healthBoxesData[battler].shadowSpriteIdSecondary < MAX_SPRITES)
         {
             struct Sprite *sprite = &gSprites[gBattleSpritesDataPtr->healthBoxesData[battler].shadowSpriteIdSecondary];
+            SetEnemyShadowPrivatePalette(sprite);
             sprite->tBattlerId = battler;
             sprite->tSpriteSide = SPRITE_SIDE_RIGHT;
             sprite->tBaseTileNum = sprite->oam.tileNum + 4;
@@ -1175,6 +1211,7 @@ void CreateEnemyShadowSprite(enum BattlerId battler)
         if (gBattleSpritesDataPtr->healthBoxesData[battler].shadowSpriteIdPrimary < MAX_SPRITES)
         {
             struct Sprite *sprite = &gSprites[gBattleSpritesDataPtr->healthBoxesData[battler].shadowSpriteIdPrimary];
+            SetEnemyShadowPrivatePalette(sprite);
             sprite->tBattlerId = battler;
             sprite->tBaseTileNum = sprite->oam.tileNum;
             sprite->invisible = TRUE;

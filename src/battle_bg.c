@@ -2,6 +2,7 @@
 #include "battle.h"
 #include "battle_anim.h"
 #include "battle_bg.h"
+#include "battle_time.h"
 #include "battle_interface.h"
 #include "contest.h"
 #include "battle_main.h"
@@ -881,6 +882,50 @@ static u8 GetBattleEnvironmentByMapScene(u8 mapBattleScene)
     return BATTLE_ENVIRONMENT_PLAIN;
 }
 
+// Only tint natural outdoor scenery, even when a map overrides the terrain.
+// Reuse Kyoto's interpolated overworld blend so dawn/dusk stay synchronized.
+static void TintBattleBgForTimeOfDay(u32 environment)
+{
+    const u32 palettes = (1 << 2) | (1 << 3) | (1 << 4);
+
+    BattleTimeSetBlend(NULL);
+
+    if (!B_BATTLE_BG_TIME_OF_DAY || !MapHasNaturalLight(gMapHeader.mapType)
+     || (gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_RECORDED_LINK | BATTLE_TYPE_FRONTIER)))
+        return;
+
+    switch (environment)
+    {
+    case BATTLE_ENVIRONMENT_GRASS:
+    case BATTLE_ENVIRONMENT_LONG_GRASS:
+    case BATTLE_ENVIRONMENT_SAND:
+    case BATTLE_ENVIRONMENT_WATER:
+    case BATTLE_ENVIRONMENT_POND:
+    case BATTLE_ENVIRONMENT_MOUNTAIN:
+    case BATTLE_ENVIRONMENT_PLAIN:
+    case BATTLE_ENVIRONMENT_RAYQUAZA:
+    case BATTLE_ENVIRONMENT_SOARING:
+    case BATTLE_ENVIRONMENT_SKY_PILLAR:
+    case BATTLE_ENVIRONMENT_PUDDLE:
+    case BATTLE_ENVIRONMENT_MARSH:
+    case BATTLE_ENVIRONMENT_SWAMP:
+    case BATTLE_ENVIRONMENT_SNOW:
+    case BATTLE_ENVIRONMENT_ICE:
+    case BATTLE_ENVIRONMENT_VOLCANO:
+        break;
+    default:
+        return;
+    }
+
+    UpdateTimeOfDay(TRUE);
+    BattleTimeSetBlend(&gTimeBlend);
+    TimeMixPalettes(palettes, gPlttBufferUnfaded, gPlttBufferFaded,
+                   &gTimeBlend.startBlend, &gTimeBlend.endBlend, gTimeBlend.weight);
+    // Keep the tinted baseline through fades and returns from Bag/Party.
+    // Called only after loading a fresh environment palette: no tint stacking.
+    CpuCopy16(&gPlttBufferFaded[BG_PLTT_ID(2)], &gPlttBufferUnfaded[BG_PLTT_ID(2)], 3 * PLTT_SIZE_4BPP);
+}
+
 // Loads the initial battle environment.
 static void LoadBattleEnvironmentGfx(u16 environment)
 {
@@ -890,6 +935,7 @@ static void LoadBattleEnvironmentGfx(u16 environment)
     DecompressDataWithHeaderVram(gBattleEnvironmentInfo[environment].background.tileset, (void *)(BG_CHAR_ADDR(2)));
     DecompressDataWithHeaderVram(gBattleEnvironmentInfo[environment].background.tilemap, (void *)(BG_SCREEN_ADDR(26)));
     LoadPalette(gBattleEnvironmentInfo[environment].palette, BG_PLTT_ID(2), 3 * PLTT_SIZE_4BPP);
+    TintBattleBgForTimeOfDay(environment);
 }
 
 // Loads the entry associated with the battle environment.
@@ -1026,10 +1072,19 @@ void LoadBattleMenuWindowGfx(void)
 #define KYOTO_UI_MAP_WIDTH 30
 #define KYOTO_UI_MAP_HEIGHT 6
 
+static void LoadKyotoBattleUiTiles(void)
+{
+    // All three pages use the same pixels in the same slots. Reloading this
+    // atlas also restores the UI after native windows temporarily reuse VRAM;
+    // switching pages never replaces visible tiles with a different tile set.
+    CpuCopy32(gKyotoBattleUiTiles,
+              (void *)(BG_CHAR_ADDR(0) + KYOTO_BATTLE_UI_TILE_START * 32),
+              sizeof(gKyotoBattleUiTiles));
+}
+
 void LoadKyotoBattleActionUi(void)
 {
-    DecompressDataWithHeaderVram(gKyotoBattleActionTiles,
-                                 (void *)(BG_CHAR_ADDR(0) + KYOTO_BATTLE_UI_TILE_START * 32));
+    LoadKyotoBattleUiTiles();
     LoadPalette(gKyotoBattleUiPalette, BG_PLTT_ID(12), PLTT_SIZE_4BPP);
     CopyToBgTilemapBufferRect_ChangePalette(0, gKyotoBattleActionTilemap,
                                            0, KYOTO_ACTION_MAP_TOP,
@@ -1041,6 +1096,7 @@ void LoadKyotoBattleActionUi(void)
 #define KYOTO_MOVE_MAP_TOP 54
 void LoadKyotoBattleMoveUi(void)
 {
+    LoadKyotoBattleUiTiles();
     // POKEKYOTO_MOVE_UI_V62: draw the 240x48 border BEFORE native move text.
     // Keep action graphics untouched until the BG0 scroll switches to the move page.
     LoadPalette(gKyotoBattleUiPalette, BG_PLTT_ID(12), PLTT_SIZE_4BPP);
@@ -1050,18 +1106,9 @@ void LoadKyotoBattleMoveUi(void)
     CopyBgTilemapBufferToVram(0);
 }
 
-void LoadKyotoBattleMoveTiles(void)
-{
-    // Reuse action BG0 tile slots only when changing to the offscreen move page;
-    // no additional tiles or palettes are allocated over the battle sprite gfx.
-    DecompressDataWithHeaderVram(gKyotoBattleMoveTiles,
-                                 (void *)(BG_CHAR_ADDR(0) + KYOTO_BATTLE_UI_TILE_START * 32));
-}
-
 void LoadKyotoBattleMessageUi(void)
 {
-    DecompressDataWithHeaderVram(gKyotoBattleMessageTiles,
-                                 (void *)(BG_CHAR_ADDR(0) + KYOTO_BATTLE_UI_TILE_START * 32));
+    LoadKyotoBattleUiTiles();
     LoadPalette(gKyotoBattleUiPalette, BG_PLTT_ID(12), PLTT_SIZE_4BPP);
     CopyToBgTilemapBufferRect_ChangePalette(0, gKyotoBattleMessageTilemap,
                                            0, KYOTO_MESSAGE_MAP_TOP,
@@ -1083,7 +1130,9 @@ void LoadBattleTextboxAndBackground(void)
     LoadBattleMenuWindowGfx();
     // Draw the Kyoto message frame *before* encounter/send-out text first appears.
     if (gBattleScripting.windowsType == B_WIN_TYPE_NORMAL)
+    {
         LoadKyotoBattleMessageUi();
+    }
     if (B_TERRAIN_BG_CHANGE == TRUE)
         DrawTerrainTypeBattleBackground();
     else
@@ -1432,12 +1481,15 @@ bool8 LoadChosenBattleElement(u8 caseId)
         break;
     case 5:
         LoadPalette(gBattleEnvironmentInfo[GetBattleEnvironmentOverride()].palette, BG_PLTT_ID(2), 3 * PLTT_SIZE_4BPP);
+        TintBattleBgForTimeOfDay(GetBattleEnvironmentOverride());
         break;
     case 6:
         LoadBattleMenuWindowGfx();
         // The staged boot path is used for normal wild and trainer battle intros.
         if (gBattleScripting.windowsType == B_WIN_TYPE_NORMAL)
+        {
             LoadKyotoBattleMessageUi();
+        }
         break;
     default:
         ret = TRUE;

@@ -46,6 +46,41 @@ static EWRAM_DATA u8 sMapFadeMode;
 static EWRAM_DATA u8 sMapFastSteps;
 static EWRAM_DATA u8 sMapFastSubmode;
 
+// Unlike gPaletteFade.y, these values describe what is already in each bank;
+// normal/fast fades can update BG and OBJ banks on different frames.
+static EWRAM_DATA struct PaletteDisplayFade sDisplayFades[32] = {0};
+static EWRAM_DATA u8 sDisplayFastSteps[2] = {0};
+
+bool32 GetPaletteFadeForDisplay(u32 palette, struct PaletteDisplayFade *fade)
+{
+    if (palette >= ARRAY_COUNT(sDisplayFades)
+     || sDisplayFades[palette].kind == PALETTE_DISPLAY_FADE_NONE)
+        return FALSE;
+
+    *fade = sDisplayFades[palette];
+    return TRUE;
+}
+
+static void ClearDisplayFadeRange(u32 offset, u32 size)
+{
+    if (size == 0)
+        return;
+
+    u32 end = min(ARRAY_COUNT(sDisplayFades), (offset + size / sizeof(u16) + 15) / 16);
+    for (u32 bank = offset / 16; bank < end; bank++)
+        sDisplayFades[bank].kind = PALETTE_DISPLAY_FADE_NONE;
+}
+
+static void RecordDisplayFade(u32 bank, u32 kind, u32 amount, u32 color)
+{
+    sDisplayFades[bank] = (struct PaletteDisplayFade)
+    {
+        .color = color,
+        .amount = amount,
+        .kind = kind,
+    };
+}
+
 static void RecordMapFade(u32 mask)
 {
     sMapFadeMask = mask & PALETTES_MAP;
@@ -111,6 +146,7 @@ static const u8 sRoundedDownGrayscaleMap[] = {
 
 void LoadPalette(const void *src, u32 offset, u32 size)
 {
+    ClearDisplayFadeRange(offset, size);
     CpuCopy16(src, &gPlttBufferUnfaded[offset], size);
     CpuCopy16(src, &gPlttBufferFaded[offset], size);
 }
@@ -120,6 +156,7 @@ void LoadPaletteFast(const void *src, u32 offset, u32 size)
 {
     if ((u32)src & 3) // In case palette is not 4 byte aligned
         return LoadPalette(src, offset, size);
+    ClearDisplayFadeRange(offset, size);
     CpuFastCopy(src, &gPlttBufferUnfaded[offset], size);
     // Copying from EWRAM->EWRAM is faster than ROM->EWRAM
     CpuFastCopy(&gPlttBufferUnfaded[offset], &gPlttBufferFaded[offset], size);
@@ -127,6 +164,7 @@ void LoadPaletteFast(const void *src, u32 offset, u32 size)
 
 void FillPalette(u32 value, u32 offset, u32 size)
 {
+    ClearDisplayFadeRange(offset, size);
     CpuFill16(value, &gPlttBufferUnfaded[offset], size);
     CpuFill16(value, &gPlttBufferFaded[offset], size);
 }
@@ -265,6 +303,7 @@ bool32 BeginTimeOfDayPaletteFade(u32 selectedPalettes, s8 delay, u8 startY, u8 t
 
 void ResetPaletteFadeControl(void)
 {
+    memset(sDisplayFades, 0, sizeof(sDisplayFades));
     sMapFadeMask = 0;
     gPaletteFade.multipurpose1 = 0;
     gPaletteFade.multipurpose2 = 0;
@@ -409,11 +448,15 @@ static u32 UpdateNormalPaletteFade_Alternate(void)
     while (selectedPalettes)
     {
         if (selectedPalettes & 1)
+        {
             BlendPalette(
                 paletteOffset,
                 16,
                 gPaletteFade.y,
                 gPaletteFade.blendColor);
+            RecordDisplayFade(paletteOffset / 16, PALETTE_DISPLAY_FADE_NORMAL,
+                              gPaletteFade.y, gPaletteFade.blendColor);
+        }
         selectedPalettes >>= 1;
         paletteOffset += 16;
     }
@@ -484,6 +527,8 @@ static u32 UpdateNormalPaletteFade_Simultaneous(void)
                 16,
                 gPaletteFade.y,
                 gPaletteFade.blendColor);
+            RecordDisplayFade(paletteOffset / 16, PALETTE_DISPLAY_FADE_NORMAL,
+                              gPaletteFade.y, gPaletteFade.blendColor);
         }
         selectedPalettes >>= 1;
         paletteOffset += 16;
@@ -584,6 +629,7 @@ void UnfadePlttBuffer(u32 selectedPalettes)
         if (selectedPalettes & 1)
         {
             u8 i;
+            sDisplayFades[paletteOffset / 16].kind = PALETTE_DISPLAY_FADE_NONE;
             for (i = 0; i < 16; i++)
                 gPlttBufferFaded[paletteOffset + i] = gPlttBufferUnfaded[paletteOffset + i];
         }
@@ -600,6 +646,7 @@ void BeginFastPaletteFade(u32 submode)
 
 static void BeginFastPaletteFadeInternal(u32 submode)
 {
+    sDisplayFastSteps[0] = sDisplayFastSteps[1] = 0;
     sMapFastSteps = 0;
     sMapFastSubmode = submode;
     gPaletteFade.y = 31;
@@ -612,6 +659,14 @@ static void BeginFastPaletteFadeInternal(u32 submode)
 
     if (submode == FAST_FADE_IN_FROM_WHITE)
         CpuFill16(RGB_WHITE, gPlttBufferFaded, PLTT_SIZE);
+
+    if (submode == FAST_FADE_IN_FROM_WHITE || submode == FAST_FADE_IN_FROM_BLACK)
+    {
+        u32 kind = submode == FAST_FADE_IN_FROM_WHITE
+                 ? PALETTE_DISPLAY_FADE_FAST_IN_WHITE : PALETTE_DISPLAY_FADE_FAST_IN_BLACK;
+        for (u32 bank = 0; bank < ARRAY_COUNT(sDisplayFades); bank++)
+            RecordDisplayFade(bank, kind, 0, 0);
+    }
 
     UpdatePaletteFade();
 }
@@ -739,6 +794,20 @@ static u32 UpdateFastPaletteFade(void)
         }
     }
 
+    {
+        static const u8 kinds[] =
+        {
+            [FAST_FADE_IN_FROM_WHITE] = PALETTE_DISPLAY_FADE_FAST_IN_WHITE,
+            [FAST_FADE_OUT_TO_WHITE] = PALETTE_DISPLAY_FADE_FAST_OUT_WHITE,
+            [FAST_FADE_IN_FROM_BLACK] = PALETTE_DISPLAY_FADE_FAST_IN_BLACK,
+            [FAST_FADE_OUT_TO_BLACK] = PALETTE_DISPLAY_FADE_FAST_OUT_BLACK,
+        };
+        u32 half = paletteOffsetStart / OBJ_PLTT_OFFSET;
+        sDisplayFastSteps[half] = min(32, sDisplayFastSteps[half] + 2);
+        for (u32 bank = paletteOffsetStart / 16; bank < paletteOffsetEnd / 16; bank++)
+            RecordDisplayFade(bank, kinds[gPaletteFadeSubmode], sDisplayFastSteps[half], 0);
+    }
+
     gPaletteFade.objPaletteToggle ^= 1;
 
     if (gPaletteFade.objPaletteToggle)
@@ -758,12 +827,17 @@ static u32 UpdateFastPaletteFade(void)
         case FAST_FADE_IN_FROM_WHITE:
         case FAST_FADE_IN_FROM_BLACK:
             CpuCopy32(gPlttBufferUnfaded, gPlttBufferFaded, PLTT_SIZE);
+            memset(sDisplayFades, 0, sizeof(sDisplayFades));
             break;
         case FAST_FADE_OUT_TO_WHITE:
             CpuFill32(0xFFFFFFFF, gPlttBufferFaded, PLTT_SIZE);
+            for (u32 bank = 0; bank < ARRAY_COUNT(sDisplayFades); bank++)
+                RecordDisplayFade(bank, PALETTE_DISPLAY_FADE_NORMAL, 16, RGB_WHITE);
             break;
         case FAST_FADE_OUT_TO_BLACK:
             CpuFill32(0x00000000, gPlttBufferFaded, PLTT_SIZE);
+            for (u32 bank = 0; bank < ARRAY_COUNT(sDisplayFades); bank++)
+                RecordDisplayFade(bank, PALETTE_DISPLAY_FADE_NORMAL, 16, RGB_BLACK);
             break;
         }
 

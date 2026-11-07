@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_battle_slide.h"
 #include "battle.h"
 #include "battle_anim.h"
 #include "battle_ai_main.h"
@@ -9,6 +10,7 @@
 #include "battle_hold_effects.h"
 #include "battle_interface.h"
 #include "battle_main.h"
+#include "battle_time.h"
 #include "battle_message.h"
 #include "battle_pyramid.h"
 #include "battle_scripts.h"
@@ -1822,6 +1824,7 @@ void VBlankCB_Battle(void)
     LoadOam();
     ProcessSpriteCopyRequests();
     TransferPlttBuffer();
+    BattleTimeTransferPalettes();
     ScanlineEffect_InitHBlankDmaTransfer();
 }
 
@@ -2386,6 +2389,7 @@ u32 GetBattleWindowTemplatePixelWidth(u32 windowsType, u32 tableId)
 
 void SpriteCB_WildMon(struct Sprite *sprite)
 {
+    sprite->data[1] = 0;
     sprite->callback = SpriteCB_MoveWildMonToRight;
     StartSpriteAnimIfDifferent(sprite, 0);
     if (B_FAST_INTRO_NO_SLIDE == FALSE && !gTestRunnerHeadless)
@@ -2402,7 +2406,7 @@ static void SpriteCB_MoveWildMonToRight(struct Sprite *sprite)
     if ((gIntroSlideFlags & 1) == 0)
     {
         if (B_FAST_INTRO_NO_SLIDE == FALSE && !gTestRunnerHeadless)
-            sprite->x2 += 2;
+            sprite->x2 = KyotoIntroSlideOffset(-DISPLAY_WIDTH, ++sprite->data[1]);
         else
             sprite->x2 = 0;
 

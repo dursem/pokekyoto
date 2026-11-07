@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_battle_slide.h"
 #include "battle.h"
 #include "battle_ai_main.h"
 #include "battle_ai_util.h"
@@ -2497,7 +2498,10 @@ void BtlController_HandleDrawTrainerPic(enum BattlerId battler, enum TrainerPicI
     if (B_FAST_INTRO_NO_SLIDE || gTestRunnerHeadless)
         gSprites[gBattleStruct->trainerSlideSpriteIds[battler]].callback = SpriteCB_TrainerSpawn;
     else
-        gSprites[gBattleStruct->trainerSlideSpriteIds[battler]].callback = SpriteCB_TrainerSlideIn;
+    {
+        gSprites[gBattleStruct->trainerSlideSpriteIds[battler]].data[1] = 0;
+        gSprites[gBattleStruct->trainerSlideSpriteIds[battler]].callback = SpriteCB_KyotoTrainerIntroSlide;
+    }
 
     gBattlerControllerFuncs[battler] = Controller_WaitForTrainerPic;
 }

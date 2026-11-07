@@ -20,7 +20,6 @@ u32 CountOrGetSprays(u32);
 u32 GetNumberSprayStrength(void);
 u32 GetSprayId(void);
 u32 GetLastUsedSprayType(void);
-u32 SetSprayMenuCursorPosition(int, int);
 #if I_REPEL_LURE_MENU == TRUE
 void DrawSprayMenu(void);
 #endif
@@ -64,14 +63,6 @@ u32 GetLastUsedSprayType(void)
         return ITEM_REPEL;
 }
 
-u32 SetSprayMenuCursorPosition(int currentSpray, int count)
-{
-    if (VarGet(VAR_LAST_REPEL_LURE_USED) == currentSpray)
-        return count;
-
-    return 0;
-}
-
 #if I_REPEL_LURE_MENU == TRUE
 void DrawSprayMenu(void)
 {
@@ -89,8 +80,10 @@ void DrawSprayMenu(void)
         menuItems[count].text = GetItemName(currentSpray);
         VarSet(LOCAL_VAR_SPRAY_CONST + count, currentSpray);
 
-        if (VAR_LAST_REPEL_LURE_USED != 0)
-            menuPos = SetSprayMenuCursorPosition(currentSpray, count);
+        // Later options must not reset a matching earlier selection to zero.
+        if (VAR_LAST_REPEL_LURE_USED != 0
+         && VarGet(VAR_LAST_REPEL_LURE_USED) == currentSpray)
+            menuPos = count;
 
         yCoord = SPRAY_MENU_Y_COORD - (2 * count);
         count++;

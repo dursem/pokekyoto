@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_battle_slide.h"
 #include "battle.h"
 #include "battle_anim.h"
 #include "battle_environment.h"
@@ -153,6 +154,7 @@ void BattleIntroSlide1(u8 taskId)
         {
             gTasks[taskId].tState++;
             gTasks[taskId].data[2] = DISPLAY_WIDTH;
+            gTasks[taskId].data[7] = 0;
             gTasks[taskId].data[3] = 32;
             gIntroSlideFlags &= ~1;
         }
@@ -179,8 +181,8 @@ void BattleIntroSlide1(u8 taskId)
         if (gBattle_WIN0V & 0xFF00)
             gBattle_WIN0V -= 0x3FC;
 
-        if (gTasks[taskId].data[2])
-            gTasks[taskId].data[2] -= 2;
+        if (gTasks[taskId].data[7] < KYOTO_INTRO_SLIDE_FRAMES)
+            gTasks[taskId].data[2] = KyotoIntroSlideOffset(DISPLAY_WIDTH, ++gTasks[taskId].data[7]);
 
         // Scanline settings have already been set in CB2_InitBattleInternal()
         for (i = 0; i < DISPLAY_HEIGHT / 2; i++)
@@ -264,6 +266,7 @@ void BattleIntroSlide2(u8 taskId)
         {
             gTasks[taskId].tState++;
             gTasks[taskId].data[2] = DISPLAY_WIDTH;
+            gTasks[taskId].data[7] = 0;
             gTasks[taskId].data[3] = 32;
             gTasks[taskId].data[5] = 1;
             gIntroSlideFlags &= ~1;
@@ -291,8 +294,8 @@ void BattleIntroSlide2(u8 taskId)
         if (gBattle_WIN0V & 0xFF00)
             gBattle_WIN0V -= 0x3FC;
 
-        if (gTasks[taskId].data[2])
-            gTasks[taskId].data[2] -= 2;
+        if (gTasks[taskId].data[7] < KYOTO_INTRO_SLIDE_FRAMES)
+            gTasks[taskId].data[2] = KyotoIntroSlideOffset(DISPLAY_WIDTH, ++gTasks[taskId].data[7]);
 
         // Scanline settings have already been set in CB2_InitBattleInternal()
         for (i = 0; i < DISPLAY_HEIGHT / 2; i++)
@@ -359,6 +362,7 @@ void BattleIntroSlide3(u8 taskId)
         {
             gTasks[taskId].tState++;
             gTasks[taskId].data[2] = DISPLAY_WIDTH;
+            gTasks[taskId].data[7] = 0;
             gTasks[taskId].data[3] = 32;
             gTasks[taskId].data[5] = 1;
             gIntroSlideFlags &= ~1;
@@ -381,8 +385,8 @@ void BattleIntroSlide3(u8 taskId)
         if (gBattle_WIN0V & 0xFF00)
             gBattle_WIN0V -= 0x3FC;
 
-        if (gTasks[taskId].data[2])
-            gTasks[taskId].data[2] -= 2;
+        if (gTasks[taskId].data[7] < KYOTO_INTRO_SLIDE_FRAMES)
+            gTasks[taskId].data[2] = KyotoIntroSlideOffset(DISPLAY_WIDTH, ++gTasks[taskId].data[7]);
 
         // Scanline settings have already been set in CB2_InitBattleInternal()
         for (i = 0; i < DISPLAY_HEIGHT / 2; i++)
@@ -455,6 +459,7 @@ static void BattleIntroSlideLink(u8 taskId)
         {
             gTasks[taskId].tState++;
             gTasks[taskId].data[2] = DISPLAY_WIDTH;
+            gTasks[taskId].data[7] = 0;
             gTasks[taskId].data[3] = 32;
             gIntroSlideFlags &= ~1;
         }
@@ -463,8 +468,8 @@ static void BattleIntroSlideLink(u8 taskId)
         if (gBattle_WIN0V & 0xFF00)
             gBattle_WIN0V -= 0x3FC;
 
-        if (gTasks[taskId].data[2])
-            gTasks[taskId].data[2] -= 2;
+        if (gTasks[taskId].data[7] < KYOTO_INTRO_SLIDE_FRAMES)
+            gTasks[taskId].data[2] = KyotoIntroSlideOffset(DISPLAY_WIDTH, ++gTasks[taskId].data[7]);
 
         // Scanline settings have already been set in CB2_InitBattleInternal()
         for (i = 0; i < DISPLAY_HEIGHT / 2; i++)
@@ -520,6 +525,7 @@ static void BattleIntroSlidePartner(u8 taskId)
         {
             gTasks[taskId].tState++;
             gTasks[taskId].data[2] = DISPLAY_WIDTH;
+            gTasks[taskId].data[7] = 0;
             gIntroSlideFlags &= ~1;
         }
         break;
@@ -527,8 +533,8 @@ static void BattleIntroSlidePartner(u8 taskId)
         if ((gBattle_WIN0V & 0xFF00) != 0x4C00)
             gBattle_WIN0V += 0x3FC;
 
-        if (gTasks[taskId].data[2])
-            gTasks[taskId].data[2] -= 2;
+        if (gTasks[taskId].data[7] < KYOTO_INTRO_SLIDE_FRAMES)
+            gTasks[taskId].data[2] = KyotoIntroSlideOffset(DISPLAY_WIDTH, ++gTasks[taskId].data[7]);
 
         gBattle_BG1_X = gTasks[taskId].data[2];
         gBattle_BG2_X = -gTasks[taskId].data[2];

@@ -259,9 +259,6 @@ struct SaveBlock3
 #if OW_USE_FAKE_RTC
     struct SiiRtcInfo fakeRTC;
 #endif
-#if FNPC_ENABLE_NPC_FOLLOWERS
-    struct NPCFollower NPCfollower;
-#endif
 #if OW_SHOW_ITEM_DESCRIPTIONS == OW_ITEM_DESCRIPTIONS_FIRST_TIME
     u8 itemFlags[ITEM_FLAGS_COUNT];
 #endif
@@ -272,7 +269,14 @@ struct SaveBlock3
 #if APRICORN_TREE_COUNT > 0
     u8 apricornTrees[NUM_APRICORN_TREE_BYTES];
 #endif
+#if FNPC_ENABLE_NPC_FOLLOWERS
+    // Append new fields so pre-follower Kyoto saves keep their existing offsets.
+    u32 npcFollowerSaveMagic;
+    struct NPCFollower NPCfollower;
+#endif
 }; /* max size 1624 bytes */
+
+#define NPC_FOLLOWER_SAVE_MAGIC 0x3146504B // Kyoto follower save format 1.
 
 extern struct SaveBlock3 *gSaveBlock3Ptr;
 
