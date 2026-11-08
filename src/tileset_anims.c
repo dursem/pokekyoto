@@ -1,7 +1,56 @@
 #include "global.h"
 #include "fieldmap.h"
 #include "tile_cache.h"
+#include "tilesets.h"
 #include "tileset_anims.h"
+
+#define LAVENDER_FRAME_TICKS 12
+#define LAVENDER_LARGE_FRAME_TICKS 24
+#define LAVENDER_LEGACY_TILES 4
+
+static const u32 sPetalburgLavenderFrame0[] = INCGFX_U32("graphics/tileset_anims/petalburg/lavender/0.png", ".4bpp");
+static const u32 sPetalburgLavenderFrame1[] = INCGFX_U32("graphics/tileset_anims/petalburg/lavender/1.png", ".4bpp");
+static const u32 sPetalburgLavenderFrame2[] = INCGFX_U32("graphics/tileset_anims/petalburg/lavender/2.png", ".4bpp");
+static const u32 sPetalburgLavenderFrame3[] = INCGFX_U32("graphics/tileset_anims/petalburg/lavender/3.png", ".4bpp");
+
+static const u32 *const sPetalburgLavenderFrames[] = {
+    sPetalburgLavenderFrame0,
+    sPetalburgLavenderFrame1,
+    sPetalburgLavenderFrame2,
+    sPetalburgLavenderFrame3,
+};
+
+static const u32 sPetalburgLavenderLargeFrame0[] = INCGFX_U32("graphics/tileset_anims/petalburg/lavender_large/0.png", ".4bpp");
+static const u32 sPetalburgLavenderLargeFrame1[] = INCGFX_U32("graphics/tileset_anims/petalburg/lavender_large/1.png", ".4bpp");
+static const u32 sPetalburgLavenderLargeFrame2[] = INCGFX_U32("graphics/tileset_anims/petalburg/lavender_large/2.png", ".4bpp");
+static const u32 sPetalburgLavenderLargeFrame3[] = INCGFX_U32("graphics/tileset_anims/petalburg/lavender_large/3.png", ".4bpp");
+static const u32 *const sPetalburgLavenderLargeFrames[] = {
+    sPetalburgLavenderLargeFrame0, sPetalburgLavenderLargeFrame1,
+    sPetalburgLavenderLargeFrame2, sPetalburgLavenderLargeFrame3,
+};
+
+// Local 8x8 tile indices, not VRAM slots. The 16x16 flower is at (0, 640)
+// in Petalburg's 128px-wide sheet. tilesetcap.py reads this table to keep
+// animated tiles out of static deduplication, including as alias targets.
+static const struct {
+    const struct Tileset *tileset;
+    u16 tile;
+    u16 frameTile;
+} sStreamedAnimTiles[] = {
+    { &gTileset_Petalburg, 1280, 0 },
+    { &gTileset_Petalburg, 1281, 1 },
+    { &gTileset_Petalburg, 1296, 2 },
+    { &gTileset_Petalburg, 1297, 3 },
+    // Frame-tile 4 onward selects the padded 16x32 artwork.
+    { &gTileset_Petalburg, 1996, 4 },
+    { &gTileset_Petalburg, 1997, 5 },
+    { &gTileset_Petalburg, 2012, 6 },
+    { &gTileset_Petalburg, 2013, 7 },
+    { &gTileset_Petalburg, 2028, 8 },
+    { &gTileset_Petalburg, 2029, 9 },
+    { &gTileset_Petalburg, 2044, 10 },
+    { &gTileset_Petalburg, 2045, 11 },
+};
 
 static EWRAM_DATA struct {
     const u16 *src;
@@ -24,10 +73,9 @@ static void _InitSecondaryTilesetAnimation(void);
 /*
  * PokeKyoto - clean tileset animation base.
  *
- * All original Emerald, FRLG and TileCacheTest animations have been removed.
- * No animation frames, palette animation data or fixed tile destinations are
- * registered here. The existing InitTilesetAnim_* entry points remain because
- * tileset definitions still reference them; every callback is disabled below.
+ * All original Emerald, FRLG and TileCacheTest animations remain disabled.
+ * Petalburg's lavender uses logical tile sources instead of fixed VRAM slots.
+ * Its existing metatiles select palette 12; no palette is changed here.
  *
  * The transfer buffer and tile-cache discovery are kept for future animations.
  * To add a new animation later:
@@ -39,6 +87,24 @@ static void _InitSecondaryTilesetAnimation(void);
  *
  * Expanded logical tile IDs are not direct VRAM destination indices.
  */
+
+const u32 *TilesetAnims_GetTileSource(const struct Tileset *tileset, u32 tile)
+{
+    for (u32 i = 0; i < ARRAY_COUNT(sStreamedAnimTiles); i++)
+    {
+        if (sStreamedAnimTiles[i].tileset == tileset && sStreamedAnimTiles[i].tile == tile)
+        {
+            if (sStreamedAnimTiles[i].frameTile >= LAVENDER_LEGACY_TILES)
+            {
+                u32 frame = (sSecondaryTilesetAnimCounter / LAVENDER_LARGE_FRAME_TICKS) % ARRAY_COUNT(sPetalburgLavenderLargeFrames);
+                return sPetalburgLavenderLargeFrames[frame] + (sStreamedAnimTiles[i].frameTile - LAVENDER_LEGACY_TILES) * (TILE_SIZE_4BPP / sizeof(u32));
+            }
+            u32 frame = (sSecondaryTilesetAnimCounter / LAVENDER_FRAME_TICKS) % ARRAY_COUNT(sPetalburgLavenderFrames);
+            return sPetalburgLavenderFrames[frame] + sStreamedAnimTiles[i].frameTile * (TILE_SIZE_4BPP / sizeof(u32));
+        }
+    }
+    return NULL;
+}
 
 static void ResetTilesetAnimBuffer(void)
 {
@@ -78,6 +144,12 @@ void TransferTilesetAnimsBuffer(void)
         DmaCopy16(3, sTilesetDMA3TransferBuffer[i].src, sTilesetDMA3TransferBuffer[i].dest, sTilesetDMA3TransferBuffer[i].size);
 
     sTilesetDMA3TransferBufferSize = 0;
+
+    // Resolve the cache owner in VBlank, after the frame's scrolling/allocations.
+    // Newly loaded tiles use the same frame through TilesetAnims_GetTileSource.
+    for (i = 0; i < ARRAY_COUNT(sStreamedAnimTiles); i++)
+        TileCache_TransferAnimatedTile(sStreamedAnimTiles[i].tileset, sStreamedAnimTiles[i].tile,
+            TilesetAnims_GetTileSource(sStreamedAnimTiles[i].tileset, sStreamedAnimTiles[i].tile));
 }
 
 void InitTilesetAnimations(void)
@@ -163,7 +235,7 @@ static void _InitSecondaryTilesetAnimation(void)
         gMapHeader.mapLayout->secondaryTileset->callback();
 }
 
-// Existing tileset entry points. No animations are enabled by default.
+// Existing tileset entry points. Only Petalburg's streamed lavender is enabled.
 
 void InitTilesetAnim_General(void)
 {
@@ -182,7 +254,7 @@ void InitTilesetAnim_Building(void)
 void InitTilesetAnim_Petalburg(void)
 {
     sSecondaryTilesetAnimCounter = 0;
-    sSecondaryTilesetAnimCounterMax = sPrimaryTilesetAnimCounterMax;
+    sSecondaryTilesetAnimCounterMax = LAVENDER_LARGE_FRAME_TICKS * ARRAY_COUNT(sPetalburgLavenderLargeFrames);
     sSecondaryTilesetAnimCallback = NULL;
 }
 

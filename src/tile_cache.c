@@ -182,13 +182,58 @@ static inline u32 CanonicalTile(u32 tile)
 static const u32 *GetTileSource(u32 tile)
 {
     u32 local;
+    const u32 *animated;
     const struct TilesetCapacityInfo *info = GetTileOwner(tile, &local);
 
     if (info == NULL || info->rawTiles == NULL)
         return NULL;
     if (local >= info->numTiles)
         return tile < NUM_TILES_TOTAL ? sLegacyPaddingTile : NULL;
+    animated = TilesetAnims_GetTileSource(info->tileset, local);
+    if (animated != NULL)
+        return animated;
     return info->rawTiles + local * (TILE_SIZE_4BPP / sizeof(u32));
+}
+
+// Called only from the field VBlank callback. Streamed animations follow their
+// logical owner; they never pin a physical slot or allocate one just to animate.
+void TileCache_TransferAnimatedTile(const struct Tileset *tileset, u32 local, const u32 *src)
+{
+    u32 tile, slot;
+
+    if (!sTileCache.active || src == NULL)
+        return;
+    if (sTileCache.secondary != NULL && sTileCache.secondary->tileset == tileset)
+    {
+        if (local >= sTileCache.secondary->numTiles)
+            return;
+        tile = local < NUM_TILES_IN_PRIMARY ? local + NUM_TILES_IN_PRIMARY : local + NUM_TILES_TOTAL;
+    }
+    else if (sTileCache.primary != NULL && sTileCache.primary->tileset == tileset)
+    {
+        if (local >= sTileCache.primary->numTiles)
+            return;
+        tile = local < NUM_TILES_IN_PRIMARY ? local
+             : local < NUM_TILES_TOTAL ? local + NUM_TILES_IN_PRIMARY
+             : local + NUM_TILES_IN_SECONDARY_EXTENDED;
+    }
+    else
+    {
+        return;
+    }
+
+    if (tile < NUM_TILES_IN_PRIMARY)
+        slot = tile;
+    else
+    {
+        if (tile >= NUM_VIRTUAL_TILES || CanonicalTile(tile) != tile)
+            return;
+        slot = sTileCache.virtualToSlot[tile - NUM_TILES_IN_PRIMARY];
+        // A slot may have been evicted or may still show the previous map.
+        if (!IsPoolSlot(slot) || sTileCache.slotOwner[slot - TILE_CACHE_FIRST_SLOT] != tile)
+            return;
+    }
+    DmaCopy16(3, src, (void *)(BG_VRAM + TILE_OFFSET_4BPP(slot)), TILE_SIZE_4BPP);
 }
 
 static inline void *SlotVram(u32 slot)

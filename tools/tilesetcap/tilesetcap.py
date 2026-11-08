@@ -564,6 +564,8 @@ def analyse(report, verbose=False):
     protected = set(range(LEGACY_TILES_IN_PRIMARY + TILE_CACHE_POOL_SLOTS, LEGACY_TILES_TOTAL))
     for slots in anims.values():
         protected.update(slots)
+    for tiles in streamed_animation_tiles(tilesets).values():
+        protected.update(tiles)
     for symbol in {s for pair in streamed_pairs for s in pair}:
         sheet = tilesets[symbol]
         sheet.aliases = static_aliases(sheet, protected)
@@ -634,6 +636,27 @@ def analyse(report, verbose=False):
 
 
 ANIM_CONSTANTS = {'NUM_TILES_IN_PRIMARY': str(LEGACY_TILES_IN_PRIMARY), 'TILE_SIZE_4BPP': '32'}
+
+
+def streamed_animation_tiles(tilesets):
+    """Protect logical animation sources, without treating them as pinned VRAM slots."""
+    with open(path('src/tileset_anims.c')) as source:
+        text = source.read()
+    table = re.search(r'\bsStreamedAnimTiles\[\]\s*=\s*\{(.*?)\n\};', text, re.S)
+    if table is None:
+        return {}
+    body = re.sub(r'//[^\n]*|/\*.*?\*/', '', table.group(1), flags=re.S)
+    entries = re.findall(r'\{\s*&(\w+)\s*,\s*(\d+)\s*,\s*\d+\s*\}', body)
+    if len(entries) != body.count('{') or not entries:
+        raise ValueError('src/tileset_anims.c: invalid sStreamedAnimTiles table')
+    result = {}
+    for symbol, local in entries:
+        sheet = tilesets.get(symbol)
+        if sheet is None or int(local) >= sheet.numTiles:
+            raise ValueError('src/tileset_anims.c: invalid animation tile %s[%s]' % (symbol, local))
+        tile = local_tile_ids(sheet.isSecondary, sheet.numTiles)[int(local)]
+        result.setdefault(symbol, set()).add(tile)
+    return result
 
 
 def constant_expression(expr, what):

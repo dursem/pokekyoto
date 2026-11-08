@@ -5,6 +5,7 @@ void InitTilesetAnimations(void);
 void InitSecondaryTilesetAnimation(void);
 void UpdateTilesetAnimations(void);
 void TransferTilesetAnimsBuffer(void);
+const u32 *TilesetAnims_GetTileSource(const struct Tileset *tileset, u32 tile);
 void TilesetAnims_DiscoverVramSlots(const struct MapLayout *layout, u32 *primarySlots, u32 *secondarySlots);
 
 void InitTilesetAnim_General(void);

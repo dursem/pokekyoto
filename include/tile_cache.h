@@ -28,6 +28,8 @@
  *
  * Animated tiles keep the VRAM slots tileset_anims.c writes them to, so a streamed map pins those
  * slots to the tiles they belong to.
+ * Logical animations instead supply their current source on cache loads and update only the
+ * slots still owned by those tiles during VBlank. They do not reserve physical slots.
  *
  * A legacy reference (below 1024) past the end of its sheet draws as an empty tile, as the stock
  * loader left it; an extended reference past the end of its sheet is rejected by tilesetcap.py.
@@ -79,6 +81,7 @@ void TileCache_WriteCell(u16 *cell, u16 tile, u32 ext);
 void TileCache_WriteCellPhysical(u16 *cell, u16 tile);
 u16 TileCache_Resolve(u16 tile, u32 ext);
 bool32 TileCache_AllowsAnimDest(u32 firstSlot, u32 numSlots);
+void TileCache_TransferAnimatedTile(const struct Tileset *tileset, u32 local, const u32 *src);
 u32 TileCache_GetOverflowCount(void);
 
 #endif // GUARD_TILE_CACHE_H
