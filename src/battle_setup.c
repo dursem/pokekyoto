@@ -48,6 +48,7 @@
 #include "tv.h"
 #include "overworld.h"
 #include "vs_seeker.h"
+#include "wild_encounter.h"
 #include "wild_encounter_ow.h"
 #include "window.h"
 #include "constants/battle_frontier.h"
@@ -396,6 +397,9 @@ void BattleSetup_StartBattlePikeWildBattle(void)
 
 static void DoStandardWildBattle(bool32 isDouble)
 {
+    enum BattleEnvironments environment;
+    enum BattleTransition transition;
+
     LockPlayerFieldControls();
     FreezeObjectEvents();
     StopPlayerAvatar();
@@ -412,7 +416,15 @@ static void DoStandardWildBattle(bool32 isDouble)
         VarSet(VAR_TEMP_E, 0);
         gBattleTypeFlags |= BATTLE_TYPE_PYRAMID;
     }
-    CreateBattleStartTask(GetWildBattleTransition(), 0);
+    environment = BattleSetup_GetEnvironmentId();
+    if ((environment == BATTLE_ENVIRONMENT_GRASS || environment == BATTLE_ENVIRONMENT_LONG_GRASS)
+     && !(gBattleTypeFlags & BATTLE_TYPE_PYRAMID)
+     && !gIsFishingEncounter && !gIsSurfingEncounter && !GetFlashLevel())
+        transition = B_TRANSITION_GRASS_WIPE;
+    else
+        transition = GetWildBattleTransition();
+
+    CreateBattleStartTask(transition, 0);
     IncrementGameStat(GAME_STAT_TOTAL_BATTLES);
     IncrementGameStat(GAME_STAT_WILD_BATTLES);
     IncrementDailyWildBattles();

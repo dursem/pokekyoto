@@ -93,6 +93,15 @@ void GetCameraOffsetWithPan(s16 *x, s16 *y)
     *y = sFieldCameraOffset.yPixelOffset + sVerticalCameraPan + 8;
 }
 
+void GetFieldViewOriginPixels(s32 *x, s32 *y)
+{
+    s16 scrollX, scrollY;
+    GetCameraOffsetWithPan(&scrollX, &scrollY);
+    // The tilemap advances a whole metatile while the scroll advances a pixel at a time.
+    *x = gSaveBlock1Ptr->pos.x * 16 + (s8)(scrollX - sFieldCameraOffset.xTileOffset * 8);
+    *y = gSaveBlock1Ptr->pos.y * 16 + (s8)(scrollY - sFieldCameraOffset.yTileOffset * 8);
+}
+
 void DrawWholeMapView(void)
 {
     DrawWholeMapViewInternal(gSaveBlock1Ptr->pos.x, gSaveBlock1Ptr->pos.y, gMapHeader.mapLayout);

@@ -2,6 +2,7 @@
 #define GUARD_BATTLE_TIME_H
 
 #define BATTLE_TIME_SHADOW_PAL_TAG 0xD75A
+#define BATTLE_TIME_SHINY_PAL_TAG  0xB180
 
 struct TimeBlendSettings;
 

@@ -9,6 +9,7 @@
 #include "trig.h"
 #include "overworld.h"
 #include "event_data.h"
+#include "field_screen_effect.h"
 #include "secret_base.h"
 #include "string_util.h"
 #include "international_string_util.h"
@@ -80,6 +81,7 @@ static EWRAM_DATA struct {
     bool8 choseFlyLocation;
 } *sFlyMap = NULL;
 
+static EWRAM_DATA MainCallback sFlyMapCancelCallback = NULL;
 static bool32 sDrawFlyDestTextWindow;
 
 static u8 ProcessRegionMapInput_Full(void);
@@ -116,6 +118,7 @@ static void SpriteCB_FlyDestIcon(struct Sprite *sprite);
 static void CB_FadeInFlyMap(void);
 static void CB_HandleFlyMapInput(void);
 static void CB_ExitFlyMap(void);
+static void CB2_ReturnToFieldFromDebugFlyMap(void);
 
 static const u16 sRegionMapCursorPal[] = INCGFX_U16("graphics/pokenav/region_map/cursor.pal", ".gbapal");
 static const u32 sRegionMapCursorSmallGfxLZ[] = INCGFX_U32("graphics/pokenav/region_map/cursor_small.png", ".4bpp.smol");
@@ -1942,6 +1945,19 @@ bool32 IsEventIslandMapSecId(mapsec_u8_t mapSecId)
     return FALSE;
 }
 
+void OpenFlyMapFromDebug(void)
+{
+    sFlyMapCancelCallback = CB2_ReturnToFieldFromDebugFlyMap;
+    SetMainCallback2(CB2_OpenFlyMap);
+}
+
+static void CB2_ReturnToFieldFromDebugFlyMap(void)
+{
+    gFieldCallback = FieldCB_ReturnToFieldNoScript;
+    gFieldCallback2 = NULL;
+    CB2_ReturnToField();
+}
+
 void CB2_OpenFlyMap(void)
 {
     switch (gMain.state)
@@ -1960,7 +1976,8 @@ void CB2_OpenFlyMap(void)
         sFlyMap = Alloc(sizeof(*sFlyMap));
         if (sFlyMap == NULL)
         {
-            SetMainCallback2(CB2_ReturnToFieldWithOpenMenu);
+            SetMainCallback2(sFlyMapCancelCallback != NULL ? sFlyMapCancelCallback : CB2_ReturnToFieldWithOpenMenu);
+            sFlyMapCancelCallback = NULL;
         }
         else
         {
@@ -2044,6 +2061,8 @@ static void VBlankCB_FlyMap(void)
 static void CB2_FlyMap(void)
 {
     sFlyMap->callback();
+    if (sFlyMap == NULL)
+        return;
     AnimateSprites();
     BuildOamBuffer();
     DoScheduledBgTilemapCopiesToVram();
@@ -2490,10 +2509,11 @@ static void CB_ExitFlyMap(void)
             }
             else
             {
-                SetMainCallback2(CB2_ReturnToPartyMenuFromFlyMap);
+                SetMainCallback2(sFlyMapCancelCallback != NULL ? sFlyMapCancelCallback : CB2_ReturnToPartyMenuFromFlyMap);
             }
             TRY_FREE_AND_SET_NULL(sFlyMap);
             FreeAllWindowBuffers();
+            sFlyMapCancelCallback = NULL;
         }
         break;
     }

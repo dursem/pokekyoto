@@ -1,5 +1,6 @@
 import json
 import re
+from io import StringIO
 
 class Config:
     def __init__(self, config_file_name, rtc_constants_file_name, encounters_json_data):
@@ -66,9 +67,10 @@ class Config:
 
 
 class WildEncounterAssembler:
-    def __init__(self, output_file, json_data, config):
+    def __init__(self, output_file, json_data, blood_moon_data, config):
         self.output_file = output_file
         self.json_data = json_data
+        self.blood_moon_data = blood_moon_data
         self.config = config
     
     def WriteLine(self, line="", indents = 0):
@@ -133,6 +135,48 @@ class WildEncounterAssembler:
         self.WriteLine()
         self.WriteLine(f"const struct WildPokemonInfo {info_name} = {{ {encounter_rate}, {name} }};")
         self.WriteLine()
+
+    def WriteBloodMoonEncounters(self, headers, fields):
+        slot_counts = {field["type"]: len(field["encounter_rates"]) for field in fields}
+        regular_maps = {entry["map"] for entry in headers["data"].values()}
+        for map_name, encounter_areas in self.blood_moon_data.items():
+            profile_name = f"sBloodMoon_{map_name}"
+            pointers = {}
+            for mon_type, entry in encounter_areas.items():
+                if mon_type not in slot_counts:
+                    raise ValueError(f"{map_name}: unknown Blood Moon encounter field {mon_type}")
+                mons = entry["mons"]
+                if len(mons) != slot_counts[mon_type]:
+                    raise ValueError(f"{map_name}: Blood Moon {mon_type} needs {slot_counts[mon_type]} slots")
+                rate = entry["encounter_rate"]
+                if not 0 <= rate <= 255:
+                    raise ValueError(f"{map_name}: Blood Moon {mon_type} encounter_rate must be 0–255")
+                for index, mon in enumerate(mons, start=1):
+                    if not 1 <= mon.get("min_level", 2) <= mon.get("max_level", 100) <= 100:
+                        raise ValueError(f"{map_name}: invalid level range in Blood Moon {mon_type} slot {index}")
+
+                member_name = mon_type.title().replace("_", "")
+                array_name = f"gBloodMoon_{map_name}_{member_name}"
+                self.WriteMonInfos(array_name, mons, rate)
+                pointers[member_name[0].lower() + member_name[1:] + "Info"] = f"&{array_name}Info"
+
+            if not pointers:
+                raise ValueError(f"{map_name}: Blood Moon needs at least one encounter field")
+
+            self.WriteLine(f"static const struct WildEncounterTypes {profile_name} =")
+            self.WriteLine("{")
+            for member, value in pointers.items():
+                self.WriteLine(f".{member} = {value},", 1)
+            self.WriteLine("};")
+            self.WriteLine()
+
+            if map_name not in regular_maps:
+                headers["data"][profile_name] = {
+                    "map": map_name,
+                    "mapGroup": f"MAP_GROUP({map_name})",
+                    "mapNum": f"MAP_NUM({map_name})",
+                    "bloodMoonOnly": True,
+                }
     
     def WriteTerminator(self):
         self.WriteLine("{", 1)
@@ -174,6 +218,8 @@ class WildEncounterAssembler:
             self.WriteLine("{", 1)
             self.WriteLine(f".mapGroup = {map_group},", 2)
             self.WriteLine(f".mapNum = {map_num},", 2)
+            if map_data.get("bloodMoonOnly"):
+                self.WriteLine(".bloodMoonOnly = TRUE,", 2)
             self.WriteLine(".encounterTypes =", 2)
             self.WriteLine("{", 2)
             for time in self.config.times_of_day:
@@ -194,6 +240,9 @@ class WildEncounterAssembler:
                 self.WriteLine("},", 3)
             
             self.WriteLine("},", 2)
+            map_name = map_data.get("map")
+            if map_name in self.blood_moon_data:
+                self.WriteLine(f".bloodMoonEncounters = &sBloodMoon_{map_name},", 2)
             self.WriteLine("},", 1)
             self.WriteLine(f"#endif")
         self.WriteTerminator()
@@ -235,6 +284,8 @@ class WildEncounterAssembler:
                     headers["data"][shared_label][time] = {}
                 headers["data"][shared_label]["mapGroup"] = map_group
                 headers["data"][shared_label]["mapNum"] = map_num
+                if for_maps:
+                    headers["data"][shared_label]["map"] = map_name
 
                 version = "EMERALD"
                 if "FireRed" in shared_label:
@@ -256,21 +307,27 @@ class WildEncounterAssembler:
                     headers["data"][shared_label][time][mon_type] = mon_array_name + "Info"
                 self.WriteLine(f"#endif")
 
+            if headers["label"] == "gWildMonHeaders":
+                self.WriteBloodMoonEncounters(headers, wild_encounter_group["fields"])
             self.WritePokemonHeaders(headers)
 
 
-def ConvertToHeaderFile(json_data):
+def ConvertToHeaderFile(json_data, blood_moon_data):
+    config = Config('include/config/overworld.h', 'include/constants/rtc.h', json_data)
+    generated = StringIO()
+    assembler = WildEncounterAssembler(generated, json_data, blood_moon_data, config)
+    assembler.WriteHeader()
+    assembler.WriteMacros()
+    assembler.WriteEncounters()
     with open('src/data/wild_encounters.h', 'w') as output_file:
-        config = Config('include/config/overworld.h', 'include/constants/rtc.h', json_data)
-        assembler = WildEncounterAssembler(output_file, json_data, config)
-        assembler.WriteHeader()
-        assembler.WriteMacros()
-        assembler.WriteEncounters()
+        output_file.write(generated.getvalue())
 
 def main():
     with open('src/data/wild_encounters.json', 'r') as json_file:
         json_data = json.load(json_file)
-        ConvertToHeaderFile(json_data)
+    with open('src/data/blood_moon_encounters.json', 'r') as json_file:
+        blood_moon_data = json.load(json_file)
+    ConvertToHeaderFile(json_data, blood_moon_data)
         
 
 if __name__ == '__main__':

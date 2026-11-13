@@ -29,6 +29,8 @@
 #define AUTUMN_RIGHT 264
 #define AUTUMN_TOP (-24)
 #define AUTUMN_BOTTOM 184
+#define BLOOD_MOON_DRAIN_SPEED_STEP 12
+#define BLOOD_MOON_DRAIN_ACCEL_FRAMES (7 * BLOOD_MOON_DRAIN_SPEED_STEP)
 
 enum PetalMode
 {
@@ -212,6 +214,8 @@ static void UpdateDrainMapState(void)
 
 static s32 ScaleDrainMotion(s32 motion)
 {
+    if (gWeatherPtr->nextWeather == WEATHER_BLOOD_MOON)
+        return motion + (motion * gWeatherPtr->finishStep) / BLOOD_MOON_DRAIN_SPEED_STEP;
     if (!sFastDrain)
         return motion;
     return (motion * KYOTO_PETALS_NEW_MAP_DRAIN_NUMERATOR)
@@ -436,9 +440,7 @@ static void Sakura_Update(struct Sprite *sprite)
 
     if (sDraining)
     {
-        // During an outgoing transition, never recycle a petal. It keeps its
-        // normal sway and source-map speed; after the map ID changes only the
-        // fall speed is boosted. The existing cell is then retired at the edge.
+        // Retire each outgoing petal at the edge while keeping its normal sway.
         if (y > 176 * 128 || y < -16 * 128 || x < -24 || x > 264)
         {
             RemoveParticleSprite(sprite);
@@ -737,9 +739,8 @@ static bool8 FinishParticles(void)
     if (sLiveCount)
     {
         // No dithered tile mask and no global BLDALPHA change. Existing
-        // particles stop recycling. They keep normal speed on the source map;
-        // after a real map change their motion is mildly accelerated so the
-        // outgoing weather clears the destination sooner.
+        // Particles stop recycling and move offscreen. The weekly transition
+        // ramps up the outgoing motion so the magenta fade can start promptly.
         if (!sDraining)
         {
             if (!sDrainMapValid && gSaveBlock1Ptr != NULL)
@@ -752,6 +753,8 @@ static bool8 FinishParticles(void)
             sDraining = TRUE;
         }
         UpdateDrainMapState();
+        if (gWeatherPtr->nextWeather == WEATHER_BLOOD_MOON && gWeatherPtr->finishStep < BLOOD_MOON_DRAIN_ACCEL_FRAMES)
+            gWeatherPtr->finishStep++;
         sNeedsReplenish = FALSE;
         sGustPhase += 64;
         RememberLocation();

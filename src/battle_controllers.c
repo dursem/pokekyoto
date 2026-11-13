@@ -3301,17 +3301,6 @@ bool32 ShouldBattleRestrictionsApply(enum BattlerId battler)
     return IsControllerPlayer(battler);
 }
 
-void FreeShinyStars(void)
-{
-    for (enum BattlerId battler = 0; battler < gBattlersCount; battler++)
-    {
-        if (gBattleSpritesDataPtr->healthBoxesData[battler].triedShinyMonAnim)
-            return;
-    }
-    FreeSpriteTilesByTag(ANIM_TAG_GOLD_STARS);
-    FreeSpritePaletteByTag(ANIM_TAG_GOLD_STARS);
-}
-
 enum BattleTrainer GetBattlerTrainer(enum BattlerId battler)
 {
     if (gBattleTypeFlags & BATTLE_TYPE_LINK)

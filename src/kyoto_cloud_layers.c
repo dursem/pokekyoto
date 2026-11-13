@@ -8,6 +8,7 @@
 #include "sprite.h"
 #include "util.h"
 #include "constants/weather.h"
+#include "kyoto_blood_moon.h"
 #include "kyoto_cloud_layers.h"
 #include "kyoto_cloud_config.h"
 #include "gpu_regs.h"
@@ -38,7 +39,8 @@ static bool8 sShadowWindowActive;
 bool32 KyotoCloud_UsesShadowWindow(void)
 {
     // Hardware fades and iris/flash windows retain their normal ownership.
-    return sCloud.created && gMain.callback2 == CB2_Overworld
+    return gMain.callback2 == CB2_Overworld
+        && (sCloud.created || BloodMoon_GetCloudShadowStrength() != 0)
         && !(gPaletteFade.active && gPaletteFade.mode == 2 /* HARDWARE_FADE */)
         && GetGpuReg(REG_OFFSET_WIN0H) == 0x00FF
         && GetGpuReg(REG_OFFSET_WIN0V) == 0x00FF
@@ -57,7 +59,7 @@ static void UpdateShadowWindowVBlank(void)
         REG_WINOUT = 0x3F1F; // all layers; brightness only inside a shadow
         REG_BLDCNT = (GetGpuReg(REG_OFFSET_BLDCNT) & BLDCNT_TGT2_ALL)
                    | BLDCNT_EFFECT_DARKEN | BLDCNT_TGT1_BG1 | BLDCNT_TGT1_BG2 | BLDCNT_TGT1_BG3;
-        REG_BLDY = OW_SHADOW_INTENSITY;
+        REG_BLDY = sCloud.created ? OW_SHADOW_INTENSITY : BloodMoon_GetCloudShadowStrength();
         sShadowWindowActive = TRUE;
     }
     else if (sShadowWindowActive)

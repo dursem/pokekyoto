@@ -1,5 +1,6 @@
 #include "global.h"
 #include "kyoto_aurora.h"
+#include "kyoto_blood_moon.h"
 #include "map_palette.h"
 #include "constants/songs.h"
 #include "constants/weather.h"
@@ -147,6 +148,7 @@ static const struct WeatherCallbacks sWeatherFuncs[] =
     [WEATHER_UNDERWATER_BUBBLES] = {Bubbles_InitVars,       Bubbles_Main,       Bubbles_InitAll,       Bubbles_Finish},
     [WEATHER_AUTUMN_WIND]        = {AutumnWind_InitVars,    AutumnWind_Main,    AutumnWind_InitAll,    AutumnWind_Finish},
     [WEATHER_NORTHERN_LIGHTS]    = {Sunny_InitVars,         Sunny_Main,         Sunny_InitAll,         KyotoAurora_Finish},
+    [WEATHER_BLOOD_MOON]         = {Sunny_InitVars,         BloodMoon_Main,     BloodMoon_InitAll,      BloodMoon_Finish},
 };
 
 void (*const gWeatherPalStateFuncs[])(void) =
@@ -205,6 +207,8 @@ void StartWeather(void)
     {
         u8 index = AllocSpritePalette(PALTAG_WEATHER);
         CpuCopy32(gFogPalette, &gPlttBufferUnfaded[OBJ_PLTT_ID(index)], PLTT_SIZE_4BPP);
+        BloodMoon_RefreshSchedule();
+        BloodMoon_ResetSprites();
 
         sPaletteColorMapTypes = sBasePaletteColorMapTypes;
 
@@ -1245,6 +1249,7 @@ static const u8 sWeatherNames[WEATHER_COUNT][24] = {
     [WEATHER_DYNAMIC]            = _("DYNAMIC"),
     [WEATHER_AUTUMN_WIND]        = _("AUTUMN WIND"),
     [WEATHER_NORTHERN_LIGHTS]    = _("NORTHERN LIGHTS"),
+    [WEATHER_BLOOD_MOON]         = _("BLOOD MOON"),
 };
 
 static const u8 sDebugText_WeatherNotDefined[] = _("NOT DEFINED!!!");

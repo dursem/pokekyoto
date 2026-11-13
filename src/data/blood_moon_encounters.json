@@ -1,0 +1,40 @@
+{
+  "MAP_ROUTE101": {
+    "land_mons": {
+      "encounter_rate": 20,
+      "mons": [
+        { "min_level": 2, "max_level": 2, "species": "SPECIES_HOOTHOOT" },
+        { "min_level": 2, "max_level": 2, "species": "SPECIES_ZUBAT" },
+        { "min_level": 2, "max_level": 3, "species": "SPECIES_HOOTHOOT" },
+        { "min_level": 2, "max_level": 3, "species": "SPECIES_ZUBAT" },
+        { "min_level": 2, "max_level": 3, "species": "SPECIES_SHUPPET" },
+        { "min_level": 2, "max_level": 3, "species": "SPECIES_SHUPPET" },
+        { "min_level": 3, "max_level": 3, "species": "SPECIES_DUSKULL" },
+        { "min_level": 3, "max_level": 3, "species": "SPECIES_DUSKULL" },
+        { "min_level": 3, "max_level": 3, "species": "SPECIES_MURKROW" },
+        { "min_level": 3, "max_level": 3, "species": "SPECIES_MURKROW" },
+        { "min_level": 3, "max_level": 3, "species": "SPECIES_MURKROW" },
+        { "min_level": 3, "max_level": 3, "species": "SPECIES_ZORUA_HISUI" }
+      ]
+    }
+  },
+  "MAP_ROUTE102": {
+    "land_mons": {
+      "encounter_rate": 20,
+      "mons": [
+        { "min_level": 3, "max_level": 3, "species": "SPECIES_MURKROW" },
+        { "min_level": 3, "max_level": 3, "species": "SPECIES_HOUNDOUR" },
+        { "min_level": 3, "max_level": 4, "species": "SPECIES_MURKROW" },
+        { "min_level": 3, "max_level": 4, "species": "SPECIES_HOUNDOUR" },
+        { "min_level": 3, "max_level": 4, "species": "SPECIES_DRIFLOON" },
+        { "min_level": 3, "max_level": 4, "species": "SPECIES_DRIFLOON" },
+        { "min_level": 4, "max_level": 4, "species": "SPECIES_PHANTUMP" },
+        { "min_level": 4, "max_level": 4, "species": "SPECIES_PHANTUMP" },
+        { "min_level": 4, "max_level": 4, "species": "SPECIES_SABLEYE" },
+        { "min_level": 4, "max_level": 4, "species": "SPECIES_SABLEYE" },
+        { "min_level": 4, "max_level": 4, "species": "SPECIES_SABLEYE" },
+        { "min_level": 4, "max_level": 4, "species": "SPECIES_LITWICK" }
+      ]
+    }
+  }
+}

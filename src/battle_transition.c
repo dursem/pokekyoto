@@ -110,6 +110,7 @@ static void Task_Slice(u8);
 static void Task_WhiteBarsFade(u8);
 static void Task_GridSquares(u8);
 static void Task_AngledWipes(u8);
+static void Task_GrassWipe(u8);
 static void Task_Mugshot(u8);
 static void Task_Aqua(u8);
 static void Task_Magma(u8);
@@ -335,11 +336,9 @@ static const u32 sFrontierSquares_Shrink1_Tileset[] = INCGFX_U32("graphics/battl
 static const u32 sFrontierSquares_Shrink2_Tileset[] = INCGFX_U32("graphics/battle_transitions/frontier_square_4.4bpp", ".smol");
 static const u32 sFrontierSquares_Tilemap[] = INCBIN_U32("graphics/battle_transitions/frontier_squares.bin");
 
-// All battle transitions use the same intro
-static const TaskFunc sTasks_Intro[B_TRANSITION_COUNT] =
-{
-    [0 ... B_TRANSITION_COUNT - 1] = &Task_Intro
-};
+static const u32 sGrassPartTiles[] = INCGFX_U32("graphics/battle_transitions/grass_part.png", ".4bpp");
+static const u16 sGrassPartPalette[] = INCGFX_U16("graphics/battle_transitions/grass_part.png", ".gbapal");
+static const u16 sGrassPartMaps[] = INCBIN_U16("graphics/battle_transitions/grass_part_maps.bin");
 
 // After the intro each transition has a unique main task.
 // This task will call the functions that do the transition effects.
@@ -383,6 +382,7 @@ static const TaskFunc sTasks_Main[B_TRANSITION_COUNT] =
     [B_TRANSITION_FRONTIER_CIRCLES_CROSS_IN_SEQ] = Task_FrontierCirclesCrossInSeq,
     [B_TRANSITION_FRONTIER_CIRCLES_ASYMMETRIC_SPIRAL_IN_SEQ] = Task_FrontierCirclesAsymmetricSpiralInSeq,
     [B_TRANSITION_FRONTIER_CIRCLES_SYMMETRIC_SPIRAL_IN_SEQ] = Task_FrontierCirclesSymmetricSpiralInSeq,
+    [B_TRANSITION_GRASS_WIPE] = Task_GrassWipe,
 };
 
 static const TransitionStateFunc sTaskHandlers[] =
@@ -1050,9 +1050,9 @@ static bool8 Transition_StartIntro(struct Task *task)
     // freeing up sprite slots for the transition
     gWeatherPtr->noShadows = TRUE;
     CpuCopy32(gPlttBufferFaded, gPlttBufferUnfaded, PLTT_SIZE);
-    if (sTasks_Intro[task->tTransitionId] != NULL)
+    if (task->tTransitionId != B_TRANSITION_GRASS_WIPE)
     {
-        CreateTask(sTasks_Intro[task->tTransitionId], 4);
+        CreateTask(Task_Intro, 4);
         task->tState++;
         return FALSE;
     }
@@ -1065,7 +1065,7 @@ static bool8 Transition_StartIntro(struct Task *task)
 
 static bool8 Transition_WaitForIntro(struct Task *task)
 {
-    if (FindTaskIdByFunc(sTasks_Intro[task->tTransitionId]) == TASK_NONE)
+    if (FindTaskIdByFunc(Task_Intro) == TASK_NONE)
     {
         task->tState++;
         return TRUE;
@@ -1105,6 +1105,71 @@ static void Task_Intro(u8 taskId)
     {
         DestroyTask(taskId);
     }
+}
+
+enum
+{
+    GRASS_PART_PALETTE = 15,
+    GRASS_PART_FRAME_COUNT = 16,
+    GRASS_PART_FRAME_HOLD = 2,
+    GRASS_PART_START = 4,
+    GRASS_PART_END = GRASS_PART_START + GRASS_PART_FRAME_COUNT * GRASS_PART_FRAME_HOLD,
+    GRASS_PART_FADE = 25,
+    GRASS_PART_TOP_ROW = 6,
+    GRASS_PART_MAP_WIDTH = 32,
+    GRASS_PART_MAP_ENTRIES = (DISPLAY_HEIGHT / 8 - GRASS_PART_TOP_ROW) * GRASS_PART_MAP_WIDTH,
+};
+
+STATIC_ASSERT(ARRAY_COUNT(sGrassPartMaps) == GRASS_PART_FRAME_COUNT + 1
+    + GRASS_PART_FRAME_COUNT * GRASS_PART_MAP_ENTRIES, GrassPartMapSize);
+
+static void DrawGrassPartFrame(u32 frame)
+{
+    // Tile offsets (including the end offset) precede the fixed-size maps.
+    u32 firstTile = sGrassPartMaps[frame];
+    u32 tileCount = sGrassPartMaps[frame + 1] - firstTile;
+    const u32 *tiles = sGrassPartTiles + firstTile * (TILE_SIZE_4BPP / sizeof(u32));
+    const u16 *map = sGrassPartMaps + GRASS_PART_FRAME_COUNT + 1 + frame * GRASS_PART_MAP_ENTRIES;
+
+    if (LoadBgTiles(0, tiles, tileCount * TILE_SIZE_4BPP, 0) != (u16)-1)
+        LoadBgTilemap(0, map, GRASS_PART_MAP_ENTRIES * sizeof(u16), GRASS_PART_TOP_ROW * GRASS_PART_MAP_WIDTH);
+}
+
+static void Task_GrassWipe(u8 taskId)
+{
+    s32 frame = gTasks[taskId].tState++;
+
+    if (frame > GRASS_PART_END)
+    {
+        DestroyTask(taskId);
+        return;
+    }
+    if (frame == GRASS_PART_END || GetBgTilemapBuffer(0) == NULL)
+    {
+        FadeScreenBlack();
+        gTasks[taskId].tState = GRASS_PART_END + 1;
+        return;
+    }
+
+    if (frame == 0)
+    {
+        // Tile zero is transparent in every frame.
+        LoadBgTiles(0, sGrassPartTiles, TILE_SIZE_4BPP, 0);
+        CpuFill16(0, GetBgTilemapBuffer(0), BG_SCREEN_SIZE);
+        CopyBgTilemapBufferToVram(0);
+        LoadPalette(sGrassPartPalette, BG_PLTT_ID(GRASS_PART_PALETTE), sizeof(sGrassPartPalette));
+        SetGpuReg(REG_OFFSET_BG0HOFS, 0);
+        SetGpuReg(REG_OFFSET_BG0VOFS, 0);
+        ShowBg(0);
+    }
+
+    if (frame >= GRASS_PART_START && (frame - GRASS_PART_START) % GRASS_PART_FRAME_HOLD == 0)
+        DrawGrassPartFrame((frame - GRASS_PART_START) / GRASS_PART_FRAME_HOLD);
+
+    BlendPalettes(PALETTES_ALL & ~(1U << GRASS_PART_PALETTE), frame * 16 / GRASS_PART_END, RGB_BLACK);
+    if (frame >= GRASS_PART_FADE)
+        BlendPalette(BG_PLTT_ID(GRASS_PART_PALETTE), 16,
+                     (frame - GRASS_PART_FADE) * 16 / (GRASS_PART_END - GRASS_PART_FADE), RGB_BLACK);
 }
 
 //--------------------

@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_blood_moon.h"
 #include "kyoto_cloud_layers.h"
 #include "battle_anim.h"
 #include "event_object_movement.h"
@@ -20,6 +21,8 @@
 #include "palette.h"
 
 EWRAM_DATA static u8 sCurrentAbnormalWeather = 0;
+EWRAM_DATA static u8 sNormalFieldWeather = WEATHER_NONE;
+EWRAM_DATA static u8 sWeatherClockFrames = 0;
 
 const u16 gCloudsWeatherPalette[] = INCGFX_U16("graphics/weather/cloud.png", ".gbapal");
 const u16 gSandstormWeatherPalette[] = INCGFX_U16("graphics/weather/sandstorm.png", ".gbapal");
@@ -2339,6 +2342,30 @@ static void UpdateBubbleSprite(struct Sprite *sprite)
 #define tWeatherB      data[2]
 #define tDelay         data[15]
 
+static void SetNextFieldWeather(u8 weather)
+{
+    sNormalFieldWeather = weather;
+    u8 nextWeather = BloodMoon_GetEffectiveWeather(weather);
+    if (nextWeather == weather || nextWeather != gWeatherPtr->nextWeather)
+        SetNextWeather(nextWeather);
+}
+
+void UpdateScheduledFieldWeather(void)
+{
+    if (++sWeatherClockFrames >= 60)
+        RefreshScheduledFieldWeather();
+}
+
+void RefreshScheduledFieldWeather(void)
+{
+    sWeatherClockFrames = 0;
+    BloodMoon_RefreshSchedule();
+    u8 nextWeather = BloodMoon_GetEffectiveWeather(sNormalFieldWeather);
+    if (nextWeather != gWeatherPtr->nextWeather
+     && (nextWeather == WEATHER_BLOOD_MOON || gWeatherPtr->nextWeather == WEATHER_BLOOD_MOON))
+        SetNextWeather(nextWeather);
+}
+
 static void Task_DoAbnormalWeather(u8 taskId)
 {
     s16 *data = gTasks[taskId].data;
@@ -2348,7 +2375,7 @@ static void Task_DoAbnormalWeather(u8 taskId)
     case 0:
         if (tDelay-- <= 0)
         {
-            SetNextWeather(tWeatherA);
+            SetNextFieldWeather(tWeatherA);
             sCurrentAbnormalWeather = tWeatherA;
             tDelay = 600;
             tState++;
@@ -2357,7 +2384,7 @@ static void Task_DoAbnormalWeather(u8 taskId)
     case 1:
         if (tDelay-- <= 0)
         {
-            SetNextWeather(tWeatherB);
+            SetNextFieldWeather(tWeatherB);
             sCurrentAbnormalWeather = tWeatherB;
             tDelay = 600;
             tState = 0;
@@ -2404,6 +2431,9 @@ static u8 GetDynamicWeather(void);
 
 void SetSavedWeather(enum OverworldWeather weather)
 {
+    if (weather == WEATHER_BLOOD_MOON)
+        return; // Blood Moon is selected by the weekly schedule.
+
     u8 oldWeather = gSaveBlock1Ptr->weather;
     gSaveBlock1Ptr->weather = TranslateWeatherNum(weather);
     UpdateRainCounter(gSaveBlock1Ptr->weather, oldWeather);
@@ -2414,6 +2444,9 @@ u8 GetSavedWeather(void)
     // A save made with the standalone Peach Leaves patch can still contain ID 21.
     if (gSaveBlock1Ptr->weather == 21 && gSaveBlock1Ptr->weather >= WEATHER_COUNT)
         return WEATHER_AUTUMN_WIND;
+    // V5 saved the selected weather. Recover the map's default from old Blood Moon saves.
+    if (gSaveBlock1Ptr->weather == WEATHER_BLOOD_MOON)
+        return TranslateWeatherNum(gMapHeader.weather);
     return gSaveBlock1Ptr->weather;
 }
 
@@ -2427,7 +2460,7 @@ void SetSavedWeatherFromCurrMapHeader(void)
 void SetWeather(enum OverworldWeather weather)
 {
     SetSavedWeather(weather);
-    SetNextWeather(GetSavedWeather());
+    SetNextFieldWeather(GetSavedWeather());
 }
 
 void DoCurrentWeather(void)
@@ -2446,7 +2479,8 @@ void DoCurrentWeather(void)
             DestroyTask(FindTaskIdByFunc(Task_DoAbnormalWeather));
         sCurrentAbnormalWeather = WEATHER_RAIN_THUNDERSTORM;
     }
-    SetNextWeather(weather);
+    BloodMoon_RefreshSchedule();
+    SetNextFieldWeather(weather);
 }
 
 void ResumePausedWeather(void)
@@ -2466,6 +2500,9 @@ void ResumePausedWeather(void)
             DestroyTask(FindTaskIdByFunc(Task_DoAbnormalWeather));
         sCurrentAbnormalWeather = WEATHER_RAIN_THUNDERSTORM;
     }
+    sNormalFieldWeather = weather;
+    sWeatherClockFrames = 0;
+    weather = BloodMoon_GetEffectiveWeather(weather);
     resumeWeather = Petals_GetResumeWeather(weather);
     SetCurrentAndNextWeather(resumeWeather);
     if (resumeWeather != weather)
@@ -2586,6 +2623,7 @@ static enum OverworldWeather TranslateWeatherNum(enum OverworldWeather weather)
     case WEATHER_DYNAMIC:            return GetDynamicWeather();
     case WEATHER_AUTUMN_WIND:        return WEATHER_AUTUMN_WIND;
     case WEATHER_NORTHERN_LIGHTS:    return WEATHER_NORTHERN_LIGHTS;
+    case WEATHER_BLOOD_MOON:         return WEATHER_SUNNY;
     }
 
     return WEATHER_NONE;

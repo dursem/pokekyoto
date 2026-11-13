@@ -5,6 +5,7 @@
 #include "fieldmap.h"
 #include "fldeff.h"
 #include "fldeff_misc.h"
+#include "kyoto_blood_moon.h"
 #include "frontier_util.h"
 #include "menu.h"
 #include "mirage_tower.h"
@@ -788,6 +789,7 @@ bool8 CameraMove(s32 x, s32 y)
         gCamera.active = TRUE;
         gCamera.x = old_x - gSaveBlock1Ptr->pos.x;
         gCamera.y = old_y - gSaveBlock1Ptr->pos.y;
+        BloodMoon_OffsetCloudMapOrigin(gCamera.x, gCamera.y);
         gSaveBlock1Ptr->pos.x += x;
         gSaveBlock1Ptr->pos.y += y;
         MoveMapViewToBackup(direction);

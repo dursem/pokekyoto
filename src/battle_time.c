@@ -63,7 +63,7 @@ void BattleTimeSetBlend(const struct TimeBlendSettings *blend)
                          + sComponentTone[1][31] + sComponentTone[2][31]) / 3) / 4);
 }
 
-static bool32 IsInterfacePalette(u32 tag)
+static bool32 IsUntintedPalette(u32 tag)
 {
     if (tag == gSpritePal_CategoryIcons.tag)
         return TRUE;
@@ -78,6 +78,7 @@ static bool32 IsInterfacePalette(u32 tag)
     case TAG_MEGA_INDICATOR_PAL:
     case TAG_MISC_INDICATOR_PAL:
     case TAG_TERA_INDICATOR_PAL:
+    case BATTLE_TIME_SHINY_PAL_TAG:
     case 0xD720: // Ability popup / quick-ball frame / move-info frame.
     case TAG_NONE:
         return TRUE;
@@ -178,7 +179,7 @@ void BattleTimePreparePalettes(void)
         if (bank >= 20)
         {
             u32 tag = GetSpritePaletteTagByPaletteNum(bank - 16);
-            if (IsInterfacePalette(tag))
+            if (IsUntintedPalette(tag))
                 continue;
             frame->spriteTags[bank - 16] = tag;
             shadow = tag == BATTLE_TIME_SHADOW_PAL_TAG;

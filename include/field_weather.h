@@ -21,6 +21,7 @@ enum {
     PALTAG_WEATHER = TAG_WEATHER_START,
     PALTAG_WEATHER_2,
     PALTAG_FIREFLY = 0x9202, // Blend-immune: retain the yellow glow at night.
+    PALTAG_BLOOD_MOON,
 };
 
 #define NUM_WEATHER_COLOR_MAPS 19
@@ -153,6 +154,8 @@ bool8 FireflyShade_Finish(void);
 void FireflyShade_Reset(void);
 void FireflyShade_Prepare(void);
 void SetNextWeather(u8 weather);
+void UpdateScheduledFieldWeather(void);
+void RefreshScheduledFieldWeather(void);
 void SetCurrentAndNextWeather(u8 weather);
 void SetCurrentAndNextWeatherNoDelay(u8 weather);
 void ApplyWeatherColorMapIfIdle(s8 colorMapIndex);

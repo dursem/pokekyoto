@@ -1341,6 +1341,7 @@ const u16 gWeatherStartsStringIds[] =
     [WEATHER_ABNORMAL]           = STRINGID_ITISRAINING,
     [WEATHER_AUTUMN_WIND]        = STRINGID_EMPTYSTRING4,
     [WEATHER_NORTHERN_LIGHTS]    = STRINGID_EMPTYSTRING4,
+    [WEATHER_BLOOD_MOON]         = STRINGID_EMPTYSTRING4,
 };
 
 const u16 gTerrainStartsStringIds[] =

@@ -17,6 +17,9 @@ static u16 sSavedIme;
 
 // iwram common
 COMMON_DATA struct Time gLocalTime = {0};
+// A nonzero value encodes a chosen weekday shift plus one.
+static EWRAM_DATA u8 sDebugWeekdayOffset = 0;
+static EWRAM_DATA struct Time sDebugTimeOffset = {0};
 
 // const rom
 static const u8 sText_AM[] = _("AM");
@@ -318,6 +321,61 @@ void RtcCalcLocalTime(void)
 {
     RtcGetInfo(&sRtc);
     RtcCalcTimeDifference(&sRtc, &gLocalTime, &gSaveBlock2Ptr->localTimeOffset);
+    if (sDebugTimeOffset.hours || sDebugTimeOffset.minutes || sDebugTimeOffset.seconds)
+        CalcTimeDifference(&gLocalTime, &sDebugTimeOffset, &gLocalTime);
+}
+
+void RtcSetDebugTime(u8 hour)
+{
+    enum Weekday weekday;
+    struct Time target;
+
+    RtcCalcLocalTime();
+    weekday = sDebugWeekdayOffset ? RtcGetLocalCalendarWeekday() : WEEKDAY_COUNT;
+    memset(&sDebugTimeOffset, 0, sizeof(sDebugTimeOffset));
+    if (hour < HOURS_PER_DAY)
+    {
+        RtcCalcLocalTime();
+        target = gLocalTime;
+        target.hours = hour;
+        target.minutes = 0;
+        target.seconds = 0;
+        CalcTimeDifference(&sDebugTimeOffset, &target, &gLocalTime);
+    }
+    RtcSetDebugWeekday(weekday);
+}
+
+static enum Weekday GetRtcCalendarWeekday(void)
+{
+    // The RTC supplies the calendar date. Use the nearest day for the local clock.
+    const s32 secondsPerDay = HOURS_PER_DAY * MINUTES_PER_HOUR * SECONDS_PER_MINUTE;
+    s32 rtcSeconds = (ConvertBcdToBinary(sRtc.hour) * MINUTES_PER_HOUR
+                    + ConvertBcdToBinary(sRtc.minute)) * SECONDS_PER_MINUTE + ConvertBcdToBinary(sRtc.second);
+    s32 localSeconds = (gLocalTime.hours * MINUTES_PER_HOUR + gLocalTime.minutes)
+                     * SECONDS_PER_MINUTE + gLocalTime.seconds;
+    s32 difference = localSeconds - rtcSeconds;
+    s32 weekday = sRtc.dayOfWeek + WEEKDAY_COUNT;
+
+    if (difference >= secondsPerDay / 2)
+        weekday--;
+    else if (difference < -secondsPerDay / 2)
+        weekday++;
+
+    return weekday % WEEKDAY_COUNT;
+}
+
+enum Weekday RtcGetLocalCalendarWeekday(void)
+{
+    u8 offset = sDebugWeekdayOffset ? sDebugWeekdayOffset - 1 : 0;
+    return (GetRtcCalendarWeekday() + offset) % WEEKDAY_COUNT;
+}
+
+void RtcSetDebugWeekday(enum Weekday weekday)
+{
+    RtcCalcLocalTime();
+    sDebugWeekdayOffset = weekday < WEEKDAY_COUNT
+        ? 1 + (weekday + WEEKDAY_COUNT - GetRtcCalendarWeekday()) % WEEKDAY_COUNT
+        : 0;
 }
 
 bool8 IsBetweenHours(s32 hours, s32 begin, s32 end)

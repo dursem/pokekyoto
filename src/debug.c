@@ -22,6 +22,7 @@
 #include "item.h"
 #include "item_icon.h"
 #include "item_use.h"
+#include "kyoto_blood_moon.h"
 #include "list_menu.h"
 #include "m4a.h"
 #include "main.h"
@@ -278,7 +279,6 @@ static void DebugAction_OpenSubMenu(u8 taskId, const struct DebugMenuOption *ite
 static void DebugAction_OpenSubMenuTrainers(u8 taskId, const struct DebugMenuOption *items);
 static void DebugAction_OpenSubMenuFlagsVars(u8 taskId, const struct DebugMenuOption *items);
 static void DebugAction_OpenOutbreakMenu(u8 taskId, const struct DebugMenuOption *items);
-static void DebugAction_OpenSubMenuFakeRTC(u8 taskId, const struct DebugMenuOption *items);
 static void DebugAction_OpenSubMenuCreateFollowerNPC(u8 taskId, const struct DebugMenuOption *items);
 static void DebugAction_ExecuteScript(u8 taskId, void *script);
 static void DebugAction_ToggleFlag(u8 taskId, void *flagToggleFunc);
@@ -293,6 +293,9 @@ static void DebugAction_Util_CheatStart(u8 taskId);
 
 static void DebugAction_TimeMenu_ChangeTimeOfDay(u8 taskId);
 static void DebugAction_TimeMenu_ChangeWeekdays(u8 taskId);
+static void DebugAction_TimeMenu_UseClockWeekday(u8 taskId);
+static void DebugAction_TimeMenu_UseClockTime(u8 taskId);
+static void DebugAction_Util_ResumeScheduledWeather(u8 taskId);
 static void DebugAction_TimeMenu_RedoDailyEvents(u8 taskId);
 
 static void DebugAction_CreateFollowerNPC(u8 taskId);
@@ -530,6 +533,7 @@ static const struct DebugMenuOption sDebugMenu_Actions_TimeMenu_TimesOfDay[] =
     [TIME_DAY]     = { gTimeOfDayStringsTable[TIME_DAY],     DebugAction_TimeMenu_ChangeTimeOfDay },
     [TIME_EVENING] = { gTimeOfDayStringsTable[TIME_EVENING], DebugAction_TimeMenu_ChangeTimeOfDay },
     [TIME_NIGHT]   = { gTimeOfDayStringsTable[TIME_NIGHT],   DebugAction_TimeMenu_ChangeTimeOfDay },
+    { COMPOUND_STRING("Use clock time"), DebugAction_TimeMenu_UseClockTime },
     { NULL }
 };
 
@@ -542,6 +546,7 @@ static const struct DebugMenuOption sDebugMenu_Actions_TimeMenu_Weekdays[] =
     [WEEKDAY_THU] = { gDayNameStringsTable[WEEKDAY_THU], DebugAction_TimeMenu_ChangeWeekdays },
     [WEEKDAY_FRI] = { gDayNameStringsTable[WEEKDAY_FRI], DebugAction_TimeMenu_ChangeWeekdays },
     [WEEKDAY_SAT] = { gDayNameStringsTable[WEEKDAY_SAT], DebugAction_TimeMenu_ChangeWeekdays },
+    { COMPOUND_STRING("Use clock weekday"), DebugAction_TimeMenu_UseClockWeekday },
     { NULL }
 };
 
@@ -560,8 +565,8 @@ static const struct DebugMenuOption sDebugMenu_Actions_TimeMenu[] =
 {
     { COMPOUND_STRING("Get time…"),         DebugAction_ExecuteScript, Debug_EventScript_TellTheTime },
     { COMPOUND_STRING("Get time of day…"),  DebugAction_ExecuteScript, Debug_EventScript_PrintTimeOfDay },
-    { COMPOUND_STRING("Set time of day…"),  DebugAction_OpenSubMenuFakeRTC, sDebugMenu_Actions_TimeMenu_TimesOfDay },
-    { COMPOUND_STRING("Set weekday…"),      DebugAction_OpenSubMenuFakeRTC, sDebugMenu_Actions_TimeMenu_Weekdays },
+    { COMPOUND_STRING("Set time of day…"), DebugAction_OpenSubMenu, sDebugMenu_Actions_TimeMenu_TimesOfDay },
+    { COMPOUND_STRING("Set weekday…"),     DebugAction_OpenSubMenu, sDebugMenu_Actions_TimeMenu_Weekdays },
     { COMPOUND_STRING("Redo daily events"), DebugAction_TimeMenu_RedoDailyEvents },
     { COMPOUND_STRING("Check wall clock…"), DebugAction_ExecuteScript, PlayersHouse_2F_EventScript_CheckWallClock },
     { COMPOUND_STRING("Set wall clock…"),   DebugAction_ExecuteScript, PlayersHouse_2F_EventScript_SetWallClock },
@@ -601,6 +606,7 @@ static const struct DebugMenuOption sDebugMenu_Actions_Utilities[] =
     { COMPOUND_STRING("Test Item Randomizer"),      DebugAction_Selection_Init, &sItemGeneratorSelection },
     { COMPOUND_STRING("Wally Tutorial"),            DebugAction_ExecuteScript, Debug_EventScript_WallyTutorial },
     { COMPOUND_STRING("Steven Multi"),              DebugAction_ExecuteScript, Debug_EventScript_Steven_Multi },
+    { COMPOUND_STRING("Resume scheduled weather"), DebugAction_Util_ResumeScheduledWeather },
     { NULL }
 };
 
@@ -912,7 +918,6 @@ static bool32 IsSubMenuAction(const void *action)
 {
     return action == DebugAction_OpenSubMenu
         || action == DebugAction_OpenSubMenuFlagsVars
-        || action == DebugAction_OpenSubMenuFakeRTC
         || action == DebugAction_OpenSubMenuCreateFollowerNPC
         || action == DebugAction_OpenSubMenuTrainers
         || action == DebugAction_OpenOutbreakMenu;
@@ -1723,14 +1728,6 @@ static void DebugAction_OpenSubMenu(u8 taskId, const struct DebugMenuOption *ite
     DebugAction_OpenSubMenuWithType(taskId, items, DEBUG_BASIC_MENU);
 }
 
-static void DebugAction_OpenSubMenuFakeRTC(u8 taskId, const struct DebugMenuOption *items)
-{
-    if (!OW_USE_FAKE_RTC)
-        Debug_DestroyMenu_Full_Script(taskId, Debug_EventScript_FakeRTCNotEnabled);
-    else
-        DebugAction_OpenSubMenuWithType(taskId, items, DEBUG_BASIC_MENU);
-}
-
 static void DebugAction_ExecuteScript(u8 taskId, void *script)
 {
     Debug_DestroyMenu_Full_Script(taskId, (const u8 *)script);
@@ -1756,8 +1753,16 @@ static void DebugAction_OpenSubMenuCreateFollowerNPC(u8 taskId, const struct Deb
 
 static void DebugAction_Util_Fly(u8 taskId)
 {
-    Debug_DestroyMenu(taskId);
-    SetMainCallback2(CB2_OpenFlyMap);
+    Debug_DestroyMenu_Full(taskId);
+    CleanupOverworldWindowsAndTilemaps();
+    OpenFlyMapFromDebug();
+}
+
+static void DebugAction_Util_ResumeScheduledWeather(u8 taskId)
+{
+    BloodMoon_SetDebugOverride(FALSE);
+    RefreshScheduledFieldWeather();
+    Debug_DestroyMenu_Full(taskId);
 }
 
 static void DebugSelectionStep_UpdateMapGroup(u8 taskId, u8 digits, u32 min, u32 max)
@@ -1955,7 +1960,12 @@ static void DebugSelectionStep_UpdateWeather(u8 taskId, u8 digits, u32 min, u32 
 
 static bool32 DebugSelection_SetWeather_OnComplete(u8 taskId)
 {
-    SetWeather(DebugSelection_GetData(taskId, 0));
+    enum OverworldWeather weather = DebugSelection_GetData(taskId, 0);
+    BloodMoon_SetDebugOverride(weather == WEATHER_BLOOD_MOON);
+    if (weather == WEATHER_BLOOD_MOON)
+        RefreshScheduledFieldWeather();
+    else
+        SetWeather(weather);
     Debug_DestroyMenu_Full(taskId);
     return TRUE;
 }
@@ -2036,21 +2046,10 @@ void BufferExpansionVersion(struct ScriptContext *ctx)
 
 void DebugMenu_CalculateTime(struct ScriptContext *ctx)
 {
-    if (OW_USE_FAKE_RTC)
-    {
-        struct SiiRtcInfo *rtc = FakeRtc_GetCurrentTime();
-        StringExpandPlaceholders(gStringVar1, gDayNameStringsTable[rtc->dayOfWeek]);
-        ConvertIntToDecimalStringN(gStringVar2, rtc->hour, STR_CONV_MODE_LEFT_ALIGN, 3);
-        ConvertIntToDecimalStringN(gStringVar3, rtc->minute, STR_CONV_MODE_LEADING_ZEROS, 2);
-    }
-    else
-    {
-        u32 day = ((gLocalTime.days - 1) + 6) % 7 ;
-        RtcCalcLocalTime();
-        StringExpandPlaceholders(gStringVar1, gDayNameStringsTable[day]);
-        ConvertIntToDecimalStringN(gStringVar2, gLocalTime.hours, STR_CONV_MODE_LEFT_ALIGN, 3);
-        ConvertIntToDecimalStringN(gStringVar3, gLocalTime.minutes, STR_CONV_MODE_LEADING_ZEROS, 2);
-    }
+    RtcCalcLocalTime();
+    StringExpandPlaceholders(gStringVar1, gDayNameStringsTable[RtcGetLocalCalendarWeekday()]);
+    ConvertIntToDecimalStringN(gStringVar2, gLocalTime.hours, STR_CONV_MODE_LEFT_ALIGN, 3);
+    ConvertIntToDecimalStringN(gStringVar3, gLocalTime.minutes, STR_CONV_MODE_LEADING_ZEROS, 2);
 }
 
 void DebugMenu_CalculateTimeOfDay(struct ScriptContext *ctx)
@@ -3590,39 +3589,44 @@ static void DebugAction_Give_DayCareEgg(u8 taskId)
 
 static void DebugAction_TimeMenu_ChangeTimeOfDay(u8 taskId)
 {
-    u32 input = ListMenu_ProcessInput(gTasks[taskId].tMenuTaskId);
-
-    DebugAction_DestroyExtraWindow(taskId);
-    switch (input)
+    static const u8 sDebugHours[TIMES_OF_DAY_COUNT] =
     {
-    case TIME_MORNING:
-        FakeRtc_ForwardTimeTo(MORNING_HOUR_BEGIN, 0, 0);
-        break;
-    case TIME_DAY:
-        FakeRtc_ForwardTimeTo(DAY_HOUR_BEGIN, 0, 0);
-        break;
-    case TIME_EVENING:
-        FakeRtc_ForwardTimeTo(EVENING_HOUR_BEGIN, 0, 0);
-        break;
-    case TIME_NIGHT:
-            FakeRtc_ForwardTimeTo(NIGHT_HOUR_BEGIN, 0, 0);
-            break;
-    }
+        [TIME_MORNING] = MORNING_HOUR_BEGIN,
+        [TIME_DAY] = DAY_HOUR_BEGIN,
+        [TIME_EVENING] = EVENING_HOUR_BEGIN,
+        [TIME_NIGHT] = NIGHT_HOUR_BEGIN,
+    };
+    u32 input = ListMenu_ProcessInput(gTasks[taskId].tMenuTaskId);
+    u8 hour = sDebugHours[input];
+    if (input == TIME_NIGHT && IsBetweenHours(BLOOD_MOON_START_HOUR, NIGHT_HOUR_BEGIN, NIGHT_HOUR_END))
+        hour = BLOOD_MOON_START_HOUR;
+    RtcSetDebugTime(hour);
+    gTimeUpdateCounter = 0;
+    RefreshScheduledFieldWeather();
     Debug_DestroyMenu_Full(taskId);
-    SetMainCallback2(CB2_LoadMap);
+}
+
+static void DebugAction_TimeMenu_UseClockTime(u8 taskId)
+{
+    RtcSetDebugTime(HOURS_PER_DAY);
+    gTimeUpdateCounter = 0;
+    RefreshScheduledFieldWeather();
+    Debug_DestroyMenu_Full(taskId);
 }
 
 static void DebugAction_TimeMenu_ChangeWeekdays(u8 taskId)
 {
-    u32 input = ListMenu_ProcessInput(gTasks[taskId].tMenuTaskId);
-    struct SiiRtcInfo *rtc = FakeRtc_GetCurrentTime();
-    u32 daysToAdd = 0;
-
-    DebugAction_DestroyExtraWindow(taskId);
-    daysToAdd = ((input - rtc->dayOfWeek) + WEEKDAY_COUNT) % WEEKDAY_COUNT;
-    FakeRtc_AdvanceTimeBy(daysToAdd, 0, 0, 0);
+    enum Weekday weekday = ListMenu_ProcessInput(gTasks[taskId].tMenuTaskId);
+    RtcSetDebugWeekday(weekday);
+    RefreshScheduledFieldWeather();
     Debug_DestroyMenu_Full(taskId);
-    SetMainCallback2(CB2_LoadMap);
+}
+
+static void DebugAction_TimeMenu_UseClockWeekday(u8 taskId)
+{
+    RtcSetDebugWeekday(WEEKDAY_COUNT);
+    RefreshScheduledFieldWeather();
+    Debug_DestroyMenu_Full(taskId);
 }
 
 void DebugAction_TimeMenu_RedoDailyEvents(u8 taskId)

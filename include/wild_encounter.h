@@ -41,7 +41,9 @@ struct WildPokemonHeader
 {
     u8 mapGroup;
     u8 mapNum;
+    bool8 bloodMoonOnly;
     const struct WildEncounterTypes encounterTypes[TIMES_OF_DAY_COUNT];
+    const struct WildEncounterTypes *bloodMoonEncounters;
 };
 
 
@@ -76,6 +78,7 @@ u32 ChooseWildMonIndex_Rocks(void);
 u32 ChooseHiddenMonIndex(void);
 bool32 MapHasNoEncounterData(void);
 enum TimeOfDay GetTimeOfDayForEncounters(u32 headerId, enum WildPokemonArea area);
+const struct WildPokemonInfo *GetMapWildMonInfo(u32 headerId, enum WildPokemonArea area);
 
 u8 GetLandEncounterSlotForMatchCall(void);
 u8 GetWaterEncounterSlotForMatchCall(void);

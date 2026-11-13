@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_blood_moon.h"
 #include "kyoto_cloud_layers.h"
 #include "map_palette.h"
 #include "palette.h"
@@ -124,6 +125,7 @@ void ReapplyMapPaletteFade(u32 bank)
     if (sMapFadeMode == TIME_OF_DAY_FADE)
     {
         TimeMixPalettes(1, unfaded, faded, gPaletteFade.bld0, gPaletteFade.bld1, gPaletteFade.weight);
+        BloodMoon_TintPalettes(1u << bank);
         MapPalettesApplyNightLights(1u << bank);
         BlendPalettesFine(1, faded, faded, sMapFadeY, sMapFadeColor);
     }
@@ -366,6 +368,7 @@ static u8 UpdateTimeOfDayPaletteFade(void)
     src = gPlttBufferUnfaded;
     dst = gPlttBufferFaded;
     TimeMixPalettes(timePalettes, src, dst, gPaletteFade.bld0, gPaletteFade.bld1, gPaletteFade.weight);
+    BloodMoon_TintPalettes(timePalettes);
 
     // palettes that were not blended above must be copied through
     if ((copyPalettes = ~timePalettes))

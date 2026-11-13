@@ -25,6 +25,7 @@ enum OverworldWeather
     WEATHER_DYNAMIC,
     WEATHER_AUTUMN_WIND, // Append new weather without renumbering existing maps.
     WEATHER_NORTHERN_LIGHTS,
+    WEATHER_BLOOD_MOON,
     WEATHER_COUNT,
 };
 
@@ -36,7 +37,6 @@ enum OverworldWeather
 // These are used in maps' coord_weather_event entries.
 // They are not a one-to-one mapping with the engine's
 // internal weather constants above.
-#define COORD_EVENT_WEATHER_NORTHERN_LIGHTS     24
 #define COORD_EVENT_WEATHER_SUNNY_CLOUDS        1
 #define COORD_EVENT_WEATHER_SUNNY               2
 #define COORD_EVENT_WEATHER_RAIN                3
@@ -53,6 +53,8 @@ enum OverworldWeather
 #define COORD_EVENT_WEATHER_SAKURA_PETALS       22
 #define COORD_EVENT_WEATHER_AUTUMN_WIND         23
 #define COORD_EVENT_WEATHER_PEACH_LEAVES        COORD_EVENT_WEATHER_AUTUMN_WIND
+#define COORD_EVENT_WEATHER_NORTHERN_LIGHTS     24
+#define COORD_EVENT_WEATHER_BLOOD_MOON          25
 
 // These are the "abnormal weather events" that are used
 // to find Kyogre and Groudon.

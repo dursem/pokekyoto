@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_blood_moon.h"
 #include "kyoto_cloud_layers.h"
 #include "glide.h"
 #include "map_palette.h"
@@ -1848,24 +1849,30 @@ void UpdatePalettesWithTime(u32 palettes)
     if (!palettes)
         return;
     TimeMixPalettes(palettes, gPlttBufferUnfaded, gPlttBufferFaded, &gTimeBlend.startBlend, &gTimeBlend.endBlend, gTimeBlend.weight);
+    BloodMoon_TintPalettes(palettes);
 }
 
 u8 UpdateSpritePaletteWithTime(u8 paletteNum)
 {
     if (MapHasNaturalLight(gMapHeader.mapType)
      && !IS_BLEND_IMMUNE_TAG(GetSpritePaletteTagByPaletteNum(paletteNum)))
+    {
         TimeMixPalettes(1, &gPlttBufferUnfaded[OBJ_PLTT_ID(paletteNum)], &gPlttBufferFaded[OBJ_PLTT_ID(paletteNum)], &gTimeBlend.startBlend, &gTimeBlend.endBlend, gTimeBlend.weight);
+        BloodMoon_TintPalettes(1u << (16 + paletteNum));
+    }
     return paletteNum;
 }
 
 static void OverworldBasic(void)
 {
     ScriptContext_RunScript();
+    UpdateScheduledFieldWeather();
     RunTasks();
     AnimateSprites();
     Glide_Update();
     CameraUpdate();
     UpdateCameraPanning();
+    BloodMoon_PositionCloudShadows();
     BuildOamBuffer();
     UpdatePaletteFade();
     UpdateTilesetAnimations();
