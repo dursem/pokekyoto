@@ -207,7 +207,7 @@ extern const u16 gBerryFixWindow_Pal[];
 extern const u32 gBattleTextboxTiles[];
 extern const u32 gBattleTextboxTilemap[];
 extern const u16 gBattleTextboxPalette[];
-extern const u32 gKyotoBattleUiTiles[78 * 8];
+extern const u32 gKyotoBattleUiTiles[81 * 8];
 extern const u16 gKyotoBattleActionTilemap[];
 extern const u16 gKyotoBattleActionCursorTilemap[];
 extern const u32 gKyotoBattleActionNameBg[];

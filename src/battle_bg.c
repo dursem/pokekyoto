@@ -1074,6 +1074,8 @@ void LoadBattleMenuWindowGfx(void)
 
 static void LoadKyotoBattleUiTiles(void)
 {
+    // Kyoto textbox: BG0 in front of battler OBJ sprites.
+    SetBgAttribute(0, BG_ATTR_PRIORITY, 0);
     // All three pages use the same pixels in the same slots. Reloading this
     // atlas also restores the UI after native windows temporarily reuse VRAM;
     // switching pages never replaces visible tiles with a different tile set.
