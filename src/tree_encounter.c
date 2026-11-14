@@ -22,6 +22,7 @@
 #include "constants/species.h"
 #endif
 #include "tree_encounter.h"
+#include "tree_encounter_sway.h"
 #include "config/tree_encounter.h"
 
 struct TreeEncounterShape
@@ -196,6 +197,8 @@ static bool8 OwnLeafSprite(u32 index)
 void TreeEncounter_ReleaseVisuals(void)
 {
     u32 i;
+    // TREE_ENCOUNTER_CANOPY_SWAY_V4_RELEASE
+    TreeEncounterSway_Release();
     if (!sVisualsAllocated)
         return;
     for (i = 0; i < TREE_ENCOUNTER_LEAF_COUNT; i++)
@@ -780,6 +783,64 @@ static u32 TreePaletteBank(void)
     return TREE_ENCOUNTER_TREE_PALETTE;
 }
 
+// TREE_ENCOUNTER_PLAYER_FRONT_V4_1_BEGIN
+// Keep the original leaf layer except where it intersects the player.
+// Change only the leaf's OAM sort key; never move/recolour the player or tree.
+static void TreeEncounter_SetLeafDrawOrder(struct Sprite *sprite)
+{
+    u8 playerId = GetPlayerAvatarSpriteId();
+    const struct Sprite *player;
+    s32 leafX, leafY, playerX, playerY;
+
+    // Restore the existing leaf layer every frame, including after overlap ends.
+    sprite->oam.priority = 1;
+    sprite->subpriority = 0;
+    if (playerId >= MAX_SPRITES)
+        return;
+    player = &gSprites[playerId];
+    if (player == sprite || !player->inUse || player->invisible
+     || player->centerToCornerVecX >= 0 || player->centerToCornerVecY >= 0)
+        return;
+
+    // Screen-space bounds include camera offsets and walking/jump offsets.
+    // The normal field sprites are centred; negative corner vectors give
+    // their half-width/height (and already include an affine double-size box).
+    leafX = sprite->x + sprite->x2 + sprite->centerToCornerVecX;
+    leafY = sprite->y + sprite->y2 + sprite->centerToCornerVecY;
+    playerX = player->x + player->x2 + player->centerToCornerVecX;
+    playerY = player->y + player->y2 + player->centerToCornerVecY;
+    if (sprite->coordOffsetEnabled)
+    {
+        leafX += gSpriteCoordOffsetX;
+        leafY += gSpriteCoordOffsetY;
+    }
+    if (player->coordOffsetEnabled)
+    {
+        playerX += gSpriteCoordOffsetX;
+        playerY += gSpriteCoordOffsetY;
+    }
+    if (leafX >= playerX - 2 * player->centerToCornerVecX
+     || playerX >= leafX - 2 * sprite->centerToCornerVecX
+     || leafY >= playerY - 2 * player->centerToCornerVecY
+     || playerY >= leafY - 2 * sprite->centerToCornerVecY)
+        return;
+
+    // BuildOamBuffer sorts by priority, then subpriority, then Y and index.
+    // A strictly later key keeps the player in front regardless of walking Y.
+    if (sprite->oam.priority > player->oam.priority)
+        return; // The default leaf layer is already behind this player layer.
+    sprite->oam.priority = player->oam.priority;
+    if (player->subpriority < 255)
+        sprite->subpriority = player->subpriority + 1;
+    else if (player->oam.priority < 3)
+        sprite->oam.priority = player->oam.priority + 1;
+    else
+        // No later sort slot exists. Suppress just this intersecting leaf
+        // for this frame; the normal update restores visibility next frame.
+        sprite->invisible = TRUE;
+}
+// TREE_ENCOUNTER_PLAYER_FRONT_V4_1_END
+
 void TreeEncounter_UpdateSprites(void)
 {
     s16 sx, sy;
@@ -819,8 +880,13 @@ void TreeEncounter_UpdateSprites(void)
             || sprite->x + gSpriteCoordOffsetX > 248
             || sprite->y + gSpriteCoordOffsetY < -8
             || sprite->y + gSpriteCoordOffsetY > 168;
+        // TREE_ENCOUNTER_PLAYER_FRONT_V4_1_UPDATE
+        if (!sprite->invisible)
+            TreeEncounter_SetLeafDrawOrder(sprite);
     }
     sTree.leafFrame = (sTree.leafFrame + 1) % TREE_ENCOUNTER_LEAF_CYCLE;
+    // TREE_ENCOUNTER_CANOPY_SWAY_V4_UPDATE
+    TreeEncounterSway_Update(sTree.x, sTree.y, sTree.shape, sTree.leafFrame);
 }
 
 void TreeEncounter_UpdatePalette(void)
