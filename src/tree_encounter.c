@@ -16,6 +16,8 @@
 #include "sprite.h"
 #include "wild_encounter.h"
 #include "constants/map_groups.h"
+#include "constants/flags.h"
+#include "constants/vars.h"
 #include "constants/metatile_behaviors.h"
 #include "constants/species.h"
 #endif
@@ -56,6 +58,7 @@ struct TreeEncounterState
     u8 mapNum;
     u8 shape;
     bool8 initialized;
+    bool8 starterUnlocked;
     bool8 active;
     bool8 armed;
     bool8 burst;
@@ -83,6 +86,7 @@ static void TreeLeafCallback(struct Sprite *sprite);
 static bool8 EnsureLeafSprites(void);
 static bool8 TreeMatches(s16 x, s16 y, u32 shape);
 static bool8 PlayerCanUseTrees(void);
+static bool8 StarterProgressUnlocked(void);
 static void SyncMap(void);
 
 // Four 8x8, 4bpp frames. Only 3-4 pixels per leaf are visible.
@@ -120,12 +124,15 @@ static const struct SpriteTemplate sTreeLeafTemplate =
     .callback = TreeLeafCallback,
 };
 
-// The approved preview's three leaves, converted to ~60 Hz game frames.
+// Five staggered leaves per cycle; the first three retain their original motion.
+// The extra leaves share the same four tiny frames and foliage palette.
 static const struct TreeLeafMotion sLeafMotions[TREE_ENCOUNTER_LEAF_COUNT] =
 {
     { 38, 176,  5, -14, -1 },
     { 84, 164, 25, -11,  1 },
     {126, 168, 16, -18,  1 },
+    { 12, 172, 12, -20, -1 },
+    {162, 170, 21, -16,  1 },
 };
 static const s8 sLeafWobble[16] = {0, 1, 2, 3, 3, 3, 2, 1, 0, -1, -2, -3, -3, -3, -2, -1};
 
@@ -209,9 +216,20 @@ void TreeEncounter_Reset(void)
     sTree = (struct TreeEncounterState){0};
 }
 
+static bool8 StarterProgressUnlocked(void)
+{
+    // The flag is set before ChooseStarter. The lab-state milestone is set
+    // only after that choice/battle returns, when the starter is in the party.
+    // Do not test the starter species: it may evolve or be stored later.
+    return FlagGet(TREE_ENCOUNTER_STARTER_FLAG)
+        && VarGet(TREE_ENCOUNTER_STARTER_VAR) >= TREE_ENCOUNTER_STARTER_MIN_STATE;
+}
+
 static void SyncMap(void)
 {
+    bool8 starterUnlocked = StarterProgressUnlocked();
     if (sTree.initialized
+     && sTree.starterUnlocked == starterUnlocked
      && sTree.layout == gMapHeader.mapLayout
      && sTree.mapGroup == (u8)gSaveBlock1Ptr->location.mapGroup
      && sTree.mapNum == (u8)gSaveBlock1Ptr->location.mapNum)
@@ -221,7 +239,10 @@ static void SyncMap(void)
     sTree.layout = gMapHeader.mapLayout;
     sTree.mapGroup = gSaveBlock1Ptr->location.mapGroup;
     sTree.mapNum = gSaveBlock1Ptr->location.mapNum;
-    sTree.profile = FindProfile();
+    sTree.starterUnlocked = starterUnlocked;
+    // Pre-starter steps never accumulate. Unlocking starts a fresh timer.
+    // Losing the milestone (debug/new save) also clears any active effect.
+    sTree.profile = starterUnlocked ? FindProfile() : NULL;
     if (sTree.profile != NULL)
         sTree.targetSteps = NextStepTarget();
 }
@@ -229,7 +250,8 @@ static void SyncMap(void)
 static bool8 PlayerCanUseTrees(void)
 {
     u32 i;
-    if (IsOverworldLinkActive()
+    if (!StarterProgressUnlocked()
+     || IsOverworldLinkActive()
      || TestPlayerAvatarFlags(PLAYER_AVATAR_FLAG_SURFING | PLAYER_AVATAR_FLAG_UNDERWATER))
         return FALSE;
     for (i = 0; i < PARTY_SIZE; i++)
@@ -683,6 +705,9 @@ void TreeEncounter_DebugActivate(void)
     s16 x, y;
     u8 shape;
     SyncMap();
+    gSpecialVar_Result = 5;
+    if (!sTree.starterUnlocked)
+        return;
     gSpecialVar_Result = 0;
     if (sTree.profile == NULL)
         return;

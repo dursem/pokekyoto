@@ -23,11 +23,17 @@ Debug_EventScript_TreeEncounter_Activate::
     goto_if_eq Debug_TreeEncounter_NoTree
     compare VAR_RESULT, 4
     goto_if_eq Debug_TreeEncounter_NoSprites
+    compare VAR_RESULT, 5
+    goto_if_eq Debug_TreeEncounter_NoStarter
     msgbox Debug_TreeEncounter_TextNoTable, MSGBOX_DEFAULT
     releaseall
     end
 Debug_TreeEncounter_Ready:
     msgbox Debug_TreeEncounter_TextReady, MSGBOX_DEFAULT
+    releaseall
+    end
+Debug_TreeEncounter_NoStarter:
+    msgbox Debug_TreeEncounter_TextNoStarter, MSGBOX_DEFAULT
     releaseall
     end
 Debug_TreeEncounter_NoParty:
@@ -58,6 +64,9 @@ Debug_TreeEncounter_TextReady:
 Debug_TreeEncounter_TextNoTable:
     .string "No Tree encounter table here.\n"
     .string "Use Sendai, Route 101 or 103.$"
+Debug_TreeEncounter_TextNoStarter:
+    .string "Get your starter POKEMON first.\n"
+    .string "Tree encounters are not ready yet.$"
 Debug_TreeEncounter_TextNoParty:
     .string "A healthy POKEMON is needed.\n"
     .string "Stand on land to use this.$"
