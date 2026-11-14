@@ -1,4 +1,5 @@
 #include "global.h"
+#include "tree_encounter.h"
 #include "battle_setup.h"
 #include "bike.h"
 #include "coord_event_weather.h"
@@ -183,6 +184,7 @@ int ProcessPlayerFieldInput(struct FieldInput *input)
     if (input->tookStep)
     {
         IncrementGameStat(GAME_STAT_STEPS);
+        TreeEncounter_OnStep(); // TREE_ENCOUNTER_V1
         IncrementBirthIslandRockStepCount();
         DespawnAllOverworldWildEncounters(OWE_GENERATED, WILD_CHECK_REPEL);
         if (FindTaskIdByFunc(Task_FollowerNPCOutOfDoor) == TASK_NONE && TryStartStepBasedScript(&position, metatileBehavior, playerDirection) == TRUE)
@@ -312,6 +314,11 @@ static const u8 *GetInteractionScript(struct MapPosition *position, u8 metatileB
         return script;
 
     script = GetInteractedBackgroundEventScript(position, metatileBehavior, direction);
+    if (script != NULL)
+        return script;
+
+    // TREE_ENCOUNTER_V1: keep NPC/background event priority.
+    script = TreeEncounter_GetInteractionScript(position->x, position->y, position->elevation);
     if (script != NULL)
         return script;
 

@@ -7,6 +7,7 @@
 #include "gpu_regs.h"
 #include "graphics.h"
 #include "international_string_util.h"
+#include "kyoto_blood_moon.h"
 #include "main.h"
 #include "menu.h"
 #include "map_name_popup.h"
@@ -367,6 +368,34 @@ enum {
 #define tYOffset       data[2]
 #define tIncomingPopUp data[3]
 #define tPrintTimer    data[4]
+#define tBloodMoon     data[5]
+
+static const u8 sText_BloodMoonRising[] = _("A blood moon is rising");
+
+static void StartMapPopup(bool32 bloodMoon)
+{
+    u8 taskId = CreateTask(Task_MapNamePopUpWindow, OW_POPUP_GENERATION == GEN_5 ? 100 : 90);
+    struct Task *task = &gTasks[taskId];
+
+    if (!task->isActive || task->func != Task_MapNamePopUpWindow)
+        return;
+
+    gPopupTaskId = taskId;
+    task->tState = STATE_PRINT;
+    task->tYOffset = POPUP_OFFSCREEN_Y;
+    task->tBloodMoon = bloodMoon;
+
+    if (OW_POPUP_GENERATION != GEN_5)
+        SetGpuReg(REG_OFFSET_BG0VOFS, POPUP_OFFSCREEN_Y);
+    else if (OW_POPUP_BW_ALPHA_BLEND && !IsWeatherAlphaBlend())
+        SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG0 | BLDCNT_TGT2_ALL | BLDCNT_EFFECT_BLEND);
+}
+
+void TryShowBloodMoonPopup(void)
+{
+    if (BloodMoon_ShouldAnnounceRising() && !FuncIsActiveTask(Task_MapNamePopUpWindow))
+        StartMapPopup(TRUE);
+}
 
 void ShowMapNamePopup(void)
 {
@@ -374,22 +403,7 @@ void ShowMapNamePopup(void)
     {
         if (!FuncIsActiveTask(Task_MapNamePopUpWindow))
         {
-            // New pop up window
-            if (OW_POPUP_GENERATION == GEN_5)
-            {
-                gPopupTaskId = CreateTask(Task_MapNamePopUpWindow, 100);
-
-                if (OW_POPUP_BW_ALPHA_BLEND && !IsWeatherAlphaBlend())
-                    SetGpuReg(REG_OFFSET_BLDCNT, BLDCNT_TGT1_BG0 | BLDCNT_TGT2_ALL | BLDCNT_EFFECT_BLEND);
-            }
-            else
-            {
-                gPopupTaskId = CreateTask(Task_MapNamePopUpWindow, 90);
-                SetGpuReg(REG_OFFSET_BG0VOFS, POPUP_OFFSCREEN_Y);
-            }
-
-            gTasks[gPopupTaskId].tState = STATE_PRINT;
-            gTasks[gPopupTaskId].tYOffset = POPUP_OFFSCREEN_Y;
+            StartMapPopup(FALSE);
         }
         else
         {
@@ -412,6 +426,11 @@ static void Task_MapNamePopUpWindow(u8 taskId)
         // Wait, then create and print the pop up window
         if (++task->tPrintTimer > 30)
         {
+            if (task->tBloodMoon && !BloodMoon_ShouldAnnounceRising())
+            {
+                HideMapNamePopUpWindow();
+                return;
+            }
             task->tState = STATE_SLIDE_IN;
             task->tPrintTimer = 0;
             ShowMapNamePopUpWindow();
@@ -429,7 +448,9 @@ static void Task_MapNamePopUpWindow(u8 taskId)
         {
             task->tYOffset = 0;
             task->tState = STATE_WAIT;
-            gTasks[gPopupTaskId].tOnscreenTimer = 0;
+            task->tOnscreenTimer = 0;
+            if (task->tBloodMoon)
+                BloodMoon_MarkRisingAnnounced();
         }
         break;
     case STATE_WAIT:
@@ -453,6 +474,7 @@ static void Task_MapNamePopUpWindow(u8 taskId)
                 task->tState = STATE_PRINT;
                 task->tPrintTimer = 0;
                 task->tIncomingPopUp = FALSE;
+                task->tBloodMoon = FALSE;
             }
             else
             {
@@ -484,9 +506,7 @@ void HideMapNamePopUpWindow(void)
 {
     if (FuncIsActiveTask(Task_MapNamePopUpWindow))
     {
-    #ifdef UBFIX
         if (GetMapNamePopUpWindowId() != WINDOW_NONE)
-    #endif // UBFIX
         {
             ClearStdWindowAndFrame(GetMapNamePopUpWindowId(), TRUE);
             RemoveMapNamePopUpWindow();
@@ -584,13 +604,19 @@ u8 *GetPopUpMapName(u8 *dest, const struct MapHeader *mapHeader)
 
 static void ShowMapNamePopUpWindow(void)
 {
-    u8 mapDisplayHeader[MAP_POPUP_STRING_BUFFER_LENGTH];
+    u8 mapDisplayHeader[max(MAP_POPUP_STRING_BUFFER_LENGTH,
+                            MAP_POPUP_PREFIX_BUFFER_LENGTH + sizeof(sText_BloodMoonRising))];
     u8 *withoutPrefixPtr;
     u8 x;
     const u8 *mapDisplayHeaderSource;
     u8 mapNamePopUpWindowId, secondaryPopUpWindowId;
 
-    if (CurrentBattlePyramidLocation() != PYRAMID_LOCATION_NONE)
+    if (gTasks[gPopupTaskId].tBloodMoon)
+    {
+        withoutPrefixPtr = &(mapDisplayHeader[MAP_POPUP_PREFIX_BUFFER_LENGTH]);
+        StringCopy(withoutPrefixPtr, sText_BloodMoonRising);
+    }
+    else if (CurrentBattlePyramidLocation() != PYRAMID_LOCATION_NONE)
     {
         if (gMapHeader.mapLayoutId == LAYOUT_BATTLE_FRONTIER_BATTLE_PYRAMID_TOP)
         {
@@ -640,9 +666,10 @@ static void ShowMapNamePopUpWindow(void)
     }
     else
     {
-        u32 fontId = GetFontIdToFit(withoutPrefixPtr, FONT_NORMAL, -1, 80);
+        bool32 bloodMoon = gTasks[gPopupTaskId].tBloodMoon;
+        u32 fontId = bloodMoon ? FONT_SMALL_NARROWER : GetFontIdToFit(withoutPrefixPtr, FONT_NORMAL, -1, 80);
         x = GetStringCenterAlignXOffset(fontId, withoutPrefixPtr, 80);
-        AddTextPrinterParameterized(GetMapNamePopUpWindowId(), fontId, mapDisplayHeader, x, 3, TEXT_SKIP_DRAW, NULL);
+        AddTextPrinterParameterized(GetMapNamePopUpWindowId(), fontId, mapDisplayHeader, x, bloodMoon ? 7 : 3, TEXT_SKIP_DRAW, NULL);
         CopyWindowToVram(GetMapNamePopUpWindowId(), COPYWIN_FULL);
     }
 }

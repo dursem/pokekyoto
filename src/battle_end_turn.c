@@ -122,6 +122,7 @@ static bool32 HandleEndTurnWeatherDamage(enum BattlerId battler)
     {
     case BATTLE_WEATHER_FOG:
     case BATTLE_WEATHER_STRONG_WINDS:
+    case BATTLE_WEATHER_BLOOD_MOON:
         break;
     case BATTLE_WEATHER_RAIN:
     case BATTLE_WEATHER_RAIN_PRIMAL:

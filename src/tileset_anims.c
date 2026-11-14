@@ -8,6 +8,19 @@
 #define LAVENDER_LARGE_FRAME_TICKS 24
 #define LAVENDER_LEGACY_TILES 4
 
+// POKEKYOTO_GENERAL_FLOWER_RESTORE_V1
+// Reuse the original 16x16 GBA flower frames (no new art or palettes).
+#define GENERAL_FLOWER_FRAME_TICKS 16
+static const u32 sKyotoGeneralFlowerFrame0[] = INCGFX_U32("data/tilesets/primary/general/anim/flower/0.png", ".4bpp");
+static const u32 sKyotoGeneralFlowerFrame1[] = INCGFX_U32("data/tilesets/primary/general/anim/flower/1.png", ".4bpp");
+static const u32 sKyotoGeneralFlowerFrame2[] = INCGFX_U32("data/tilesets/primary/general/anim/flower/2.png", ".4bpp");
+static const u32 *const sKyotoGeneralFlowerFrames[] = {
+    sKyotoGeneralFlowerFrame0,
+    sKyotoGeneralFlowerFrame1,
+    sKyotoGeneralFlowerFrame0,
+    sKyotoGeneralFlowerFrame2,
+};
+
 static const u32 sPetalburgLavenderFrame0[] = INCGFX_U32("graphics/tileset_anims/petalburg/lavender/0.png", ".4bpp");
 static const u32 sPetalburgLavenderFrame1[] = INCGFX_U32("graphics/tileset_anims/petalburg/lavender/1.png", ".4bpp");
 static const u32 sPetalburgLavenderFrame2[] = INCGFX_U32("graphics/tileset_anims/petalburg/lavender/2.png", ".4bpp");
@@ -37,6 +50,11 @@ static const struct {
     u16 tile;
     u16 frameTile;
 } sStreamedAnimTiles[] = {
+    // Primary General's original Emerald flower occupies local tiles 508-511.
+    { &gTileset_General, 508, 0 },
+    { &gTileset_General, 509, 1 },
+    { &gTileset_General, 510, 2 },
+    { &gTileset_General, 511, 3 },
     { &gTileset_Petalburg, 1280, 0 },
     { &gTileset_Petalburg, 1281, 1 },
     { &gTileset_Petalburg, 1296, 2 },
@@ -94,6 +112,15 @@ const u32 *TilesetAnims_GetTileSource(const struct Tileset *tileset, u32 tile)
     {
         if (sStreamedAnimTiles[i].tileset == tileset && sStreamedAnimTiles[i].tile == tile)
         {
+            // The cache updates all four original 8x8 tiles together. This
+            // also makes a flower entering the screen show the current frame.
+            if (tileset == &gTileset_General)
+            {
+                u32 frame = (sPrimaryTilesetAnimCounter / GENERAL_FLOWER_FRAME_TICKS)
+                          % ARRAY_COUNT(sKyotoGeneralFlowerFrames);
+                return sKyotoGeneralFlowerFrames[frame]
+                     + sStreamedAnimTiles[i].frameTile * (TILE_SIZE_4BPP / sizeof(u32));
+            }
             if (sStreamedAnimTiles[i].frameTile >= LAVENDER_LEGACY_TILES)
             {
                 u32 frame = (sSecondaryTilesetAnimCounter / LAVENDER_LARGE_FRAME_TICKS) % ARRAY_COUNT(sPetalburgLavenderLargeFrames);

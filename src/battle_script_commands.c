@@ -6570,7 +6570,7 @@ static void Cmd_recoverbasedonsunlight(void)
         u32 weather = GetWeather();
         enum Ability ability = GetBattlerAbility(gBattlerAttacker);
         u32 attackerWeather = GetAttackerWeather(GetBattlerHoldEffect(gBattlerAttacker), ability, weather);
-        u32 healingWeather = attackerWeather & ~B_WEATHER_STRONG_WINDS;
+        u32 healingWeather = attackerWeather & ~(B_WEATHER_STRONG_WINDS | B_WEATHER_BLOOD_MOON);
         bool32 isAffectedByMegaSol = FALSE;
         if (GetMoveEffect(gCurrentMove) == EFFECT_SHORE_UP)
         {

@@ -721,8 +721,20 @@ static const struct DebugMenuOption sDebugMenu_Actions_MassOutbreak[] =
     { NULL }
 };
 
+// TREE_ENCOUNTER_V1
+extern const u8 Debug_EventScript_TreeEncounter_Activate[];
+extern const u8 Debug_EventScript_TreeEncounter_Clear[];
+
+static const struct DebugMenuOption sDebugMenu_Actions_TreeEncounter[] =
+{
+    { COMPOUND_STRING("Activate nearest"), DebugAction_ExecuteScript, Debug_EventScript_TreeEncounter_Activate },
+    { COMPOUND_STRING("Clear"), DebugAction_ExecuteScript, Debug_EventScript_TreeEncounter_Clear },
+    { NULL }
+};
+
 static const struct DebugMenuOption sDebugMenu_Actions_Encounters[] =
 {
+    { COMPOUND_STRING("Tree encounter"), DebugAction_OpenSubMenu, sDebugMenu_Actions_TreeEncounter },
     { COMPOUND_STRING("Mass outbreak…"), DebugAction_OpenOutbreakMenu, sDebugMenu_Actions_MassOutbreak },
     { NULL }
 };

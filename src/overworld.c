@@ -1,4 +1,5 @@
 #include "global.h"
+#include "tree_encounter.h"
 #include "kyoto_blood_moon.h"
 #include "kyoto_cloud_layers.h"
 #include "glide.h"
@@ -1638,6 +1639,7 @@ static void InitOverworldBgs_NoResetHeap(void)
 
 void CleanupOverworldWindowsAndTilemaps(void)
 {
+    TreeEncounter_ReleaseVisuals(); // TREE_ENCOUNTER_V1
     MapPalettesReset();
     ClearMirageTowerPulseBlendEffect();
     FreeAllOverworldWindowBuffers();
@@ -1873,6 +1875,7 @@ static void OverworldBasic(void)
     CameraUpdate();
     UpdateCameraPanning();
     BloodMoon_PositionCloudShadows();
+    TreeEncounter_UpdateSprites(); // TREE_ENCOUNTER_V1
     BuildOamBuffer();
     UpdatePaletteFade();
     UpdateTilesetAnimations();
@@ -1895,6 +1898,7 @@ static void OverworldBasic(void)
         }
     }
     UpdateOverworldWildEncounter();
+    TreeEncounter_UpdatePalette(); // TREE_ENCOUNTER_V1
 }
 
 // This CB2 is used when starting
@@ -1914,6 +1918,9 @@ void CB2_Overworld(void)
         SetFieldVBlankCallback();
         return;
     }
+    if (gMain.callback2 == CB2_Overworld && !gPaletteFade.active
+     && !ArePlayerFieldControlsLocked() && IsFieldMessageBoxHidden())
+        TryShowBloodMoonPopup();
 }
 
 void SetMainCallback1(MainCallback cb)

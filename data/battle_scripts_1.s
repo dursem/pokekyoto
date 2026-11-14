@@ -3231,6 +3231,11 @@ BattleScript_OverworldSSWeatherStarts::
 	call BattleScript_ActivateWeatherAbilities
 	end3
 
+BattleScript_BloodMoonShining::
+	printstring STRINGID_BLOODMOONSHINING
+	waitmessage B_WAIT_TIME_LONG
+	end3
+
 BattleScript_OverworldTerrain::
 	printfromtable gTerrainStartsStringIds
 	waitmessage B_WAIT_TIME_LONG

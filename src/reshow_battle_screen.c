@@ -1,4 +1,5 @@
 #include "global.h"
+#include "kyoto_blood_moon.h"
 #include "reshow_battle_screen.h"
 #include "battle.h"
 #include "palette.h"
@@ -163,6 +164,7 @@ static void CB2_ReshowBattleScreenAfterMenu(void)
         }
         break;
     default:
+        BloodMoon_BattleUpdate();
         SetVBlankCallback(VBlankCB_Battle);
         ClearBattleBgCntBaseBlocks();
         BeginHardwarePaletteFade(0xFF, 0, 0x10, 0, 1);
@@ -246,6 +248,7 @@ static void CB2_ReshowBlankBattleScreenAfterMenu(void)
             CreateCaughtMonSprite(); // displays the caught mon for the switch into party feature
         break;
     default:
+        BloodMoon_BattleUpdate();
         SetVBlankCallback(VBlankCB_Battle);
         ClearBattleBgCntBaseBlocks();
         BeginHardwarePaletteFade(0xFF, 0, 0x10, 0, 1);

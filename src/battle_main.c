@@ -1,5 +1,6 @@
 #include "global.h"
 #include "kyoto_battle_slide.h"
+#include "kyoto_blood_moon.h"
 #include "battle.h"
 #include "battle_anim.h"
 #include "battle_ai_main.h"
@@ -580,6 +581,7 @@ static void CB2_InitBattleInternal(void)
     gReservedSpritePaletteCount = MAX_BATTLERS_COUNT;
     SetVBlankCallback(VBlankCB_Battle);
     SetUpBattleVarsAndBirchZigzagoon();
+    BloodMoon_BattleStart();
 
     if (gBattleTypeFlags & BATTLE_TYPE_MULTI
      && (TESTING || gBattleTypeFlags & (BATTLE_TYPE_BATTLE_TOWER | BATTLE_TYPE_INGAME_PARTNER)))
@@ -867,6 +869,7 @@ static void CB2_HandleStartBattle(void)
     u8 enemyMultiplayerId;
 
     RunTasks();
+    BloodMoon_BattleUpdate();
     AnimateSprites();
     BuildOamBuffer();
 
@@ -1068,6 +1071,7 @@ static void CB2_HandleStartMultiPartnerBattle(void)
     u8 partnerMultiplayerId;
 
     RunTasks();
+    BloodMoon_BattleUpdate();
     AnimateSprites();
     BuildOamBuffer();
 
@@ -1732,6 +1736,7 @@ static void CB2_HandleStartMultiBattle(void)
 
 void BattleMainCB2(void)
 {
+    BloodMoon_BattleUpdate();
     AnimateSprites();
     BuildOamBuffer();
     RunTextPrinters();
@@ -2392,13 +2397,8 @@ void SpriteCB_WildMon(struct Sprite *sprite)
     sprite->data[1] = 0;
     sprite->callback = SpriteCB_MoveWildMonToRight;
     StartSpriteAnimIfDifferent(sprite, 0);
-    if (B_FAST_INTRO_NO_SLIDE == FALSE && !gTestRunnerHeadless)
-    {
-        if (WILD_DOUBLE_BATTLE)
-            BeginNormalPaletteFade((0x10000 << sprite->sBattler) | (0x10000 << GetPartnerBattler(sprite->sBattler)), 0, 10, 10, RGB(8, 8, 8));
-        else
-            BeginNormalPaletteFade((0x10000 << sprite->sBattler), 0, 10, 10, RGB(8, 8, 8));
-    }
+    // KYOTO_V7_WILD_SLIDE_KEEP_PALETTE_START
+    // Keep the original wild Pokémon palette throughout the slide.
 }
 
 static void SpriteCB_MoveWildMonToRight(struct Sprite *sprite)
@@ -2425,13 +2425,8 @@ static void SpriteCB_WildMonShowHealthbox(struct Sprite *sprite)
         SetHealthboxSpriteVisible(gHealthboxSpriteIds[sprite->sBattler]);
         sprite->callback = SpriteCB_WildMonAnimate;
         StartSpriteAnimIfDifferent(sprite, 0);
-        if (B_FAST_INTRO_NO_SLIDE == FALSE && !gTestRunnerHeadless)
-        {
-            if (WILD_DOUBLE_BATTLE)
-                BeginNormalPaletteFade((0x10000 << sprite->sBattler) | (0x10000 << GetPartnerBattler(sprite->sBattler)), 0, 10, 0, RGB(8, 8, 8));
-            else
-                BeginNormalPaletteFade((0x10000 << sprite->sBattler), 0, 10, 0, RGB(8, 8, 8));
-        }
+        // KYOTO_V7_WILD_SLIDE_KEEP_PALETTE_END
+        // No extra palette fade at the end of the wild slide.
     }
 }
 
@@ -2816,7 +2811,8 @@ static void BattleStartClearSetData(void)
     gBattlerTarget = 0;
     gEffectBattler = 0;
     gBattlerAbility = 0;
-    gBattleWeather = 0;
+    // Blood Moon is inherited before the scene becomes visible.
+    gBattleWeather &= B_WEATHER_BLOOD_MOON;
     gHitMarker = 0;
 
     if (!(gBattleTypeFlags & BATTLE_TYPE_RECORDED))

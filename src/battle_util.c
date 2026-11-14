@@ -164,6 +164,12 @@ static const u8 sGoNearCounterToCatchFactor[] = {4, 3, 2, 1};
 static const u8 sGoNearCounterToEscapeFactor[] = {4, 4, 4, 4};
 
 const struct BattleWeatherInfo gBattleWeatherInfo[BATTLE_WEATHER_COUNT] = {
+    [BATTLE_WEATHER_BLOOD_MOON] =
+    {
+        .flag = B_WEATHER_BLOOD_MOON,
+        .type = BATTLE_WEATHER_BLOOD_MOON,
+    },
+
     [BATTLE_WEATHER_RAIN] =
     {
         .flag = B_WEATHER_RAIN_NORMAL,
@@ -355,7 +361,7 @@ bool32 EndOrContinueWeather(void)
 {
     enum BattleWeather currBattleWeather = GetBattleWeather(gBattleWeather);
 
-    if (currBattleWeather == BATTLE_WEATHER_NONE)
+    if (currBattleWeather == BATTLE_WEATHER_NONE || currBattleWeather == BATTLE_WEATHER_BLOOD_MOON)
         return FALSE;
 
     if (gBattleStruct->weatherDuration > 0 && --gBattleStruct->weatherDuration == 0)
@@ -2911,6 +2917,12 @@ bool32 TryFieldEffects(enum FieldEffectCases caseId)
         }
         break;
     case FIELD_EFFECT_OVERWORLD_WEATHER:
+        if (gBattleWeather & B_WEATHER_BLOOD_MOON)
+        {
+            BattleScriptPushCursorAndCallback(BattleScript_BloodMoonShining);
+            return TRUE;
+        }
+
         if (!(gBattleTypeFlags & BATTLE_TYPE_RECORDED))
         {
             switch (GetCurrentWeather())
@@ -6415,7 +6427,8 @@ static inline u32 CalcMoveBasePower(struct DamageContext *ctx)
             basePower *= 2;
         break;
     case EFFECT_WEATHER_BALL:
-        if (GetAttackerWeather(ctx->holdEffects[ctx->battlerAtk], ctx->abilities[ctx->battlerAtk], ctx->weather) & (B_WEATHER_ANY & ~B_WEATHER_STRONG_WINDS))
+        if (GetAttackerWeather(ctx->holdEffects[ctx->battlerAtk], ctx->abilities[ctx->battlerAtk], ctx->weather)
+          & (B_WEATHER_ANY & ~(B_WEATHER_STRONG_WINDS | B_WEATHER_BLOOD_MOON)))
             basePower *= 2;
         break;
     case EFFECT_PURSUIT:
@@ -7520,6 +7533,10 @@ static uq4_12_t GetWeatherDamageModifier(struct DamageContext *ctx)
     u32 attackerWeather = GetAttackerWeather(ctx->holdEffects[ctx->battlerAtk], ctx->abilities[ctx->battlerAtk], ctx->weather);
     if ((attackerWeather | ctx->weather) == B_WEATHER_NONE)
         return UQ_4_12(1.0);// This early exit helps limit AI thinking time
+    if ((ctx->weather & B_WEATHER_BLOOD_MOON)
+     && (ctx->moveType == TYPE_DARK || ctx->moveType == TYPE_GHOST || ctx->moveType == TYPE_PSYCHIC))
+        return UQ_4_12(1.1);
+
     if (GetMoveEffect(ctx->move) == EFFECT_HYDRO_STEAM && (attackerWeather & B_WEATHER_SUN))
         return UQ_4_12(1.5);
     if (ctx->holdEffects[ctx->battlerDef] == HOLD_EFFECT_UTILITY_UMBRELLA)
@@ -11464,6 +11481,7 @@ u32 GetWeatherFromOverworldWeather(u32 owWeather)
     case WEATHER_DOWNPOUR:              return B_WEATHER_NONE;
     case WEATHER_AUTUMN_WIND:           return B_WEATHER_NONE;
     case WEATHER_NORTHERN_LIGHTS:       return B_WEATHER_NONE;
+    case WEATHER_BLOOD_MOON:            return B_WEATHER_BLOOD_MOON;
     case WEATHER_UNDERWATER_BUBBLES:    return B_WEATHER_NONE;
     case WEATHER_ABNORMAL:              return B_WEATHER_NONE;
     case WEATHER_ROUTE119_CYCLE:        return B_WEATHER_NONE;
@@ -11493,6 +11511,7 @@ enum BattleTerrain GetBattleTerrainFromOverworldWeather(u32 owWeather)
     case WEATHER_DOWNPOUR:              return B_TERRAIN_NONE;
     case WEATHER_AUTUMN_WIND:           return B_TERRAIN_NONE;
     case WEATHER_NORTHERN_LIGHTS:       return B_TERRAIN_NONE;
+    case WEATHER_BLOOD_MOON:            return B_TERRAIN_NONE;
     case WEATHER_UNDERWATER_BUBBLES:    return B_TERRAIN_NONE;
     case WEATHER_ABNORMAL:              return B_TERRAIN_NONE;
     case WEATHER_ROUTE119_CYCLE:        return B_TERRAIN_NONE;

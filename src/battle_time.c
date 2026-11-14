@@ -3,6 +3,8 @@
 #include "battle_main.h"
 #include "battle_time.h"
 #include "battle_interface.h"
+#include "field_weather.h"
+#include "kyoto_blood_moon.h"
 #include "main.h"
 #include "palette.h"
 #include "sprite.h"
@@ -79,6 +81,7 @@ static bool32 IsUntintedPalette(u32 tag)
     case TAG_MISC_INDICATOR_PAL:
     case TAG_TERA_INDICATOR_PAL:
     case BATTLE_TIME_SHINY_PAL_TAG:
+    case PALTAG_BLOOD_MOON:
     case 0xD720: // Ability popup / quick-ball frame / move-info frame.
     case TAG_NONE:
         return TRUE;
@@ -151,13 +154,26 @@ static inline u16 ApplyDisplayFade(u16 color, const struct PaletteDisplayFade *f
     return RGB2(r, g, b);
 }
 
+static inline u16 TintBloodMoon(u16 color, u32 glow)
+{
+    s32 r = GET_R(color);
+    s32 g = GET_G(color);
+    s32 b = GET_B(color);
+    s32 light = (r + 2 * g + b) >> 2;
+    r += (min(31 - r, light) * glow + 8) >> 4;
+    g -= (g * glow + 8) >> 4;
+    b += (min(31 - b, r / 2) * glow + 8) >> 4;
+    return RGB2(r, g, b);
+}
+
 void BattleTimePreparePalettes(void)
 {
     u32 bank, i;
     u32 frameIndex;
     struct BattleTimeFrame *frame;
+    u32 glow = gMain.inBattle ? BloodMoon_GetBattleGlow() : 0;
 
-    if (!sTimeTintActive || gPaletteFade.bufferTransferDisabled
+    if ((!sTimeTintActive && !glow) || gPaletteFade.bufferTransferDisabled
      || gMain.vblankCallback != VBlankCB_Battle)
     {
         sPreparedFrameReady = FALSE;
@@ -168,11 +184,19 @@ void BattleTimePreparePalettes(void)
     frame = &sPreparedFrames[frameIndex];
     frame->bankMask = 0;
 
-    for (bank = 8; bank < 32; bank++)
+    for (bank = glow ? 2 : 8; bank < 32; bank++)
     {
         bool32 shadow = FALSE;
         bool32 hasFade;
         struct PaletteDisplayFade fade;
+        bool32 scenery = bank >= 2 && bank <= 4;
+        bool32 tintForTime = sTimeTintActive && !scenery;
+        u32 hue = scenery ? glow : (bank < 20 ? glow / 2 : 0);
+
+        if (bank < 8 && !scenery)
+            continue;
+        if (!tintForTime && !hue)
+            continue;
         // BG8-11 are battle-mon copies used by animations; OBJ0-3 are battlers.
         if (bank >= 12 && bank < 16)
             continue;
@@ -202,10 +226,12 @@ void BattleTimePreparePalettes(void)
             u16 faded = gPlttBufferFaded[bank * 16 + i];
             // Apply the ambient light before a global fade, preserving white
             // transitions. If an animation replaced the fade, retain its color.
-            if (hasFade)
-                frame->colors[bank][i] = ApplyDisplayFade(TintColor(raw, shadow), &fade);
-            else
-                frame->colors[bank][i] = TintColor(faded, shadow);
+            u16 color = hasFade ? raw : faded;
+            if (tintForTime)
+                color = TintColor(color, shadow);
+            if (hue)
+                color = TintBloodMoon(color, hue);
+            frame->colors[bank][i] = hasFade ? ApplyDisplayFade(color, &fade) : color;
         }
         frame->bankMask |= 1u << bank;
     }
@@ -222,11 +248,11 @@ void BattleTimeTransferPalettes(void)
     u32 bank;
     const struct BattleTimeFrame *frame;
 
-    if (!sPreparedFrameReady || !sTimeTintActive || gPaletteFade.bufferTransferDisabled)
+    if (!sPreparedFrameReady || gPaletteFade.bufferTransferDisabled)
         return;
 
     frame = &sPreparedFrames[sPreparedFrameIndex];
-    for (bank = 8; bank < 32; bank++)
+    for (bank = 2; bank < 32; bank++)
     {
         if (!(frame->bankMask & (1u << bank)))
             continue;

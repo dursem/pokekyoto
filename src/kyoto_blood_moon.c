@@ -1,4 +1,5 @@
 #include "global.h"
+#include "battle.h"
 #include "fake_rtc.h"
 #include "field_camera.h"
 #include "field_weather.h"
@@ -156,6 +157,14 @@ static EWRAM_DATA struct
     bool8 debugOverride;
 } sBloodMoon = {0};
 
+// Keep the notice state across outdoor maps, interiors and field reloads.
+static EWRAM_DATA struct
+{
+    s16 scheduledDay;
+    bool8 scheduledNoticeShown;
+    bool8 debugNoticeShown;
+} sBloodMoonNotice = {0};
+
 void BloodMoon_RefreshSchedule(void)
 {
     sBloodMoon.scheduled = FALSE;
@@ -186,7 +195,29 @@ u8 BloodMoon_GetEffectiveWeather(u8 weather)
 
 void BloodMoon_SetDebugOverride(bool8 enabled)
 {
+    if (enabled && !sBloodMoon.debugOverride)
+        sBloodMoonNotice.debugNoticeShown = FALSE;
     sBloodMoon.debugOverride = enabled;
+}
+
+bool32 BloodMoon_ShouldAnnounceRising(void)
+{
+    if (GetCurrentWeather() != WEATHER_BLOOD_MOON || !MapHasNaturalLight(gMapHeader.mapType))
+        return FALSE;
+    if (sBloodMoon.scheduled && !sBloodMoon.ending)
+        return !sBloodMoonNotice.scheduledNoticeShown || sBloodMoonNotice.scheduledDay != gLocalTime.days;
+    return sBloodMoon.debugOverride && !sBloodMoonNotice.debugNoticeShown;
+}
+
+void BloodMoon_MarkRisingAnnounced(void)
+{
+    if (sBloodMoon.scheduled && !sBloodMoon.ending)
+    {
+        sBloodMoonNotice.scheduledDay = gLocalTime.days;
+        sBloodMoonNotice.scheduledNoticeShown = TRUE;
+    }
+    if (sBloodMoon.debugOverride)
+        sBloodMoonNotice.debugNoticeShown = TRUE;
 }
 
 void BloodMoon_ResetSprites(void)
@@ -435,4 +466,148 @@ void BloodMoon_TintPalettes(u32 palettes)
             colors[i] = RGB2(red, green, blue);
         }
     }
+}
+
+enum
+{
+    BATTLE_BLOOD_MOON_GLOW = 8,
+    BATTLE_BLOOD_MOON_CLOCK_INTERVAL = 60,
+    BATTLE_BLOOD_MOON_EMBER_COUNT = 20,
+    BATTLE_BLOOD_MOON_EMBER_MARGIN = 8,
+    BATTLE_BLOOD_MOON_EMBER_HEIGHT = 118,
+};
+
+static const u16 sBattleEmberPalette[16] =
+{
+    RGB_BLACK,
+    RGB(23, 6, 18),
+    RGB(27, 10, 22),
+    RGB(31, 14, 25),
+    RGB(31, 21, 27),
+    RGB(31, 28, 29),
+};
+
+static EWRAM_DATA struct
+{
+    u32 lastClockCheck;
+    u8 glow;
+    u8 emberCount;
+    u8 emberIds[BATTLE_BLOOD_MOON_EMBER_COUNT];
+} sBattleBloodMoon = {0};
+
+static bool32 IsBloodMoonOverworldWeather(void)
+{
+    return GetCurrentWeather() == WEATHER_BLOOD_MOON
+        && BloodMoon_GetEffectiveWeather(WEATHER_NONE) == WEATHER_BLOOD_MOON;
+}
+
+void BloodMoon_BattleStart(void)
+{
+    sBattleBloodMoon.glow = 0;
+    sBattleBloodMoon.emberCount = 0;
+    gBattleWeather = B_WEATHER_NONE;
+
+    if (gBattleTypeFlags & (BATTLE_TYPE_LINK | BATTLE_TYPE_RECORDED | BATTLE_TYPE_FRONTIER | BATTLE_TYPE_SAFARI))
+        return;
+    if (GetCurrentWeather() != WEATHER_BLOOD_MOON)
+        return;
+
+    BloodMoon_RefreshSchedule();
+    if (IsBloodMoonOverworldWeather())
+    {
+        gBattleWeather = B_WEATHER_BLOOD_MOON;
+        sBattleBloodMoon.glow = BATTLE_BLOOD_MOON_GLOW;
+        sBattleBloodMoon.lastClockCheck = gMain.vblankCounter1;
+    }
+}
+
+static void SpriteCB_BattleBloodMoonEmber(struct Sprite *sprite)
+{
+    u32 index = sprite->data[0];
+    u32 tick = gMain.vblankCounter1;
+    u32 travel = BATTLE_BLOOD_MOON_EMBER_HEIGHT + 2 * BATTLE_BLOOD_MOON_EMBER_MARGIN;
+    u32 rise = tick * (2 + index % 3) / 8;
+    u32 y = (index * 43 + travel - rise % travel) % travel;
+    u32 phase = tick + index * 31;
+
+    sprite->x2 = Sin(phase & 255, 7);
+    sprite->y = (s32)y - BATTLE_BLOOD_MOON_EMBER_MARGIN;
+    sprite->invisible = sprite->y < 0 || sprite->y >= BATTLE_BLOOD_MOON_EMBER_HEIGHT
+                     || sBattleBloodMoon.glow <= index % BATTLE_BLOOD_MOON_GLOW;
+    if (!sprite->invisible)
+        StartSpriteAnimIfDifferent(sprite, (phase >> 3) % ARRAY_COUNT(sEmberFrames));
+}
+
+static void CreateBattleBloodMoonEmbers(void)
+{
+    u32 palette = LoadSpritePaletteWithTag(sBattleEmberPalette, PALTAG_BLOOD_MOON);
+    if (palette == 0xFF)
+        return;
+    for (u32 i = 0; i < ARRAY_COUNT(sBattleBloodMoon.emberIds); i++)
+    {
+        u32 x = BATTLE_BLOOD_MOON_EMBER_MARGIN
+              + i * 59 % (DISPLAY_WIDTH - 2 * BATTLE_BLOOD_MOON_EMBER_MARGIN);
+        u32 id = CreateSpriteAtEndUnchecked(&sEmberTemplate, x, 0, 100);
+        if (id == MAX_SPRITES)
+            break;
+        struct Sprite *sprite = &gSprites[id];
+        sprite->oam.priority = 2;
+        sprite->invisible = TRUE;
+        sprite->data[0] = i;
+        sprite->callback = SpriteCB_BattleBloodMoonEmber;
+        sBattleBloodMoon.emberIds[sBattleBloodMoon.emberCount++] = id;
+    }
+    if (sBattleBloodMoon.emberCount == 0)
+        FreeSpritePaletteByTag(PALTAG_BLOOD_MOON);
+}
+
+void BloodMoon_BattleUpdate(void)
+{
+    u32 frame = gMain.vblankCounter1;
+
+    if (gBattleWeather & B_WEATHER_BLOOD_MOON)
+    {
+        if (frame - sBattleBloodMoon.lastClockCheck >= BATTLE_BLOOD_MOON_CLOCK_INTERVAL)
+        {
+            sBattleBloodMoon.lastClockCheck = frame;
+            BloodMoon_RefreshSchedule();
+        }
+        if (!IsBloodMoonOverworldWeather())
+            gBattleWeather &= ~B_WEATHER_BLOOD_MOON;
+    }
+
+    if (sBattleBloodMoon.glow == 0)
+        return;
+
+    if (!(gBattleWeather & B_WEATHER_BLOOD_MOON) && frame % 4 == 0)
+        sBattleBloodMoon.glow--;
+
+    // Bag and Party rebuild OAM. Slots from before that reset may be in use again.
+    if (sBattleBloodMoon.emberCount != 0)
+    {
+        const struct Sprite *first = &gSprites[sBattleBloodMoon.emberIds[0]];
+        if (!first->inUse || first->callback != SpriteCB_BattleBloodMoonEmber)
+            sBattleBloodMoon.emberCount = 0;
+    }
+
+    if (sBattleBloodMoon.glow == 0)
+    {
+        for (u32 i = 0; i < sBattleBloodMoon.emberCount; i++)
+        {
+            struct Sprite *sprite = &gSprites[sBattleBloodMoon.emberIds[i]];
+            if (sprite->callback == SpriteCB_BattleBloodMoonEmber)
+                DestroySprite(sprite);
+        }
+        sBattleBloodMoon.emberCount = 0;
+        FreeSpritePaletteByTag(PALTAG_BLOOD_MOON);
+    }
+    else if (sBattleBloodMoon.emberCount == 0 && (gBattleWeather & B_WEATHER_BLOOD_MOON))
+    {
+        CreateBattleBloodMoonEmbers();
+    }
+}
+
+u8 BloodMoon_GetBattleGlow(void)
+{
+    return sBattleBloodMoon.glow;
 }
